@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# React Router owns client-side navigation. Without this, opening a patient
+# route directly on the demo URL would return a Netlify 404 instead of the app.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

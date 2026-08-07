@@ -1,0 +1,242 @@
+import { describe, expect, it } from 'vitest'
+import { bandAge, deidentify, REDACTED, scrubFreeText } from './deidentify'
+import { toFhirBundle } from './fhir'
+import { aggregateMonth } from './dhis2'
+import type { Encounter, Patient } from '../db/schema'
+
+const patient = (over: Partial<Patient> = {}): Patient => ({
+  id: 'p1',
+  givenName: 'Voahirana',
+  familyName: 'RAKOTOARISOA',
+  sex: 'female',
+  approximateAge: 34,
+  phone: '034 12 345 67',
+  address: 'Ambohimanga',
+  registerNo: '2041',
+  preferredLang: 'mg',
+  searchKey: 'rakotoarisoa voahirana',
+  createdAt: 0,
+  updatedAt: 0,
+  ...over,
+})
+
+const encounter = (over: Partial<Encounter> = {}): Encounter => ({
+  id: 'e1',
+  patientId: 'p1',
+  occurredAt: Date.UTC(2026, 7, 14, 9, 0),
+  vitals: { temperature: 38.5 },
+  prescriptions: [],
+  provenance: {},
+  attachmentIds: [],
+  status: 'final',
+  createdAt: 0,
+  updatedAt: 0,
+  ...over,
+})
+
+describe('scrubFreeText', () => {
+  const names = ['RAKOTOARISOA', 'Voahirana', 'ANDRIANJAFY']
+
+  it('removes roster names from a note', () => {
+    const { text } = scrubFreeText('Patiente RAKOTOARISOA revue ce jour', names)
+    expect(text).not.toMatch(/RAKOTOARISOA/i)
+    expect(text).toContain(REDACTED)
+  })
+
+  it('matches regardless of accent and case', () => {
+    const { text } = scrubFreeText('voahirana se plaint', names)
+    expect(text).not.toMatch(/voahirana/i)
+  })
+
+  it('removes a name belonging to a different patient on the roster', () => {
+    // Notes routinely reference relatives who are themselves patients.
+    const { text } = scrubFreeText('frère de ANDRIANJAFY', names)
+    expect(text).not.toMatch(/ANDRIANJAFY/i)
+  })
+
+  it('does not truncate a long name into a shorter roster match', () => {
+    const { text } = scrubFreeText('RAKOTOARISOA', ['RAKOTO', 'RAKOTOARISOA'])
+    expect(text).toBe(REDACTED)
+  })
+
+  it('removes phone numbers', () => {
+    const { text } = scrubFreeText('joindre au 034 12 345 67', names)
+    expect(text).not.toMatch(/\d{2}\s?\d{2}\s?\d{3}/)
+  })
+
+  it('removes village names, which identify in a small fokontany', () => {
+    // Regression: removing the address field but leaving the village in a note
+    // removes nothing. Caught by a round-trip export test, not by unit tests.
+    const { text } = scrubFreeText('vit au village Ambohimanga', [...names, 'Ambohimanga'])
+    expect(text).not.toMatch(/Ambohimanga/i)
+  })
+
+  it('removes register numbers, which are too short for the digit rule', () => {
+    const { text } = scrubFreeText('dossier 2041 retrouvé', [...names, '2041'])
+    expect(text).not.toContain('2041')
+  })
+
+  it('keeps the clinical content intact', () => {
+    const { text } = scrubFreeText('fièvre depuis trois jours, paludisme simple', names)
+    expect(text).toBe('fièvre depuis trois jours, paludisme simple')
+  })
+
+  it('ignores short tokens that would shred the note', () => {
+    // A three-letter given name matches half the French in a sentence.
+    const { text } = scrubFreeText('la toux est sèche', ['Eva'])
+    expect(text).toBe('la toux est sèche')
+  })
+})
+
+describe('bandAge', () => {
+  it('caps ages that are identifying on their own', () => {
+    expect(bandAge(34)).toBe(34)
+    expect(bandAge(89)).toBe(89)
+    expect(bandAge(94)).toBe(90)
+    expect(bandAge(undefined)).toBeUndefined()
+  })
+})
+
+describe('deidentify', () => {
+  it('passes data through untouched when identified', async () => {
+    const r = await deidentify([patient()], [encounter()], { level: 'identified' })
+    expect(r.patients[0]!.familyName).toBe('RAKOTOARISOA')
+    expect(r.patients[0]!.phone).toBe('034 12 345 67')
+  })
+
+  it('removes every direct identifier', async () => {
+    const r = await deidentify([patient()], [encounter()], { level: 'pseudonymous', salt: 's' })
+    const p = r.patients[0]!
+    expect(p.givenName).toBe('')
+    expect(p.familyName).not.toBe('RAKOTOARISOA')
+    expect(p.phone).toBeUndefined()
+    expect(p.address).toBeUndefined()
+    expect(p.registerNo).toBeUndefined()
+    expect(p.birthDate).toBeUndefined()
+    expect(p.searchKey).not.toContain('rakoto')
+  })
+
+  it('keeps the clinical payload', async () => {
+    const r = await deidentify([patient()], [encounter()], { level: 'pseudonymous', salt: 's' })
+    expect(r.encounters[0]!.vitals.temperature).toBe(38.5)
+  })
+
+  it('gives the same patient the same code across exports with the same salt', async () => {
+    const a = await deidentify([patient()], [], { level: 'pseudonymous', salt: 'facility-1' })
+    const b = await deidentify([patient()], [], { level: 'pseudonymous', salt: 'facility-1' })
+    expect(a.patients[0]!.id).toBe(b.patients[0]!.id)
+  })
+
+  it('breaks linkage between exports when anonymous', async () => {
+    const a = await deidentify([patient()], [], { level: 'anonymous' })
+    const b = await deidentify([patient()], [], { level: 'anonymous' })
+    expect(a.patients[0]!.id).not.toBe(b.patients[0]!.id)
+  })
+
+  it('rewrites encounter references to the pseudonym, keeping the join valid', async () => {
+    const r = await deidentify([patient()], [encounter()], { level: 'pseudonymous', salt: 's' })
+    expect(r.encounters[0]!.patientId).toBe(r.patients[0]!.id)
+    expect(r.encounters[0]!.patientId).not.toBe('p1')
+  })
+
+  it('never emits the original id for an orphan encounter', async () => {
+    const r = await deidentify([], [encounter({ patientId: 'ghost' })], {
+      level: 'pseudonymous',
+      salt: 's',
+    })
+    expect(r.encounters[0]!.patientId).toBe('UNKNOWN')
+  })
+
+  it('scrubs every roster identifier, name, village and register number', async () => {
+    const r = await deidentify(
+      [patient()],
+      [encounter({ notes: 'RAKOTOARISOA du village Ambohimanga, dossier 2041, tel 034 12 345 67' })],
+      { level: 'anonymous' },
+    )
+    const notes = r.encounters[0]!.notes!
+    for (const secret of ['RAKOTOARISOA', 'Ambohimanga', '2041', '034 12 345 67']) {
+      expect(notes).not.toContain(secret)
+    }
+  })
+
+  it('scrubs names out of notes and diagnoses', async () => {
+    const r = await deidentify(
+      [patient()],
+      [encounter({ notes: 'RAKOTOARISOA Voahirana revue', diagnosis: 'paludisme simple' })],
+      { level: 'pseudonymous', salt: 's' },
+    )
+    expect(r.encounters[0]!.notes).not.toMatch(/RAKOTOARISOA/i)
+    expect(r.encounters[0]!.diagnosis).toBe('paludisme simple')
+    expect(r.manifest.freeTextRedactions).toBeGreaterThan(0)
+  })
+
+  it('scrubs the raw dictation kept in provenance', async () => {
+    // Provenance stores verbatim speech and OCR, the richest source of
+    // stray identifiers anywhere in the record.
+    const r = await deidentify(
+      [patient()],
+      [
+        encounter({
+          provenance: {
+            notes: { source: 'voice', confidence: 0.6, rawText: 'patiente RAKOTOARISOA température 38.5' },
+          },
+        }),
+      ],
+      { level: 'pseudonymous', salt: 's' },
+    )
+    expect(r.encounters[0]!.provenance.notes!.rawText).not.toMatch(/RAKOTOARISOA/i)
+  })
+
+  it('drops attachments, which cannot be redacted', async () => {
+    const r = await deidentify([patient()], [encounter({ attachmentIds: ['a1', 'a2'] })], {
+      level: 'pseudonymous',
+      salt: 's',
+    })
+    expect(r.encounters[0]!.attachmentIds).toEqual([])
+  })
+
+  it('generalises dates to the month when anonymous', async () => {
+    const r = await deidentify([patient()], [encounter()], { level: 'anonymous' })
+    const d = new Date(r.encounters[0]!.occurredAt)
+    expect(d.getDate()).toBe(1)
+    expect(d.getMonth()).toBe(7)
+  })
+
+  it('caps identifying ages', async () => {
+    const r = await deidentify([patient({ approximateAge: 96 })], [], { level: 'pseudonymous', salt: 's' })
+    expect(r.patients[0]!.approximateAge).toBe(90)
+  })
+
+  it('does not mutate the caller’s records', async () => {
+    const original = patient()
+    await deidentify([original], [], { level: 'pseudonymous', salt: 's' })
+    expect(original.familyName).toBe('RAKOTOARISOA')
+    expect(original.phone).toBe('034 12 345 67')
+  })
+})
+
+describe('de-identified exports', () => {
+  it('produces a FHIR bundle with no identifiers in it', async () => {
+    const r = await deidentify(
+      [patient()],
+      [encounter({ notes: 'RAKOTOARISOA vue en consultation' })],
+      { level: 'pseudonymous', salt: 's' },
+    )
+    const json = JSON.stringify(toFhirBundle(r.patients, r.encounters))
+    for (const secret of ['RAKOTOARISOA', 'Voahirana', 'Ambohimanga', '034 12 345 67', '2041']) {
+      expect(json).not.toContain(secret)
+    }
+  })
+
+  it('leaves monthly reporting counts unchanged', async () => {
+    // De-identification must not alter the numbers a facility reports.
+    const month = new Date(2026, 7, 1)
+    const before = aggregateMonth([patient()], [encounter({ diagnosis: 'paludisme' })], month)
+    const r = await deidentify([patient()], [encounter({ diagnosis: 'paludisme' })], {
+      level: 'pseudonymous',
+      salt: 's',
+    })
+    const after = aggregateMonth(r.patients, r.encounters, month)
+    expect(after.map((c) => [c.indicator, c.count])).toEqual(before.map((c) => [c.indicator, c.count]))
+  })
+})
