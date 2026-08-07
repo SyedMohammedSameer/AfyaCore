@@ -1,0 +1,17 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.vite
+coverage
+*.log
+.env
+.env.*
+!.env.example
+
+# OCR runtime, vendored at build time by scripts/vendor-ocr.mjs
+public/ocr/
+.cache/
+server/data/
+.npm-cache
