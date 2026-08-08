@@ -14,7 +14,7 @@
  * in*, see `DHIS2_MAPPING` and README. Exporting with placeholders is
  * deliberately marked in the payload so nobody mistakes it for a live feed.
  */
-import type { Encounter, Patient } from '../db/schema'
+import type { Encounter, LangCode, Patient } from '../db/schema'
 import { patientAge } from '../db/repo'
 
 /** WHO/IMCI-aligned age bands, which is how these reports are conventionally cut. */
@@ -55,6 +55,55 @@ export type IndicatorKey = (typeof INDICATORS)[number]['key']
  * indicator. Keeping it a distinct type stops the two being confused.
  */
 export type CountKey = IndicatorKey | 'consultations'
+
+/**
+ * Indicator names for the *interface*, which follows the staff's chosen
+ * language. `INDICATORS[].label` above is deliberately left alone: it is what
+ * lands in the exported CSV, and that file goes to a district office in
+ * Madagascar, where the reporting vocabulary is French regardless of what the
+ * phone is set to. Report contents must not shift with a UI preference.
+ *
+ * ⚠️ The Malagasy terms here share the caveat on i18n/strings.ts, they have not
+ * been reviewed by a native speaker.
+ */
+const INDICATOR_LABELS: Record<LangCode, Record<CountKey, string>> = {
+  fr: {
+    consultations: 'Consultations',
+    malaria: 'Paludisme',
+    ari: 'Infection respiratoire aiguë',
+    diarrhoea: 'Diarrhée',
+    malnutrition: 'Malnutrition',
+    tuberculosis: 'Tuberculose',
+    hypertension: 'Hypertension',
+    other: 'Autre',
+  },
+  en: {
+    consultations: 'Consultations',
+    malaria: 'Malaria',
+    ari: 'Acute respiratory infection',
+    diarrhoea: 'Diarrhoea',
+    malnutrition: 'Malnutrition',
+    tuberculosis: 'Tuberculosis',
+    hypertension: 'Hypertension',
+    other: 'Other',
+  },
+  mg: {
+    consultations: 'Fitsaboana',
+    malaria: 'Tazomoka',
+    ari: 'Aretin’ny fofonaina',
+    diarrhoea: 'Fivalanana',
+    malnutrition: 'Tsy fahampian-tsakafo',
+    tuberculosis: 'Raboka',
+    hypertension: 'Tosidra avo',
+    other: 'Hafa',
+  },
+}
+
+/** Display name for an indicator in the interface language. */
+export function indicatorLabel(key: string, lang: LangCode): string {
+  const table = INDICATOR_LABELS[lang]
+  return (table as Record<string, string>)[key] ?? key
+}
 
 export function classifyDiagnosis(diagnosis: string | undefined): IndicatorKey {
   if (!diagnosis) return 'other'

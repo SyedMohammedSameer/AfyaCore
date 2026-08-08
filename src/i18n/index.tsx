@@ -15,11 +15,27 @@ interface I18nValue {
 
 const I18nContext = createContext<I18nValue | null>(null)
 
+/** The languages the interface is fully translated into. Drives the picker. */
+export const SUPPORTED_LANGS: LangCode[] = ['fr', 'mg', 'en']
+
+function isLangCode(v: unknown): v is LangCode {
+  return v === 'fr' || v === 'mg' || v === 'en'
+}
+
 function initialLang(): LangCode {
   const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored === 'fr' || stored === 'mg' || stored === 'en') return stored
+  if (isLangCode(stored)) return stored
+
+  // On a first run only, follow the device. A phone set to English almost
+  // certainly belongs to someone who reads English, and the picker in the
+  // header is one tap away for anyone this guesses wrong about.
+  for (const tag of navigator.languages ?? [navigator.language]) {
+    const base = tag?.slice(0, 2).toLowerCase()
+    if (isLangCode(base)) return base
+  }
+
   // French is the working language of clinical documentation in Madagascar, so
-  // it is the default regardless of what the device reports.
+  // it remains the fallback when the device says nothing useful.
   return 'fr'
 }
 

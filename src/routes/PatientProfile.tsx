@@ -1,10 +1,10 @@
 import { Link, useNavigate, useParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CalendarPlus, ClipboardList, FileText, Languages, MapPin, Phone } from 'lucide-react'
+import { CalendarPlus, ClipboardList, FileText, Languages, MapPin, Merge, Pencil, Phone, Trash2 } from 'lucide-react'
 import { AppShell } from '../components/AppShell'
-import { ActionBar, Avatar, Badge, Button, Card, EmptyState, SectionTitle, SkeletonRows, cx, riseStyle } from '../components/ui'
+import { ActionBar, Avatar, Badge, Button, Card, EmptyState, MoreMenu, SectionTitle, SkeletonRows, cx, riseStyle } from '../components/ui'
 import { db } from '../db/db'
-import { createDraftEncounter, patientAge, patientEncounters } from '../db/repo'
+import { createDraftEncounter, deletePatient, patientAge, patientEncounters } from '../db/repo'
 import { formatDate, formatVital, hasAnyVital, VITAL_ORDER } from '../lib/format'
 import { vitalSeverity } from '../db/schema'
 import { LANG_LABELS, useI18n } from '../i18n'
@@ -138,6 +138,24 @@ export function PatientProfile() {
     navigate(`/patient/${patientId}/encounter/${id}`)
   }
 
+  /**
+   * Deleting a patient takes their consultations with them, so the count goes
+   * in the prompt. "Delete this patient?" and "delete this patient and the
+   * eleven consultations recorded for them" are different decisions, and only
+   * the second one is the truth.
+   */
+  async function removePatient() {
+    if (!patientId) return
+    const count = encounters?.length ?? 0
+    const warning =
+      count > 0
+        ? `${t.deletePatientConfirm}\n\n${count} ${t.consultationsWillBeDeleted}`
+        : t.deletePatientConfirm
+    if (!window.confirm(warning)) return
+    await deletePatient(patientId)
+    navigate('/patients', { replace: true })
+  }
+
   const details = [
     patient.registerNo && { icon: FileText, text: `${t.registerNo} ${patient.registerNo}` },
     patient.address && { icon: MapPin, text: patient.address },
@@ -145,7 +163,33 @@ export function PatientProfile() {
   ].filter(Boolean) as { icon: typeof FileText; text: string }[]
 
   return (
-    <AppShell title={`${patient.familyName} ${patient.givenName}`} showBack>
+    <AppShell
+      title={`${patient.familyName} ${patient.givenName}`}
+      showBack
+      actions={
+        <MoreMenu
+          label={t.manage}
+          items={[
+            {
+              label: t.editPatient,
+              icon: <Pencil size={16} />,
+              onSelect: () => navigate(`/patient/${patientId}/edit`),
+            },
+            {
+              label: t.mergeDuplicate,
+              icon: <Merge size={16} />,
+              onSelect: () => navigate(`/patient/${patientId}/merge`),
+            },
+            {
+              label: t.deletePatient,
+              icon: <Trash2 size={16} />,
+              danger: true,
+              onSelect: () => void removePatient(),
+            },
+          ]}
+        />
+      }
+    >
       <div className="flex flex-col gap-5 pb-4">
         <Card className="flex items-center gap-4">
           <Avatar familyName={patient.familyName} givenName={patient.givenName} size="lg" />

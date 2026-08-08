@@ -8,7 +8,7 @@ import { clearAllData, seedDemoData } from '../db/seed'
 import { liveEncounterCount, liveEncounters, livePatientCount, livePatients } from '../db/repo'
 import { formatBytes } from '../lib/format'
 import { toFhirBundle } from '../lib/fhir'
-import { aggregateMonth, toAggregateCsv, toDhis2DataValueSet, INDICATORS } from '../lib/dhis2'
+import { aggregateMonth, toAggregateCsv, toDhis2DataValueSet, indicatorLabel } from '../lib/dhis2'
 import { isOcrReady, preloadOcr } from '../lib/ocr'
 import { PrivacySelector } from '../components/PrivacySelector'
 import { SyncPanel } from '../components/SyncPanel'
@@ -158,8 +158,6 @@ export function Settings() {
     }
   }
 
-  const indicatorLabels = new Map(INDICATORS.map((i) => [i.key as string, i.label]))
-
   return (
     <AppShell title={t.settings} tabs>
       <div className="flex flex-col gap-5 pb-24">
@@ -246,14 +244,14 @@ export function Settings() {
                 {monthlySummary.slice(0, 8).map((c, i) => (
                   <li key={i} className="flex justify-between gap-2">
                     <span className="truncate text-slate-600">
-                      {indicatorLabels.get(c.indicator) ?? 'Consultations'} · {c.ageBand}
+                      {indicatorLabel(c.indicator, lang)} · {c.ageBand}
                     </span>
                     <span className="font-semibold text-slate-900">{c.count}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-slate-400">, </p>
+              <p className="text-sm text-slate-400">{t.noReportData}</p>
             )}
             <Button variant="secondary" full icon={<Table size={20} />} onClick={exportCsv}>
               {t.exportCsv}
@@ -284,33 +282,30 @@ export function Settings() {
         {/* Demo controls. Present so the app can be shown end-to-end without a
             live facility; destructive actions confirm first. */}
         <section className="flex flex-col gap-2">
-          <SectionTitle>Démonstration</SectionTitle>
+          <SectionTitle>{t.demo}</SectionTitle>
           <Button variant="secondary" full icon={<Sparkles size={20} />} onClick={() => seedDemoData()}>
-            Charger des données de démonstration
+            {t.loadDemo}
           </Button>
           <Button
             variant="ghost"
             full
             icon={<Trash2 size={18} />}
             onClick={() => {
-              if (window.confirm('Effacer toutes les données de cet appareil ?')) clearAllData()
+              if (window.confirm(t.clearDataConfirm)) clearAllData()
             }}
           >
-            Effacer toutes les données
+            {t.clearData}
           </Button>
         </section>
 
-        <Card className="flex gap-3 bg-brand-50 text-sm text-brand-900 ring-brand-200">
+        <Card variant="plain" className="flex gap-3 bg-brand-50 text-sm text-brand-900 ring-1 ring-brand-200">
           <ShieldCheck size={20} className="mt-0.5 shrink-0" />
           <p>{t.dataNotice}</p>
         </Card>
 
         <Card className="flex gap-3 text-xs text-slate-500">
           <Info size={16} className="mt-0.5 shrink-0" />
-          <p>
-            AfyaCore v0.2, prototype. Les libellés en malgache n’ont pas encore été relus par un
-            locuteur natif. L’export DHIS2 contient des identifiants à remplacer.
-          </p>
+          <p>{t.prototypeNotice}</p>
         </Card>
       </div>
     </AppShell>

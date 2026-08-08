@@ -2,7 +2,17 @@ import type { LangCode, Prescription, Vitals, VitalKey } from '../db/schema'
 import { VITAL_RANGES } from '../db/schema'
 import type { Strings } from '../i18n/strings'
 
-const LOCALES: Record<LangCode, string> = { fr: 'fr-FR', mg: 'mg-MG', en: 'en-GB' }
+/**
+ * BCP-47 tag per interface language, for date and number formatting.
+ *
+ * Malagasy maps to `fr-FR` rather than `mg-MG` on purpose: no browser ships
+ * Malagasy Intl data, so `mg-MG` silently falls through to the *device's*
+ * locale, which on a phone bought anywhere means an English date under a
+ * Malagasy interface. French is the language the facility's paperwork is
+ * already in, so it is the coherent fallback rather than an accidental one.
+ */
+export const DATE_LOCALES: Record<LangCode, string> = { fr: 'fr-FR', mg: 'fr-FR', en: 'en-GB' }
+const LOCALES = DATE_LOCALES
 
 export function formatDate(ts: number, lang: LangCode): string {
   return new Date(ts).toLocaleDateString(LOCALES[lang], {
@@ -43,8 +53,11 @@ export function vitalLabel(key: VitalKey, t: Strings): string {
   switch (key) {
     case 'temperature': return t.temperature
     case 'pulse': return t.pulse
-    case 'systolic': return `${t.bloodPressure} (sys)`
-    case 'diastolic': return `${t.bloodPressure} (dia)`
+    // Not `${bloodPressure} (sys)`: that composes to "Blood pressure (sys)",
+    // which does not fit a vitals tile in English even though the French
+    // "Tension (sys)" did. Each half gets its own string per language.
+    case 'systolic': return t.systolic
+    case 'diastolic': return t.diastolic
     case 'respiratoryRate': return t.respiratoryRate
     case 'weight': return t.weight
     case 'height': return t.height

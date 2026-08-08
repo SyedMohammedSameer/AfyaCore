@@ -14,6 +14,9 @@ import { HomeScreen } from './routes/Home'
  */
 const Roster = lazy(() => import('./routes/Roster').then((m) => ({ default: m.Roster })))
 const NewPatient = lazy(() => import('./routes/NewPatient').then((m) => ({ default: m.NewPatient })))
+const MergePatient = lazy(() =>
+  import('./routes/MergePatient').then((m) => ({ default: m.MergePatient })),
+)
 const PatientProfile = lazy(() =>
   import('./routes/PatientProfile').then((m) => ({ default: m.PatientProfile })),
 )
@@ -45,6 +48,10 @@ export function App() {
             <Route path="/reports" element={<Settings />} />
             <Route path="/patient/new" element={<NewPatient />} />
             <Route path="/patient/:patientId" element={<PatientProfile />} />
+            {/* Same component as /patient/new: it switches to edit mode on the
+                presence of :patientId. See routes/NewPatient.tsx. */}
+            <Route path="/patient/:patientId/edit" element={<NewPatient />} />
+            <Route path="/patient/:patientId/merge" element={<MergePatient />} />
             <Route path="/patient/:patientId/encounter/:encounterId" element={<EncounterCapture />} />
             <Route path="/patient/:patientId/encounter/:encounterId/review" element={<Review />} />
             <Route

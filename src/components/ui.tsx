@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -5,6 +7,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react'
+import { MoreVertical } from 'lucide-react'
 import { avatarColour, initials as makeInitials } from '../lib/avatar'
 
 /**
@@ -68,17 +71,26 @@ export function Button({ variant = 'primary', size = 'md', icon, full, className
 
 // ------------------------------------------------------------------ Card ---
 
+/**
+ * `glass` is the default surface. `plain` exists because `glass-panel` sets the
+ * `background` *shorthand*, which silently wins over any `bg-*` class passed in
+ * `className`: a card asking for a dark or tinted background got the white glass
+ * gradient anyway, and white-on-white text with it. A card that supplies its own
+ * background must therefore opt out of the glass, not fight it.
+ */
 export function Card({
   children,
   className,
   as: As = 'div',
+  variant = 'glass',
 }: {
   children: ReactNode
   className?: string
   as?: 'div' | 'section' | 'li'
+  variant?: 'glass' | 'plain'
 }) {
   return (
-    <As className={cx('glass-panel rounded-card p-4', className)}>
+    <As className={cx(variant === 'glass' ? 'glass-panel' : 'shadow-card', 'rounded-card p-4', className)}>
       {children}
     </As>
   )
@@ -297,6 +309,114 @@ export function ActionBar({ children }: { children: ReactNode }) {
     <div className="glass-panel sticky bottom-0 z-20 -mx-3 mt-auto rounded-t-[1.5rem] border-x-0 border-b-0 px-3 pt-3 pb-safe">
       <div className="mx-auto flex max-w-5xl gap-2.5">{children}</div>
     </div>
+  )
+}
+
+// ------------------------------------------------------------- MoreMenu ---
+
+export interface MenuItem {
+  label: string
+  icon?: ReactNode
+  onSelect: () => void
+  /** Renders in red. Use for anything that destroys a record. */
+  danger?: boolean
+}
+
+/**
+ * Overflow menu for actions that belong to the record on screen.
+ *
+ * Portalled to `document.body` rather than rendered where it sits. The app's
+ * cards use `backdrop-filter`, which puts each one in its own composited
+ * stacking context, and a menu nested inside the header then paints *through*
+ * the cards below it no matter what z-index it is given. Escaping to the body
+ * and positioning against the trigger's measured rect is the only placement
+ * that is not at the mercy of an ancestor.
+ *
+ * A full-screen backdrop closes it, rather than a document click listener: on a
+ * touch screen the first tap must dismiss the menu without also activating
+ * whatever sits underneath, and a real element in the way is the only reliable
+ * way to get that.
+ */
+export function MoreMenu({ label, items }: { label: string; items: MenuItem[] }) {
+  const trigger = useRef<HTMLButtonElement>(null)
+  const [at, setAt] = useState<{ top: number; right: number } | null>(null)
+
+  // Measured on open, and dropped on scroll or resize: a fixed menu cannot
+  // follow its trigger, so the honest options are to reposition or to close,
+  // and closing is what someone scrolling the page underneath expects anyway.
+  useEffect(() => {
+    if (!at) return
+    const close = () => setAt(null)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [at])
+
+  if (items.length === 0) return null
+
+  function toggle() {
+    if (at) return setAt(null)
+    const rect = trigger.current?.getBoundingClientRect()
+    if (rect) setAt({ top: rect.bottom + 6, right: window.innerWidth - rect.right })
+  }
+
+  return (
+    <>
+      <button
+        ref={trigger}
+        onClick={toggle}
+        aria-label={label}
+        aria-expanded={at !== null}
+        aria-haspopup="menu"
+        className="tap-safe press press-active grid shrink-0 place-items-center rounded-2xl bg-white/55 text-slate-700 hover:bg-white"
+      >
+        <MoreVertical size={20} />
+      </button>
+
+      {at !== null &&
+        createPortal(
+          <>
+            <button
+              aria-hidden
+              tabIndex={-1}
+              onClick={() => setAt(null)}
+              className="fixed inset-0 z-[60] cursor-default bg-transparent"
+            />
+            {/* Opaque, not `glass-panel`. A translucent surface is fine for a
+                panel sitting in the page flow, but a menu floats over arbitrary
+                content and has to stay readable against whatever is under it. */}
+            <div
+              role="menu"
+              style={{ top: at.top, right: at.right }}
+              className="animate-rise fixed z-[61] flex w-60 flex-col gap-0.5 rounded-[1.25rem] bg-white p-1.5 shadow-float ring-1 ring-slate-200/80"
+            >
+              {items.map((item) => (
+                <button
+                  key={item.label}
+                  role="menuitem"
+                  onClick={() => {
+                    setAt(null)
+                    item.onSelect()
+                  }}
+                  className={cx(
+                    'press press-active flex items-center gap-2.5 rounded-2xl px-3 py-3 text-left text-sm font-semibold',
+                    item.danger
+                      ? 'text-danger-700 hover:bg-danger-50'
+                      : 'text-slate-700 hover:bg-slate-100',
+                  )}
+                >
+                  <span className="grid size-5 shrink-0 place-items-center">{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </>,
+          document.body,
+        )}
+    </>
   )
 }
 
