@@ -1,6 +1,6 @@
 {
   "name": "afyacore",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "description": "Offline-first clinical data capture for Madagascar health facilities",
@@ -8,7 +8,7 @@
     "type": "git",
     "url": "git+https://github.com/SyedMohammedSameer/AfyaCore.git"
   },
-  "license": "ISC",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "node scripts/vendor-ocr.mjs && tsc --noEmit && vite build",

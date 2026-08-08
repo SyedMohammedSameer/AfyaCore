@@ -208,10 +208,14 @@ export function HomeScreen() {
 
               <section>
                 <SectionTitle>{t.patients}</SectionTitle>
-                <Card variant="plain" className="relative min-h-[14rem] overflow-hidden bg-slate-950 text-white">
+                {/* `flex` on the card and `flex-1` on the content, not `h-full`:
+                    a percentage height against a parent that only has `min-h`
+                    is indeterminate, so the column collapsed to its content and
+                    the `mt-auto` below never pushed anything anywhere. */}
+                <Card variant="plain" className="relative flex min-h-[14rem] flex-col overflow-hidden bg-slate-950 text-white">
                   <div className="grid-dots pointer-events-none absolute inset-0 opacity-25" />
                   <div className="pointer-events-none absolute -top-12 -right-12 size-40 rounded-full bg-brand-400/30 blur-2xl" />
-                  <div className="relative flex h-full flex-col">
+                  <div className="relative flex flex-1 flex-col">
                     <span className="grid size-11 place-items-center rounded-2xl bg-white/10 text-brand-200 ring-1 ring-white/15"><Users size={21} /></span>
                     <p className="numeric mt-5 text-5xl leading-none font-extrabold tracking-[-0.07em]">{total}</p>
                     <p className="mt-1 text-sm font-semibold text-white/65">{t.patientCount}</p>
