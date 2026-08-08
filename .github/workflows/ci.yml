@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A second push to the same branch cancels the first: nothing here is worth
+# paying for twice.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22+ is a hard requirement, not a preference: the sync server uses
+      # node:sqlite, which does not exist before it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # Runs vendor-ocr first, which fetches the ~7 MB Tesseract French model.
+      # If that ever becomes flaky in CI, cache `.cache/` rather than skipping
+      # the build, since bundling is where route splitting actually breaks.
+      - name: Build
+        run: npm run build
+
+      - name: Report bundle size
+        run: |
+          echo '### Bundle' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ls -lh dist/assets/*.js dist/assets/*.css | awk '{print $5, $9}' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

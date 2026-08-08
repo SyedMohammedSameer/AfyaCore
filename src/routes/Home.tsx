@@ -136,7 +136,7 @@ export function HomeScreen() {
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-base font-extrabold text-slate-900">
-                            {draft.patient ? `${draft.patient.familyName} ${draft.patient.givenName}` : '—'}
+                            {draft.patient ? `${draft.patient.familyName} ${draft.patient.givenName}` : t.unknown}
                           </span>
                           <span className="mt-1 block truncate text-sm text-slate-500">{draft.chiefComplaint || draft.diagnosis || t.draft}</span>
                           <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-warn-700">
