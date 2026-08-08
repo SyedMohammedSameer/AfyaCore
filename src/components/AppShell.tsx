@@ -1,9 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { Activity, ArrowLeft, Cloud, CloudOff, Home, SlidersHorizontal, Users } from 'lucide-react'
+import { Activity, ArrowLeft, Cloud, CloudOff, HardDrive, Home, SlidersHorizontal, Users } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { pendingSyncCount } from '../db/db'
+import { getSyncSettings } from '../lib/sync'
 import { useI18n } from '../i18n'
+import { LanguageMenu } from './LanguageMenu'
 import { cx } from './ui'
 
 /** Track connectivity so the UI can be honest about what will and won't work. */
@@ -22,25 +24,53 @@ export function useOnline(): boolean {
   return online
 }
 
-/** A compact status chip. It makes the local-first promise visible at all times. */
+/**
+ * A compact status chip. It makes the local-first promise visible at all times.
+ *
+ * "N pending" is only the truth when a server exists to be pending *on*. With
+ * no sync configured that counter can never fall, so it reads as a growing pile
+ * of stuck work when the actual situation is that everything is safely on the
+ * device and nothing is waiting for anything. So the unconfigured case says so.
+ */
 export function SyncStatus({ onDark = false }: { onDark?: boolean }) {
   const { t } = useI18n()
   const online = useOnline()
   const pending = useLiveQuery(() => pendingSyncCount(), [], 0)
-  const label = !online ? t.offline : pending > 0 ? `${pending} ${t.pendingSync}` : t.allSynced
+  const configured = useLiveQuery(
+    async () => {
+      const { serverUrl, facilityId } = await getSyncSettings()
+      return Boolean(serverUrl && facilityId)
+    },
+    [],
+    false,
+  )
+
+  const waiting = configured && pending > 0
+  const label = !configured ? t.savedOnDevice : !online ? t.offline : waiting ? `${pending} ${t.pendingSync}` : t.allSynced
 
   const tone = onDark
     ? 'bg-white/13 text-white/90 ring-white/20'
-    : !online
+    : !configured
       ? 'bg-slate-100/85 text-slate-600 ring-slate-200/80'
-      : pending > 0
-        ? 'bg-warn-50/90 text-warn-700 ring-warn-200/80'
-        : 'bg-ok-50/90 text-ok-700 ring-ok-200/80'
+      : !online
+        ? 'bg-slate-100/85 text-slate-600 ring-slate-200/80'
+        : waiting
+          ? 'bg-warn-50/90 text-warn-700 ring-warn-200/80'
+          : 'bg-ok-50/90 text-ok-700 ring-ok-200/80'
 
   return (
-    <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-bold ring-1 backdrop-blur-md', tone)}>
-      {online ? <Cloud size={13} /> : <CloudOff size={13} />}
-      {label}
+    // Icon-only on a phone. Three chips plus a title do not fit 375px, and the
+    // one that has to give is the status: its icon and colour already carry the
+    // state, the wording is spelled out in Settings, and the thing it was
+    // crushing was the patient's name. The label returns as soon as there is
+    // room for it. Capped even then, so a long translation cannot take over.
+    <span
+      title={label}
+      aria-label={label}
+      className={cx('inline-flex max-w-[9.5rem] items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-bold ring-1 backdrop-blur-md', tone)}
+    >
+      {!configured ? <HardDrive size={13} className="shrink-0" /> : online ? <Cloud size={13} className="shrink-0" /> : <CloudOff size={13} className="shrink-0" />}
+      <span className="hidden truncate sm:inline">{label}</span>
     </span>
   )
 }
@@ -115,19 +145,30 @@ function DesktopRail() {
           <Navigation desktop />
         </nav>
 
-        <div className="mt-auto rounded-2xl bg-brand-950 p-4 text-white shadow-lift">
-          <span className="mb-3 inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[0.65rem] font-bold tracking-[0.12em] text-white/75 uppercase">Local-first</span>
-          <p className="text-sm leading-relaxed text-white/85">{t.dataNotice}</p>
-          <div className="mt-4"><SyncStatus onDark /></div>
+        <div className="mt-auto flex flex-col gap-3">
+          <LanguageMenu expand />
+          <div className="rounded-2xl bg-brand-950 p-4 text-white shadow-lift">
+            <span className="mb-3 inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[0.65rem] font-bold tracking-[0.12em] text-white/75 uppercase">Local-first</span>
+            <p className="text-sm leading-relaxed text-white/85">{t.dataNotice}</p>
+            <div className="mt-4"><SyncStatus onDark /></div>
+          </div>
         </div>
       </div>
     </aside>
   )
 }
 
+/**
+ * Bottom navigation.
+ *
+ * `fixed`, not `sticky`. As the last child of the shell's flex column a sticky
+ * bar has nothing after it to stick against, so it simply renders at the end of
+ * the document and only appears once the page is scrolled to the bottom, which
+ * is exactly where a tab bar is least useful. `main` reserves the height below.
+ */
 function TabBar() {
   return (
-    <nav className="glass-panel sticky bottom-0 z-30 mx-2 mb-2 rounded-[1.45rem] px-1.5 pb-safe lg:hidden">
+    <nav className="glass-panel fixed inset-x-2 bottom-2 z-30 rounded-[1.45rem] px-1.5 pb-safe lg:hidden">
       <Navigation />
     </nav>
   )
@@ -201,17 +242,26 @@ export function AppShell({
               {subtitle && <p className={cx('mt-0.5 truncate text-sm font-medium', hero ? 'text-white/70' : 'text-slate-500')}>{subtitle}</p>}
             </div>
 
-            {actions ?? <SyncStatus onDark={hero} />}
+            <div className="flex shrink-0 items-center gap-2">
+              {actions ?? <SyncStatus onDark={hero} />}
+              {/* Top-level screens only. A sub-screen keeps its header for the
+                  patient's name, and nobody switches language mid-consultation. */}
+              {tabs && <LanguageMenu onDark={hero} />}
+            </div>
           </div>
 
-          {heroContent && <div className="relative mx-auto w-full max-w-5xl px-3 pb-9 sm:px-5 sm:pb-11">{heroContent}</div>}
+          {heroContent && <div className="relative mx-auto w-full max-w-5xl px-3 pb-6 sm:px-5 sm:pb-8">{heroContent}</div>}
         </header>
 
         <main
           className={cx(
             'relative mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 sm:px-5',
-            hero ? '-mt-7 sm:-mt-9' : 'pt-5 sm:pt-6',
-            tabs ? 'pb-6 lg:pb-8' : 'pb-0',
+            // The hero used to pull `main` up under itself so cards tucked into
+            // its rounded bottom edge. That also swallowed whatever came first,
+            // and what comes first is a section heading, not a card.
+            hero ? 'pt-4 sm:pt-5' : 'pt-5 sm:pt-6',
+            // Room for the fixed tab bar, which no longer occupies flow space.
+            tabs ? 'pb-28 lg:pb-8' : 'pb-0',
           )}
         >
           {children}

@@ -6,7 +6,7 @@ import { Avatar, Badge, Button, Card, EmptyState, SectionTitle, SkeletonRows, ri
 import { db } from '../db/db'
 import { seedDemoData } from '../db/seed'
 import { liveEncounters, livePatientCount, patientAge } from '../db/repo'
-import { formatDate } from '../lib/format'
+import { DATE_LOCALES, formatDate } from '../lib/format'
 import { useI18n } from '../i18n'
 import type { Encounter, Patient } from '../db/schema'
 
@@ -75,7 +75,7 @@ export function HomeScreen() {
 
   const total = useLiveQuery(() => livePatientCount(), [], 0)
   const now = new Date()
-  const dateLabel = now.toLocaleDateString(lang === 'fr' ? 'fr-FR' : lang === 'mg' ? 'mg-MG' : 'en-GB', {
+  const dateLabel = now.toLocaleDateString(DATE_LOCALES[lang], {
     weekday: 'long', day: 'numeric', month: 'long',
   })
 
@@ -208,7 +208,7 @@ export function HomeScreen() {
 
               <section>
                 <SectionTitle>{t.patients}</SectionTitle>
-                <Card className="relative min-h-[14rem] overflow-hidden bg-slate-950 text-white ring-0">
+                <Card variant="plain" className="relative min-h-[14rem] overflow-hidden bg-slate-950 text-white">
                   <div className="grid-dots pointer-events-none absolute inset-0 opacity-25" />
                   <div className="pointer-events-none absolute -top-12 -right-12 size-40 rounded-full bg-brand-400/30 blur-2xl" />
                   <div className="relative flex h-full flex-col">

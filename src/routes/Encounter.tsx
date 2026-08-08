@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Camera, Check, Trash2 } from 'lucide-react'
+import { AlertTriangle, Camera, Check, Trash2 } from 'lucide-react'
 import { AppShell } from '../components/AppShell'
 import { ActionBar, Button, Card, Field, SectionTitle, Spinner, TextArea } from '../components/ui'
 import { DictationPanel } from '../components/DictationPanel'
@@ -49,6 +49,11 @@ export function EncounterCapture() {
     )
   }
 
+  // A final encounter reaches this screen only via "Correct" on the review
+  // screen. Amending never demotes it back to a draft: it was confirmed by a
+  // human, and a correction is still a confirmed record.
+  const isDraft = encounter.status === 'draft'
+
   /** Dictation → structured fields. Never overwrites typed input. */
   async function applyDictation(result: ExtractionResult, transcript: string) {
     if (!encounter) return
@@ -86,7 +91,13 @@ export function EncounterCapture() {
     }
   }
 
+  /**
+   * A draft is discarded on one tap: nothing has been confirmed, and asking
+   * "are you sure" about abandoning a half-typed form trains people to dismiss
+   * prompts. A *confirmed* consultation is a different act and says so first.
+   */
   async function discard() {
+    if (!isDraft && !window.confirm(t.deleteRecordConfirm)) return
     await deleteEncounter(encounterId!)
     navigate(`/patient/${patientId}`, { replace: true })
   }
@@ -96,10 +107,19 @@ export function EncounterCapture() {
   return (
     <AppShell
       title={`${patient?.familyName ?? ''} ${patient?.givenName ?? ''}`.trim() || t.newEncounter}
-      subtitle={t.newEncounter}
+      subtitle={isDraft ? t.newEncounter : t.amend}
       showBack
     >
       <div className="flex flex-col gap-5 pb-4">
+        {/* Editing something already confirmed is a different act from filling
+            in a draft, and the screen should not look identical while doing it. */}
+        {!isDraft && (
+          <Card variant="plain" className="flex gap-3 bg-warn-50 text-sm text-warn-700 ring-1 ring-warn-200">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+            <p>{t.amendNotice}</p>
+          </Card>
+        )}
+
         <DictationPanel onApply={applyDictation} />
 
         <section>
@@ -203,14 +223,14 @@ export function EncounterCapture() {
 
       <ActionBar>
         <Button variant="secondary" icon={<Trash2 size={18} />} onClick={discard}>
-          {t.delete}
+          {isDraft ? t.delete : t.deleteRecord}
         </Button>
         <Button
           full
           icon={<Check size={20} />}
           onClick={() => navigate(`/patient/${patientId}/encounter/${encounterId}/review`)}
         >
-          {t.review}
+          {isDraft ? t.review : t.saveCorrection}
         </Button>
       </ActionBar>
     </AppShell>

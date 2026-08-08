@@ -21,7 +21,10 @@ export interface Strings {
   online: string
   pendingSync: string
   allSynced: string
+  /** Shown instead of a pending count when no sync server is configured. */
+  savedOnDevice: string
   back: string
+  manage: string
   // Roster
   searchPlaceholder: string
   noPatients: string
@@ -39,11 +42,27 @@ export interface Strings {
   age: string
   years: string
   birthDate: string
+  birthDateHint: string
   approximateAge: string
   phone: string
   address: string
   registerNo: string
   preferredLang: string
+  preferredLangHint: string
+  // Patient management
+  editPatient: string
+  savePatient: string
+  deletePatient: string
+  deletePatientConfirm: string
+  /** Composed as "<n> <consultationsWillBeDeleted>". */
+  consultationsWillBeDeleted: string
+  mergeDuplicate: string
+  mergeHint: string
+  mergeInto: string
+  mergeConfirm: string
+  /** Composed as "<n> <consultationsMoved>". */
+  consultationsMoved: string
+  noOtherPatients: string
   // Encounter
   newEncounter: string
   encounters: string
@@ -127,6 +146,12 @@ export interface Strings {
   checkThis: string
   confirmSave: string
   saved: string
+  // Correcting a confirmed record
+  amend: string
+  amendNotice: string
+  saveCorrection: string
+  deleteRecord: string
+  deleteRecordConfirm: string
   // Instructions
   instructions: string
   instructionsFor: string
@@ -137,6 +162,9 @@ export interface Strings {
   temperature: string
   pulse: string
   bloodPressure: string
+  /** Short enough to fit a vitals tile on a phone. See lib/format.ts. */
+  systolic: string
+  diastolic: string
   respiratoryRate: string
   weight: string
   height: string
@@ -161,6 +189,11 @@ export interface Strings {
   exportData: string
   dataNotice: string
   loadDemo: string
+  demo: string
+  clearData: string
+  clearDataConfirm: string
+  noReportData: string
+  prototypeNotice: string
 }
 
 const fr: Strings = {
@@ -171,7 +204,9 @@ const fr: Strings = {
   online: 'En ligne',
   pendingSync: 'en attente',
   allSynced: 'Tout enregistré',
+  savedOnDevice: 'Sur l’appareil',
   back: 'Retour',
+  manage: 'Gérer',
   searchPlaceholder: 'Rechercher un patient…',
   noPatients: 'Aucun patient',
   noPatientsHint: 'Enregistrez le premier patient pour commencer.',
@@ -187,11 +222,25 @@ const fr: Strings = {
   age: 'Âge',
   years: 'ans',
   birthDate: 'Date de naissance',
+  birthDateHint: 'Laissez vide si inconnue',
   approximateAge: 'Âge approximatif',
   phone: 'Téléphone',
   address: 'Village / Fokontany',
   registerNo: 'N° de registre',
   preferredLang: 'Langue du patient',
+  preferredLangHint: 'Langue des consignes remises au patient',
+  editPatient: 'Modifier la fiche',
+  savePatient: 'Enregistrer les modifications',
+  deletePatient: 'Supprimer le patient',
+  deletePatientConfirm: 'Supprimer ce patient et tout son dossier ?',
+  consultationsWillBeDeleted: 'consultation(s) seront également supprimées.',
+  mergeDuplicate: 'Fusionner un doublon',
+  mergeHint:
+    'Choisissez la fiche en double. Ses consultations seront rattachées à cette fiche-ci, et les champs vides d’ici seront complétés à partir d’elle.',
+  mergeInto: 'Fusionner dans cette fiche',
+  mergeConfirm: 'Fusionner ces deux fiches ?',
+  consultationsMoved: 'consultation(s) rattachée(s)',
+  noOtherPatients: 'Aucune autre fiche à fusionner',
   newEncounter: 'Nouvelle consultation',
   encounters: 'Consultations',
   noEncounters: 'Aucune consultation enregistrée',
@@ -272,6 +321,13 @@ const fr: Strings = {
   checkThis: 'À vérifier',
   confirmSave: 'Confirmer et enregistrer',
   saved: 'Consultation enregistrée',
+  amend: 'Corriger',
+  amendNotice:
+    'Cette consultation est déjà validée. Toute correction remplace l’enregistrement et sera renvoyée à la synchronisation.',
+  saveCorrection: 'Enregistrer la correction',
+  deleteRecord: 'Supprimer la consultation',
+  deleteRecordConfirm:
+    'Supprimer définitivement cette consultation validée ? Elle disparaîtra des rapports mensuels, y compris ceux déjà transmis.',
   instructions: 'Consignes patient',
   instructionsFor: 'Consignes pour',
   speakAloud: 'Écouter',
@@ -280,6 +336,8 @@ const fr: Strings = {
   temperature: 'Température',
   pulse: 'Pouls',
   bloodPressure: 'Tension',
+  systolic: 'Tension (sys)',
+  diastolic: 'Tension (dia)',
   respiratoryRate: 'Fréq. respiratoire',
   weight: 'Poids',
   height: 'Taille',
@@ -303,6 +361,12 @@ const fr: Strings = {
   dataNotice:
     'Toutes les données restent sur cet appareil. Rien n’est envoyé sans synchronisation explicite.',
   loadDemo: 'Charger la démonstration',
+  demo: 'Démonstration',
+  clearData: 'Effacer toutes les données',
+  clearDataConfirm: 'Effacer toutes les données de cet appareil ?',
+  noReportData: 'Aucune consultation validée ce mois-ci.',
+  prototypeNotice:
+    'AfyaCore v0.5, prototype. Les libellés en malgache n’ont pas encore été relus par un locuteur natif. L’export DHIS2 contient des identifiants à remplacer.',
 }
 
 const mg: Strings = {
@@ -313,7 +377,9 @@ const mg: Strings = {
   online: 'Misy aterineto',
   pendingSync: 'miandry',
   allSynced: 'Voatahiry daholo',
+  savedOnDevice: 'Ao anaty finday',
   back: 'Hiverina',
+  manage: 'Fitantanana',
   searchPlaceholder: 'Hitady marary…',
   noPatients: 'Tsy misy marary',
   noPatientsHint: 'Soraty ny marary voalohany.',
@@ -329,11 +395,25 @@ const mg: Strings = {
   age: 'Taona',
   years: 'taona',
   birthDate: 'Daty nahaterahana',
+  birthDateHint: 'Avelao foana raha tsy fantatra',
   approximateAge: 'Taona manodidina',
   phone: 'Finday',
   address: 'Tanàna / Fokontany',
   registerNo: 'Laharana',
   preferredLang: 'Fitenin’ny marary',
+  preferredLangHint: 'Fiteny hanoratana ny toromarika ho an’ny marary',
+  editPatient: 'Hanova ny rakitra',
+  savePatient: 'Tehirizo ny fanovana',
+  deletePatient: 'Fafao ity marary ity',
+  deletePatientConfirm: 'Hofafana ity marary ity sy ny rakiny rehetra?',
+  consultationsWillBeDeleted: 'fitsaboana no hofafana koa.',
+  mergeDuplicate: 'Hampiraisina ny rakitra mitovy',
+  mergeHint:
+    'Fidio ny rakitra mitovy. Hafindra amin’ity rakitra ity ny fitsaboana rehetra, ary hofenoina avy aminy ny banga eto.',
+  mergeInto: 'Ampidiro amin’ity rakitra ity',
+  mergeConfirm: 'Hampiraisina ireo rakitra roa ireo?',
+  consultationsMoved: 'fitsaboana no nafindra',
+  noOtherPatients: 'Tsy misy rakitra hafa hampiraisina',
   newEncounter: 'Fitsaboana vaovao',
   encounters: 'Fitsaboana',
   noEncounters: 'Tsy mbola nisy fitsaboana',
@@ -414,6 +494,13 @@ const mg: Strings = {
   checkThis: 'Hamarino',
   confirmSave: 'Ekena sy tehirizo',
   saved: 'Voatahiry',
+  amend: 'Hanitsy',
+  amendNotice:
+    'Efa voamarina ity fitsaboana ity. Ny fanitsiana dia hanolo ny rakitra ary halefa indray amin’ny fampifanarahana.',
+  saveCorrection: 'Tehirizo ny fanitsiana',
+  deleteRecord: 'Fafao ity fitsaboana ity',
+  deleteRecordConfirm:
+    'Hofafana tanteraka ity fitsaboana voamarina ity? Hiala amin’ny tatitra isam-bolana izy, na dia efa nalefa aza.',
   instructions: 'Toromarika',
   instructionsFor: 'Toromarika ho an’i',
   speakAloud: 'Henoy',
@@ -422,6 +509,8 @@ const mg: Strings = {
   temperature: 'Mari-pana',
   pulse: 'Fitempon’ny fo',
   bloodPressure: 'Tosidra',
+  systolic: 'Tosidra (sys)',
+  diastolic: 'Tosidra (dia)',
   respiratoryRate: 'Fiainana',
   weight: 'Lanja',
   height: 'Halavana',
@@ -444,6 +533,12 @@ const mg: Strings = {
   exportData: 'Havoaka ny rakitra',
   dataNotice: 'Mijanona ato amin’ity finday ity ny rakitra rehetra.',
   loadDemo: 'Asehoy ny ohatra',
+  demo: 'Ohatra',
+  clearData: 'Fafao ny rakitra rehetra',
+  clearDataConfirm: 'Hofafana ny rakitra rehetra ato amin’ity finday ity?',
+  noReportData: 'Tsy nisy fitsaboana vita ity volana ity.',
+  prototypeNotice:
+    'AfyaCore v0.5, andrana. Mbola tsy voahamarin’ny tompon-teny ny teny malagasy. Misy laharana tokony hosoloina ny fanondranana DHIS2.',
 }
 
 const en: Strings = {
@@ -454,7 +549,9 @@ const en: Strings = {
   online: 'Online',
   pendingSync: 'pending',
   allSynced: 'All saved',
+  savedOnDevice: 'Saved on device',
   back: 'Back',
+  manage: 'Manage',
   searchPlaceholder: 'Search patients…',
   noPatients: 'No patients yet',
   noPatientsHint: 'Register the first patient to begin.',
@@ -470,11 +567,25 @@ const en: Strings = {
   age: 'Age',
   years: 'yrs',
   birthDate: 'Date of birth',
+  birthDateHint: 'Leave blank if unknown',
   approximateAge: 'Approximate age',
   phone: 'Phone',
   address: 'Village / Fokontany',
   registerNo: 'Register no.',
   preferredLang: 'Patient language',
+  preferredLangHint: 'Language the patient’s instruction sheet is printed in',
+  editPatient: 'Edit patient',
+  savePatient: 'Save changes',
+  deletePatient: 'Delete patient',
+  deletePatientConfirm: 'Delete this patient and their whole record?',
+  consultationsWillBeDeleted: 'consultation(s) will be deleted too.',
+  mergeDuplicate: 'Merge a duplicate',
+  mergeHint:
+    'Pick the duplicate record. Its consultations move onto this one, and any field blank here is filled in from it.',
+  mergeInto: 'Merge into this record',
+  mergeConfirm: 'Merge these two records?',
+  consultationsMoved: 'consultation(s) moved',
+  noOtherPatients: 'No other record to merge',
   newEncounter: 'New consultation',
   encounters: 'Consultations',
   noEncounters: 'No consultations recorded',
@@ -555,6 +666,13 @@ const en: Strings = {
   checkThis: 'Check this',
   confirmSave: 'Confirm and save',
   saved: 'Consultation saved',
+  amend: 'Correct',
+  amendNotice:
+    'This consultation is already confirmed. A correction replaces the record and will be sent again on the next sync.',
+  saveCorrection: 'Save correction',
+  deleteRecord: 'Delete consultation',
+  deleteRecordConfirm:
+    'Permanently delete this confirmed consultation? It will drop out of the monthly reports, including any already submitted.',
   instructions: 'Patient instructions',
   instructionsFor: 'Instructions for',
   speakAloud: 'Listen',
@@ -563,6 +681,8 @@ const en: Strings = {
   temperature: 'Temperature',
   pulse: 'Pulse',
   bloodPressure: 'Blood pressure',
+  systolic: 'BP systolic',
+  diastolic: 'BP diastolic',
   respiratoryRate: 'Resp. rate',
   weight: 'Weight',
   height: 'Height',
@@ -585,6 +705,12 @@ const en: Strings = {
   exportData: 'Export data',
   dataNotice: 'All data stays on this device. Nothing leaves without explicit sync.',
   loadDemo: 'Load demo workspace',
+  demo: 'Demo',
+  clearData: 'Erase all data',
+  clearDataConfirm: 'Erase all data on this device?',
+  noReportData: 'No confirmed consultations this month.',
+  prototypeNotice:
+    'AfyaCore v0.5, prototype. The Malagasy labels have not yet been reviewed by a native speaker. The DHIS2 export contains placeholder identifiers.',
 }
 
 export const STRINGS: Record<LangCode, Strings> = { fr, mg, en }

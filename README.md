@@ -22,6 +22,10 @@ actually read on the way out.
   through the same extractor as dictation
 - **Works offline**, every write lands locally and succeeds immediately; connectivity is never
   on the critical path
+- **Correcting the record**, patients can be edited, deleted or merged when the same person was
+  registered twice, and a confirmed consultation can be amended or deleted. Deletes are tombstones
+  so they reach the facility's other devices; deleting a confirmed consultation says out loud that
+  it will drop out of monthly reports, including any already submitted
 - **Exports**, FHIR R4 bundle, DHIS2 monthly `dataValueSet`, aggregate CSV, and a raw JSON dump
 - **Sync** between the devices at a facility, with a zero-dependency server you can self-host
 - **De-identified export**, identifiers stripped before anything leaves the device, with a stable
@@ -36,6 +40,11 @@ Two things are translated independently, because they are used by different peop
 | Interface | staff preference | French, Malagasy, English |
 | Patient instruction sheet | the patient's recorded language | French, Malagasy, English |
 | **Dictation and extraction** | the interface language | **French, English** |
+
+The interface language is switched from the chip in the header of any top-level screen, from the
+sidebar on a wide screen, or from `Settings → Language`. On a device's first run it follows the
+phone's own language when that is one of the three, and falls back to French otherwise; after that
+the choice is remembered.
 
 Dictation was French-only, which quietly locked the app to francophone countries. The extractor is
 now driven by language packs, so a locale is a data exercise rather than a rewrite.

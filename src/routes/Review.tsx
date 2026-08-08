@@ -1,11 +1,11 @@
 import { useNavigate, useParams, Link } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AlertTriangle, Check, Languages, Pencil } from 'lucide-react'
+import { AlertTriangle, Check, Languages, Pencil, Trash2 } from 'lucide-react'
 import { AppShell } from '../components/AppShell'
-import { ActionBar, Badge, Button, Card, SectionTitle, Spinner } from '../components/ui'
+import { ActionBar, Badge, Button, Card, MoreMenu, SectionTitle, Spinner } from '../components/ui'
 import { ProvenanceChip } from '../components/VitalsGrid'
 import { db } from '../db/db'
-import { finaliseEncounter } from '../db/repo'
+import { deleteEncounter, finaliseEncounter } from '../db/repo'
 import {
   formatDateTime,
   formatVital,
@@ -66,17 +66,49 @@ export function Review() {
     navigate(`/patient/${patientId}/encounter/${encounterId}/instructions`, { replace: true })
   }
 
+  /**
+   * Deleting a *confirmed* consultation is not the same act as discarding a
+   * draft, so it does not get the draft's one-tap treatment. The record has
+   * already been counted in this month's aggregate, and may already have been
+   * submitted, which is what the prompt says out loud before anything happens.
+   */
+  async function removeEncounter() {
+    if (!window.confirm(t.deleteRecordConfirm)) return
+    await deleteEncounter(encounterId!)
+    navigate(`/patient/${patientId}`, { replace: true })
+  }
+
   return (
     <AppShell
       title={isDraft ? t.review : t.encounters}
       subtitle={`${patient.familyName} ${patient.givenName}`}
       showBack
+      actions={
+        isDraft ? undefined : (
+          <MoreMenu
+            label={t.manage}
+            items={[
+              {
+                label: t.amend,
+                icon: <Pencil size={16} />,
+                onSelect: () => navigate(`/patient/${patientId}/encounter/${encounterId}`),
+              },
+              {
+                label: t.deleteRecord,
+                icon: <Trash2 size={16} />,
+                danger: true,
+                onSelect: () => void removeEncounter(),
+              },
+            ]}
+          />
+        )
+      }
     >
       <div className="flex flex-col gap-5 pb-4">
         <p className="text-sm text-slate-500">{formatDateTime(encounter.occurredAt, lang)}</p>
 
         {isDraft && uncertain.length > 0 && (
-          <Card className="bg-warn-50 ring-warn-200">
+          <Card variant="plain" className="bg-warn-50 ring-1 ring-warn-200">
             <p className="flex items-start gap-2 font-semibold text-warn-700">
               <AlertTriangle size={20} className="mt-0.5 shrink-0" />
               {t.reviewHint}
@@ -166,7 +198,9 @@ export function Review() {
                   <li key={p.id} className="flex items-start gap-2">
                     <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand-600" />
                     <div className="min-w-0">
-                      <p className="font-semibold text-slate-900">{prescriptionInstruction(p, 'fr')}</p>
+                      {/* The clinician's own language. The patient sheet is the
+                          screen that follows the patient's, not this one. */}
+                      <p className="font-semibold text-slate-900">{prescriptionInstruction(p, lang)}</p>
                       <ProvenanceChip provenance={encounter.provenance[`prescription.${p.id}`]} />
                     </div>
                   </li>

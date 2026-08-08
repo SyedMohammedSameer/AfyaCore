@@ -130,6 +130,143 @@ export async function deleteEncounter(id: string): Promise<void> {
   })
 }
 
+/**
+ * Soft-delete a patient and everything recorded about them.
+ *
+ * The patient row and every encounter row survive as tombstones, for the same
+ * reason a deleted encounter does: a hard delete cannot propagate, so the other
+ * phone at the facility would keep a record this device believes is gone. The
+ * schema, the Dexie v2 index and the sync protocol were all built for this;
+ * this is the function that finally sets the flag.
+ *
+ * Attachments are destroyed outright rather than tombstoned. They never sync,
+ * so nothing else needs to learn they are gone, and they are the only thing
+ * here large enough that keeping them would be a real cost.
+ */
+export async function deletePatient(id: string): Promise<void> {
+  await db.transaction('rw', db.patients, db.encounters, db.attachments, async () => {
+    const now = Date.now()
+    const encounters = await db.encounters.where('patientId').equals(id).toArray()
+
+    for (const encounter of encounters) {
+      await db.attachments.where('encounterId').equals(encounter.id).delete()
+      await db.encounters.update(encounter.id, {
+        deletedAt: now,
+        attachmentIds: [],
+        updatedAt: now,
+        syncedAt: undefined,
+      })
+    }
+
+    await db.patients.update(id, { deletedAt: now, updatedAt: now, syncedAt: undefined })
+  })
+}
+
+export interface MergeOutcome {
+  /** Encounters moved onto the surviving record. */
+  moved: number
+  /** Fields the surviving record was missing and inherited from the duplicate. */
+  filled: string[]
+}
+
+/** Fields a merge is allowed to copy across when the survivor left them blank. */
+const MERGEABLE_FIELDS = [
+  'givenName',
+  'birthDate',
+  'approximateAge',
+  'phone',
+  'address',
+  'registerNo',
+] as const
+
+/**
+ * Decide what a merge copies from the duplicate onto the surviving record.
+ *
+ * Split out from `mergePatients` and pure, because this is the part with a
+ * judgement in it: the transaction around it only moves rows. The rule is that
+ * the survivor's own values are never overwritten, so a merge can add what was
+ * missing but can never replace a phone number somebody deliberately corrected.
+ */
+export function mergeFields(
+  keep: Patient,
+  duplicate: Patient,
+): { changes: Partial<Patient>; filled: string[] } {
+  const changes: Partial<Patient> = {}
+  const filled: string[] = []
+
+  for (const field of MERGEABLE_FIELDS) {
+    const mine = keep[field]
+    const theirs = duplicate[field]
+    // Empty string counts as blank: a patient registered in a hurry often has
+    // a family name and nothing else.
+    if ((mine === undefined || mine === '') && theirs !== undefined && theirs !== '') {
+      Object.assign(changes, { [field]: theirs })
+      filled.push(field)
+    }
+  }
+
+  if (keep.sex === 'unknown' && duplicate.sex !== 'unknown') {
+    changes.sex = duplicate.sex
+    filled.push('sex')
+  }
+
+  // Precision travels with the date it describes, or it would claim a
+  // day-accurate birth date the record does not actually have.
+  if (changes.birthDate !== undefined) changes.birthDatePrecision = duplicate.birthDatePrecision
+
+  return { changes, filled }
+}
+
+/**
+ * Fold a duplicate patient into the one that is being kept.
+ *
+ * The same person registered twice is routine on a paper roster: a card is
+ * mislaid, a name is spelled differently, and two rows accumulate different
+ * halves of one clinical history. Merging has to move the *encounters*, because
+ * a history split across two records is the actual harm, not the duplicate row.
+ *
+ * Two rules:
+ *
+ *  1. The surviving record's own values are never overwritten. Only fields it
+ *     left blank are filled in from the duplicate, so a merge cannot quietly
+ *     replace a phone number someone deliberately corrected.
+ *  2. The duplicate becomes a tombstone rather than disappearing, so the merge
+ *     reaches the facility's other devices instead of the duplicate reappearing
+ *     on the next pull.
+ */
+export async function mergePatients(keepId: string, duplicateId: string): Promise<MergeOutcome> {
+  if (keepId === duplicateId) throw new Error('Cannot merge a patient into itself')
+
+  return db.transaction('rw', db.patients, db.encounters, async () => {
+    const [keep, duplicate] = await Promise.all([db.patients.get(keepId), db.patients.get(duplicateId)])
+    if (!keep) throw new Error(`Patient ${keepId} not found`)
+    if (!duplicate) throw new Error(`Patient ${duplicateId} not found`)
+
+    const now = Date.now()
+
+    const encounters = await db.encounters.where('patientId').equals(duplicateId).toArray()
+    for (const encounter of encounters) {
+      await db.encounters.update(encounter.id, {
+        patientId: keepId,
+        updatedAt: now,
+        syncedAt: undefined,
+      })
+    }
+
+    const { changes, filled } = mergeFields(keep, duplicate)
+
+    await db.patients.update(keepId, {
+      ...changes,
+      searchKey: buildSearchKey({ ...keep, ...changes }),
+      updatedAt: now,
+      syncedAt: undefined,
+    })
+    await db.patients.update(duplicateId, { deletedAt: now, updatedAt: now, syncedAt: undefined })
+
+    return { moved: encounters.length, filled }
+  })
+}
+
 export async function addAttachment(
   encounterId: string,
   blob: Blob,
