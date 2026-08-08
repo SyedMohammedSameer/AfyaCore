@@ -230,6 +230,67 @@ describe('extractClinical, English', () => {
   })
 })
 
+/**
+ * The examples printed in the README, asserted verbatim.
+ *
+ * A README that claims a specific dictation produces specific fields is a
+ * promise, and the cheapest way to stop it rotting is to make the build fail
+ * when it stops being true. If either of these is edited, edit the README too.
+ */
+describe('README examples', () => {
+  it('produces what the French example claims', () => {
+    const r = extractClinical(
+      'Motif : fièvre depuis trois jours. Température trente-huit virgule cinq, ' +
+        'pouls quatre-vingt-douze, tension douze sur huit. Diagnostic : paludisme simple. ' +
+        'Paracétamol 500 mg trois fois par jour pendant cinq jours et ' +
+        'artéméther luméfantrine matin et soir pendant trois jours.',
+      FR_LOCALE,
+    )
+
+    expect(r.vitals.temperature?.value).toBe(38.5)
+    expect(r.vitals.pulse?.value).toBe(92)
+    expect(r.vitals.systolic?.value).toBe(120)
+    expect(r.vitals.diastolic?.value).toBe(80)
+    expect(r.chiefComplaint?.value).toContain('fièvre')
+    expect(r.diagnosis?.value).toContain('paludisme')
+
+    // Two prescriptions, not three: the fixed-dose combination stays whole.
+    expect(r.prescriptions).toHaveLength(2)
+    const para = r.prescriptions.find((p) => /paracétamol/i.test(p.drug))!
+    expect(para.dose).toBe('500 mg')
+    expect(para.frequencyPerDay).toBe(3)
+    expect(para.durationDays).toBe(5)
+    const al = r.prescriptions.find((p) => /artéméther/i.test(p.drug))!
+    expect(al.frequencyPerDay).toBe(2)
+    expect(al.durationDays).toBe(3)
+  })
+
+  it('produces the same fields from the English example', () => {
+    const r = extractClinical(
+      'Presenting complaint fever for three days. Temperature thirty-eight point five, ' +
+        'pulse ninety-two, blood pressure 120 over 80. Diagnosis uncomplicated malaria. ' +
+        'Paracetamol 500 mg tds for 5/7 and artemether lumefantrine bd for three days.',
+      EN_LOCALE,
+    )
+
+    expect(r.vitals.temperature?.value).toBe(38.5)
+    expect(r.vitals.pulse?.value).toBe(92)
+    expect(r.vitals.systolic?.value).toBe(120)
+    expect(r.vitals.diastolic?.value).toBe(80)
+    expect(r.chiefComplaint?.value).toContain('fever')
+    expect(r.diagnosis?.value).toContain('malaria')
+
+    expect(r.prescriptions).toHaveLength(2)
+    const para = r.prescriptions.find((p) => /paracetamol/i.test(p.drug))!
+    expect(para.dose).toBe('500 mg')
+    expect(para.frequencyPerDay).toBe(3) // tds
+    expect(para.durationDays).toBe(5) // 5/7
+    const al = r.prescriptions.find((p) => /artemether/i.test(p.drug))!
+    expect(al.frequencyPerDay).toBe(2) // bd
+    expect(al.durationDays).toBe(3)
+  })
+})
+
 describe('locale selection', () => {
   it('uses English only for the English interface', () => {
     expect(clinicalLocaleFor('en')).toBe(EN_LOCALE)
