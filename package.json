@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "vendor:ocr": "node scripts/vendor-ocr.mjs",
     "screenshots": "node scripts/screenshots.mjs",
-    "sync": "node server/sync-server.mjs"
+    "sync": "node server/sync-server.mjs",
+    "admin": "node server/cli.mjs"
   },
   "dependencies": {
     "dexie": "^4.4.4",
