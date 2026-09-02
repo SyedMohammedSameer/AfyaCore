@@ -12,13 +12,16 @@ import { db } from '../db/db'
 import { addAttachment, deleteEncounter, patchEncounter, removeAttachment } from '../db/repo'
 import { compressImage } from '../lib/image'
 import { extractClinical, type ExtractionResult } from '../lib/clinicalExtract'
-import { clinicalLocaleFor } from '../lib/clinicalLocales'
+import { useClinicalLocale } from '../lib/facility'
 import { mergeExtraction } from '../lib/mergeExtraction'
 import { useI18n } from '../i18n'
 
 export function EncounterCapture() {
   const { patientId, encounterId } = useParams()
-  const { t, lang } = useI18n()
+  const { t } = useI18n()
+  // Extraction follows the deployment's country, not the interface
+  // language: see src/lib/facility.ts.
+  const clinicalLocale = useClinicalLocale()
   const navigate = useNavigate()
   const fileInput = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -71,7 +74,7 @@ export function EncounterCapture() {
     if (!encounter) return
     const { patch } = mergeExtraction(
       encounter,
-      extractClinical(text, clinicalLocaleFor(lang)),
+      extractClinical(text, clinicalLocale),
       text,
       'photo',
       Math.max(0.4, Math.min(1, ocrConfidence)),

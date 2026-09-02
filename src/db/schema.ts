@@ -185,6 +185,7 @@ export type AuditAction =
   | 'account.disable'
   | 'device.enrol'
   | 'device.unenrol'
+  | 'facility.configure'
 
 /**
  * One entry in the local, hash-chained audit trail. See src/lib/audit.ts.

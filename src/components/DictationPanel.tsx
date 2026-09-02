@@ -4,7 +4,7 @@ import { Button, Card, cx } from './ui'
 import { useOnline } from './AppShell'
 import { recogniser } from '../lib/speech'
 import { extractClinical, type ExtractionResult } from '../lib/clinicalExtract'
-import { clinicalLocaleFor } from '../lib/clinicalLocales'
+import { useClinicalLocale } from '../lib/facility'
 import { useI18n } from '../i18n'
 
 interface DictationPanelProps {
@@ -22,9 +22,11 @@ interface DictationPanelProps {
  *     block, nag, or degrade the rest of the screen.
  */
 export function DictationPanel({ onApply }: DictationPanelProps) {
-  const { t, lang } = useI18n()
+  const { t } = useI18n()
   // Recogniser and extractor must agree, or the transcript parses as noise.
-  const locale = clinicalLocaleFor(lang)
+  // Follows the deployment's country, not the interface language: see
+  // src/lib/facility.ts.
+  const locale = useClinicalLocale()
   const online = useOnline()
   const [listening, setListening] = useState(false)
   const [error, setError] = useState('')

@@ -162,6 +162,19 @@ export interface Strings {
   you: string
   lastAdmin: string
   auditVerifiedFrom: string
+  // Country profile. One setting, because everything else that varies by
+  // country is derived from it.
+  country: string
+  countryHint: string
+  clinicalLanguage: string
+  facilityType: string
+  reportingSystem: string
+  dataProtectionLaw: string
+  regulator: string
+  breachWindow: string
+  retention: string
+  unconfirmed: string
+  notLegalAdvice: string
   // Optional on-device PII model (OpenMed). An accuracy upgrade over the
   // deterministic scrub, never a replacement for it.
   piiPack: string
@@ -355,7 +368,7 @@ const fr: Strings = {
   syncing: 'Synchronisation en cours…',
   lastSync: 'Dernière synchronisation',
   syncNever: 'Jamais synchronisé',
-  syncNotConfigured: 'Renseignez l’adresse du serveur et l’identifiant du centre.',
+  syncNotConfigured: 'Renseignez l’adresse du serveur pour inscrire cet appareil.',
   syncFailed: 'Échec de la synchronisation',
   syncSummary: 'envoyés / reçus',
   lockSubtitle: 'Saisissez votre code pour continuer',
@@ -402,6 +415,17 @@ const fr: Strings = {
   you: 'vous',
   lastAdmin: 'Dernier administrateur : impossible de désactiver ce compte.',
   auditVerifiedFrom: 'vérifié à partir de l’entrée',
+  country: 'Pays',
+  countryHint: 'Détermine la langue de rédaction clinique, le format des numéros de téléphone retirés à l’export, et le régime de protection des données applicable.',
+  clinicalLanguage: 'Langue clinique',
+  facilityType: 'Type de structure',
+  reportingSystem: 'Système de rapportage',
+  dataProtectionLaw: 'Loi applicable',
+  regulator: 'Autorité de contrôle',
+  breachWindow: 'Délai de notification',
+  retention: 'Durée de conservation',
+  unconfirmed: 'À confirmer',
+  notLegalAdvice: 'Ces informations sont fournies à titre indicatif et n’ont pas été validées par un juriste de ce pays. Elles ne constituent pas un avis juridique.',
   piiPack: 'Modèle d’anonymisation',
   piiPackHint: 'Repère dans les notes les noms que le registre ne contient pas, par exemple un parent cité en passant. Le nettoyage de base fonctionne sans lui.',
   piiPackReady: 'Modèle installé, anonymisation renforcée active',
@@ -588,7 +612,7 @@ const mg: Strings = {
   syncing: 'Eo am-panaovana…',
   lastSync: 'Farany',
   syncNever: 'Tsy mbola natao',
-  syncNotConfigured: 'Fenoy ny adiresy sy ny laharana.',
+  syncNotConfigured: 'Fenoy ny adiresin’ny serivera mba hisoratana anarana.',
   syncFailed: 'Tsy nahomby',
   syncSummary: 'nalefa / noraisina',
   lockSubtitle: 'Ampidiro ny kaodinao mba hanohizana',
@@ -635,6 +659,17 @@ const mg: Strings = {
   you: 'ianao',
   lastAdmin: 'Mpitantana farany: tsy azo akanana ity kaonty ity.',
   auditVerifiedFrom: 'nohamarinina nanomboka tamin’ny laharana',
+  country: 'Firenena',
+  countryHint: 'Mamaritra ny fiteny fanoratana ara-pitsaboana, ny endriky ny laharana finday esorina rehefa manondrana, ary ny lalàna miaro ny angona.',
+  clinicalLanguage: 'Fiteny ara-pitsaboana',
+  facilityType: 'Karazana toeram-pitsaboana',
+  reportingSystem: 'Rafitra fanaovana tatitra',
+  dataProtectionLaw: 'Lalàna mifehy',
+  regulator: 'Manam-pahefana mpanara-maso',
+  breachWindow: 'Fe-potoana fampandrenesana',
+  retention: 'Faharetan’ny fitehirizana',
+  unconfirmed: 'Mbola hamarinina',
+  notLegalAdvice: 'Torohevitra fotsiny ireto vaovao ireto ary tsy nohamarinin’ny mpahay lalàna ao amin’ity firenena ity.',
   piiPack: 'Modely fanafenana anarana',
   piiPackHint: 'Mahita anarana tsy ao amin’ny rejisitra ao anaty naotra, ohatra havana voatonona. Miasa ihany ny fanadiovana fototra na tsy misy izy.',
   piiPackReady: 'Voapetraka ny modely',
@@ -820,7 +855,7 @@ const en: Strings = {
   syncing: 'Syncing…',
   lastSync: 'Last sync',
   syncNever: 'Never synced',
-  syncNotConfigured: 'Set the server address and facility ID.',
+  syncNotConfigured: 'Set the server address to enrol this device.',
   syncFailed: 'Sync failed',
   syncSummary: 'sent / received',
   lockSubtitle: 'Enter your PIN to continue',
@@ -867,6 +902,17 @@ const en: Strings = {
   you: 'you',
   lastAdmin: 'Last administrator: this account cannot be disabled.',
   auditVerifiedFrom: 'verified from entry',
+  country: 'Country',
+  countryHint: 'Sets the language clinical notes are written in, the phone-number formats removed on export, and which data protection regime applies.',
+  clinicalLanguage: 'Clinical language',
+  facilityType: 'Facility type',
+  reportingSystem: 'Reporting system',
+  dataProtectionLaw: 'Governing law',
+  regulator: 'Supervisory authority',
+  breachWindow: 'Breach notification',
+  retention: 'Retention period',
+  unconfirmed: 'To confirm',
+  notLegalAdvice: 'Recorded for guidance and not reviewed by a lawyer in this jurisdiction. This is not legal advice.',
   piiPack: 'De-identification model',
   piiPackHint: 'Finds names in notes that the roster does not hold, such as a relative mentioned in passing. The deterministic scrub works without it.',
   piiPackReady: 'Model installed, neural pass active',

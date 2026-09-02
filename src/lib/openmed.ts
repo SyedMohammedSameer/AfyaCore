@@ -257,12 +257,31 @@ export const MODEL_PATH = '/models/openmed-pii-fr'
 
 export const MODEL_REPO = 'OpenMed/OpenMed-PII-French-ClinicalE5-Small-33M-v1-onnx-android'
 
-/** True when the vendored model has been placed on this origin. */
+/**
+ * True when the vendored model has actually been placed on this origin.
+ *
+ * Deliberately fetches and parses the config rather than trusting a status
+ * code. A single-page app serves `index.html` with HTTP 200 for any unknown
+ * path, so a `HEAD` request for a model that was never vendored comes back
+ * `ok: true` with a page of HTML. The app then told the facility "Model
+ * installed, neural pass active" while running no model at all, which is the
+ * worst class of bug this codebase can have: a false claim that a privacy
+ * control is switched on.
+ *
+ * Parsing the JSON and checking for a field only a real config carries is what
+ * distinguishes "the file is there" from "the server answered".
+ */
 export async function isModelAvailable(fetchImpl: typeof fetch = fetch): Promise<boolean> {
   try {
-    const response = await fetchImpl(`${MODEL_PATH}/config.json`, { method: 'HEAD' })
-    return response.ok
+    const response = await fetchImpl(`${MODEL_PATH}/config.json`, {
+      headers: { accept: 'application/json' },
+    })
+    if (!response.ok) return false
+    const config = (await response.json()) as { model_type?: unknown; id2label?: unknown }
+    // A token-classification config always carries both.
+    return typeof config?.model_type === 'string' && typeof config?.id2label === 'object'
   } catch {
+    // Non-JSON (the SPA fallback) lands here via the JSON parse throwing.
     return false
   }
 }

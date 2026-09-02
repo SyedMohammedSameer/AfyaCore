@@ -21,6 +21,7 @@
 import type { Encounter, Patient } from '../db/schema'
 import { patientAge } from '../db/repo'
 import { applyEntities, MODEL_REPO, type NerBackend } from './openmed'
+import { allPhonePatterns } from './countries'
 
 export type DeidentLevel =
   /** No change. Identifiers included. */
@@ -32,6 +33,8 @@ export type DeidentLevel =
 
 export interface DeidentOptions {
   level: DeidentLevel
+  /** ISO country code of the exporting facility, recorded in the manifest. */
+  country?: string
   /**
    * Secret used to derive pseudonyms. The same salt yields the same codes, so a
    * facility can link exports over time; a different salt makes that impossible.
@@ -62,6 +65,13 @@ export interface DeidentResult {
     encountersProcessed: number
     fieldsRemoved: string[]
     freeTextRedactions: number
+    /**
+     * The country whose data-protection regime the exporting facility operates
+     * under. Travels with the file because a recipient in another jurisdiction
+     * needs to know which rules the data left under, and because a cross-border
+     * transfer restriction is only checkable if the origin is recorded.
+     */
+    country?: string
     /**
      * Redactions the neural pass added beyond the deterministic scrub, and the
      * model that made them. Recorded in the manifest that travels with the
@@ -172,9 +182,16 @@ export function scrubFreeText(text: string, terms: string[]): { text: string; re
     }
   }
 
-  // Phone numbers: Malagasy mobiles are 10 digits, commonly written in groups.
-  replace(/\b(?:\+?261[\s.-]?)?0?\d{2}[\s.-]?\d{2}[\s.-]?\d{3}[\s.-]?\d{2}\b/g)
-  // Any other long digit run, register numbers, national ID fragments.
+  // Phone numbers, in every format this build knows about.
+  //
+  // This used to be one regex shaped around Malagasy mobiles, which meant a
+  // Kenyan or Nigerian deployment ran a de-identifier that could not recognise
+  // its own patients' phone numbers. Being wrong about which country a device
+  // is configured for is itself a failure mode, so every pattern runs rather
+  // than only the configured one; the cost is microseconds.
+  for (const pattern of allPhonePatterns()) replace(pattern)
+
+  // Any other long digit run: register numbers, national ID fragments.
   replace(/\b\d{7,}\b/g)
 
   return { text: out, redactions }
@@ -204,6 +221,7 @@ export async function deidentify(
         encountersProcessed: encounters.length,
         fieldsRemoved: [],
         freeTextRedactions: 0,
+        ...(options.country ? { country: options.country } : {}),
       },
     }
   }
@@ -301,6 +319,7 @@ export async function deidentify(
         'attachments',
       ],
       freeTextRedactions,
+      ...(options.country ? { country: options.country } : {}),
       ...(neuralRedactions !== undefined
         ? { neuralRedactions, neuralModel: MODEL_REPO }
         : {}),

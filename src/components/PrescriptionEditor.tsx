@@ -1,7 +1,7 @@
 import { Pill, Plus, Trash2 } from 'lucide-react'
 import { Button, Card, Input, SectionTitle } from './ui'
 import { ProvenanceChip } from './VitalsGrid'
-import { clinicalLocaleFor } from '../lib/clinicalLocales'
+import { useClinicalLocale } from '../lib/facility'
 import { totalDoses } from '../lib/format'
 import { newId } from '../lib/id'
 import { useI18n } from '../i18n'
@@ -14,8 +14,8 @@ interface PrescriptionEditorProps {
 }
 
 export function PrescriptionEditor({ prescriptions, provenance, onChange }: PrescriptionEditorProps) {
-  const { t, lang } = useI18n()
-  const formulary = clinicalLocaleFor(lang).formulary
+  const { t } = useI18n()
+  const formulary = useClinicalLocale().formulary
 
   function update(id: string, patch: Partial<Prescription>) {
     onChange(prescriptions.map((p) => (p.id === id ? { ...p, ...patch } : p)))

@@ -1,7 +1,7 @@
 <h1 align="center">AfyaCore</h1>
 
 <p align="center">
-  <strong>Offline-first clinical data capture for health facilities in Madagascar.</strong><br>
+  <strong>Offline-first clinical data capture for health facilities across sub-Saharan Africa.</strong><br>
   A phone that works with no connectivity, no server and no account,<br>
   and gives the patient something they can actually read on the way out.
 </p>
@@ -272,6 +272,44 @@ Every write is appended to a hash-chained audit log, on the device and again on 
 name a record id and a field list, never clinical content: an audit log that quotes the note it
 describes is a second copy of the medical record with none of its protections.
 
+## One codebase, nine countries
+
+AfyaCore began as a Madagascar app and, in several places, quietly assumed it. The most
+consequential assumption was not cosmetic: the de-identifier's phone-number pattern matched Malagasy
+mobiles specifically, so the same build deployed in Kenya or Nigeria would have left patient phone
+numbers in exported free text. That is a privacy failure, not a localisation gap, and it is why
+country profiles exist.
+
+A profile is **data** ([`src/lib/countries.ts`](src/lib/countries.ts)). Adding a country is adding an
+entry, not editing an extractor.
+
+| | Francophone | Anglophone |
+|---|---|---|
+| Shipped | Madagascar · Sénégal · Côte d'Ivoire · RD Congo | Kenya · Nigeria · Ghana · Tanzania · Uganda |
+
+Each profile carries the phone formats to redact, the clinical documentation language, what a
+facility is called, the national HMIS, and the governing data-protection regime.
+
+**Clinical language follows the country, not the interface language.** That is a correctness fix:
+notes in Madagascar are written in French whether the nurse reads the interface in Malagasy, French
+or English. Previously the extractor took its locale from the UI, so a Malagasy clinician who
+switched the interface to English would have had French dictation parsed by the English pack, which
+rejects the cmHg blood-pressure convention and carries a different formulary. The interface language
+is a preference; the clinical language is a fact about the deployment.
+
+**What a profile deliberately does *not* set** is clinical practice. Vital-sign thresholds, IMCI age
+bands and plausibility ranges are physiology, and physiology does not change at a border. Making
+those configurable would invite somebody to "localise" a danger sign.
+
+Every phone pattern runs on every export, not just the configured country's. Being wrong about which
+country a device is set to is itself the failure being guarded against, and the cost is microseconds.
+
+⚠️ **The legal metadata is not legal advice.** Each profile names its statute and regulator, and
+every one ships `counselReviewed: false`, which the app displays. Retention periods and breach
+windows are left blank wherever we could not establish them from a primary source: a confidently
+wrong retention period in a health system gets followed, whereas an obviously absent one gets asked
+about.
+
 ## The design bet
 
 Madagascar's clinical documentation is written **in French**; most patients **do not speak French**;
@@ -351,8 +389,8 @@ Load `Settings → Load demo workspace` for synthetic patients to click through.
 
 ```
 src/db/          schema, Dexie setup, repository (the only place records are written)
-src/lib/         extraction, locales, de-identification, FHIR, DHIS2, sync client, OCR,
-                 identity and the local audit chain
+src/lib/         extraction, locales, country profiles, de-identification, FHIR,
+                 DHIS2, sync client, OCR, identity and the local audit chain
 src/routes/      one file per screen
 src/components/  UI primitives and the app shell
 eval/            evaluation harness and its synthetic corpus
@@ -493,6 +531,9 @@ much quieter bug than a wrong one.
   The fix is a pre-rendered Opus phrase bank (§3), not a model.
 - **Malagasy dates fall back to French formatting.** No browser ships `mg-MG` Intl data, so the
   alternative was the *device's* locale, which is worse.
+- ⚠️ **Country legal metadata is unreviewed.** Statute and regulator names are recorded to the best
+  of our knowledge; no lawyer in any of the nine jurisdictions has checked them, and the app says so
+  rather than implying otherwise.
 - ⚠️ **The evaluation corpus is synthetic.** It bounds correctness on anticipated cases; it says
   nothing about real dictation, real accents, or a real consultation room.
 - **Not validated against a real workflow.** The clinical scope is a reasonable general-outpatient
