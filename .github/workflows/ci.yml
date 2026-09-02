@@ -40,9 +40,23 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Report bundle size
+      # Runs after the build so it can measure dist/. Exits non-zero only on a
+      # correctness failure (an identifier the roster HOLDS survived a scrub, or
+      # clinical content was destroyed), never on an accuracy number, so a model
+      # that is simply absent cannot fail the build.
+      - name: Evaluate
+        run: npm run eval | tee eval-report.txt
+
+      - name: Report
+        if: always()
         run: |
-          echo '### Bundle' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          ls -lh dist/assets/*.js dist/assets/*.css | awk '{print $5, $9}' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo '### Evaluation'
+            echo '```'
+            cat eval-report.txt || true
+            echo '```'
+            echo '### Bundle'
+            echo '```'
+            ls -lh dist/assets/*.js dist/assets/*.css | awk '{print $5, $9}'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

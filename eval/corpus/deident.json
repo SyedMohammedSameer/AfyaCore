@@ -1,0 +1,118 @@
+{
+  "_comment": [
+    "De-identification gold standard. ENTIRELY SYNTHETIC: every name, village,",
+    "phone number and register number below was invented for this file. No real",
+    "patient, relative, clinician or facility is represented.",
+    "",
+    "The split that matters is `onRoster`. An identifier the device already holds",
+    "is findable by exact match, and the deterministic scrub gets 100% of those at",
+    "zero megabytes. An identifier the roster does NOT hold, a relative named in",
+    "passing, a referring clinician, a neighbouring village, is invisible to exact",
+    "matching by construction. That second set is the entire case for spending",
+    "67 MB on a neural pass, so the harness reports the two separately: a combined",
+    "recall number would hide exactly the thing being measured.",
+    "",
+    "`roster` is the patient list the device is assumed to hold when scrubbing.",
+    "`identifiers` are the substrings that MUST be gone from the output.",
+    "`mustKeep` are clinical terms that must SURVIVE: a scrubber that redacts",
+    "everything scores 100% recall and destroys the record, so precision is",
+    "measured against these rather than left implicit."
+  ],
+  "roster": [
+    { "familyName": "RAKOTOARISOA", "givenName": "Voahirana", "address": "Ambohimanga", "registerNo": "2041" },
+    { "familyName": "ANDRIANJAFY", "givenName": "Naivo", "address": "Anjozorobe", "registerNo": "2042" },
+    { "familyName": "RAZAFIMAHATRATRA", "givenName": "Hery", "address": "Ambatolampy", "registerNo": "2043" }
+  ],
+  "cases": [
+    {
+      "id": "di-01-own-name",
+      "notes": "The dominant leak: the patient's own name in their own note. Exact match handles it.",
+      "text": "Patiente RAKOTOARISOA revue ce jour pour fièvre persistante.",
+      "identifiers": [{ "value": "RAKOTOARISOA", "onRoster": true }],
+      "mustKeep": ["fièvre"]
+    },
+    {
+      "id": "di-02-other-patient",
+      "notes": "Notes routinely reference relatives who are themselves registered.",
+      "text": "Frère de ANDRIANJAFY, même symptomatologie, toux sèche.",
+      "identifiers": [{ "value": "ANDRIANJAFY", "onRoster": true }],
+      "mustKeep": ["toux"]
+    },
+    {
+      "id": "di-03-village",
+      "notes": "A fokontany of a few hundred people plus an age and a sex identifies someone. HIPAA Safe Harbor removes geography below state level for the same reason.",
+      "text": "Vit au village Ambohimanga, marche deux heures pour venir.",
+      "identifiers": [{ "value": "Ambohimanga", "onRoster": true }],
+      "mustKeep": ["marche"]
+    },
+    {
+      "id": "di-04-phone",
+      "notes": "Malagasy mobile, written in the usual groups. Pattern-matched, not roster-matched.",
+      "text": "Joindre la famille au 034 12 345 67 si aggravation.",
+      "identifiers": [{ "value": "034 12 345 67", "onRoster": true }],
+      "mustKeep": ["aggravation"]
+    },
+    {
+      "id": "di-05-register-number",
+      "notes": "Too short for the long-digit rule; a direct key back into the paper file.",
+      "text": "Dossier 2041 retrouvé, antécédent de paludisme en 2025.",
+      "identifiers": [{ "value": "2041", "onRoster": true }],
+      "mustKeep": ["paludisme"]
+    },
+    {
+      "id": "di-06-relative-off-roster",
+      "notes": "THE CASE FOR THE MODEL. 'Hanta' is a real identifier and no roster lookup will ever find her: she is not a patient here.",
+      "text": "Accompagnée par sa fille Hanta, qui rapporte une fièvre depuis trois jours.",
+      "identifiers": [{ "value": "Hanta", "onRoster": false }],
+      "mustKeep": ["fièvre"]
+    },
+    {
+      "id": "di-07-referring-clinician",
+      "notes": "A referring clinician's name identifies the patient by narrowing the catchment to one practice.",
+      "text": "Adressée par le Docteur Ramanantsoa du CSB de Manjakandriana.",
+      "identifiers": [
+        { "value": "Ramanantsoa", "onRoster": false },
+        { "value": "Manjakandriana", "onRoster": false }
+      ],
+      "mustKeep": []
+    },
+    {
+      "id": "di-08-neighbouring-village",
+      "notes": "A village nobody on this roster lives in is still identifying, and still invisible to exact matching.",
+      "text": "Résidence habituelle Ambodivona, déplacée chez un parent depuis un mois.",
+      "identifiers": [{ "value": "Ambodivona", "onRoster": false }],
+      "mustKeep": ["parent"]
+    },
+    {
+      "id": "di-09-mixed",
+      "notes": "Both kinds in one sentence, which is the realistic case. The deterministic pass should get one and miss the other.",
+      "text": "RAZAFIMAHATRATRA accompagné de son voisin Solofo, tous deux fébriles.",
+      "identifiers": [
+        { "value": "RAZAFIMAHATRATRA", "onRoster": true },
+        { "value": "Solofo", "onRoster": false }
+      ],
+      "mustKeep": ["fébriles"]
+    },
+    {
+      "id": "di-10-clinical-only",
+      "notes": "No identifiers whatsoever. Any redaction here is a false positive against clinical content.",
+      "text": "Fièvre depuis trois jours, paludisme simple confirmé au test rapide, traitement débuté.",
+      "identifiers": [],
+      "mustKeep": ["Fièvre", "paludisme", "test rapide", "traitement"]
+    },
+    {
+      "id": "di-11-age-must-survive",
+      "notes": "Age is clinical content: it drives the WHO/IMCI bands the DHIS2 report is disaggregated by, and is capped structurally elsewhere. Redacting it damages the record.",
+      "text": "Enfant de 6 ans, poids 18 kg, diarrhée aiguë sans déshydratation.",
+      "identifiers": [],
+      "mustKeep": ["6 ans", "18 kg", "diarrhée"]
+    },
+    {
+      "id": "di-12-drug-names-must-survive",
+      "notes": "Drug names look like proper nouns to a NER model. Redacting them would be catastrophic and is the most likely false-positive mode.",
+      "text": "Artéméther luméfantrine matin et soir, paracétamol si fièvre, revoir dans trois jours.",
+      "identifiers": [],
+      "mustKeep": ["Artéméther luméfantrine", "paracétamol", "fièvre"]
+    }
+  ]
+}

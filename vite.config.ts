@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type PluginOption } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -6,8 +6,40 @@ import { VitePWA } from 'vite-plugin-pwa'
 // AfyaCore ships to Android phones over slow, metered connections. Every byte in
 // the initial shell is a byte a CHU nurse waits for on 2G, so heavy work (ASR
 // models, OCR) is deliberately kept out of the bundle and fetched on demand.
+/**
+ * Keep onnxruntime-web's WebAssembly cores out of the build.
+ *
+ * onnxruntime-web locates its core with `new URL("ort-wasm-....wasm",
+ * import.meta.url)`. Vite treats that as an asset reference, resolves it, and
+ * emits the file: 23.5 MB of `asyncify` core landing in `dist/` on every build.
+ *
+ * Nothing ever loads it. `src/lib/openmed.ts` sets `wasmPaths = '/ort/'`, and
+ * the runtime resolves its core by *filename* against that prefix, where
+ * `npm run vendor:openmed` has placed the single 13 MB core we actually use. So
+ * the emitted asset is pure deployment weight: it quadruples the size of a
+ * `dist/` a facility's server has to host, to ship a file no client requests.
+ *
+ * Rewriting the expression to the bare filename removes the asset reference
+ * while leaving the runtime's own resolution untouched, which is the behaviour
+ * we want anyway.
+ */
+function excludeOnnxWasm(): PluginOption {
+  const ORT_URL = /new URL\((["'])(ort-wasm[\w.-]*\.wasm)\1\s*,\s*import\.meta\.url\)/g
+
+  return {
+    name: 'afyacore:exclude-onnx-wasm',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!id.includes('onnxruntime-web') || !ORT_URL.test(code)) return null
+      ORT_URL.lastIndex = 0
+      return { code: code.replace(ORT_URL, (_m, q, file) => `${q}${file}${q}`), map: null }
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
+    excludeOnnxWasm(),
     react(),
     tailwindcss(),
     VitePWA({
