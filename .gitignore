@@ -17,3 +17,7 @@ server/data/
 .npm-cache
 # Server database and WAL files, created at runtime
 server/data/
+
+# Vendored ML models, ~67 MB, fetched by npm run vendor:openmed
+public/models/
+public/ort/

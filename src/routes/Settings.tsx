@@ -10,10 +10,13 @@ import { formatBytes } from '../lib/format'
 import { toFhirBundle } from '../lib/fhir'
 import { aggregateMonth, toAggregateCsv, toDhis2DataValueSet, indicatorLabel } from '../lib/dhis2'
 import { isOcrReady, preloadOcr } from '../lib/ocr'
+import { isModelAvailable, loadBackend } from '../lib/openmed'
+import { recordAudit } from '../lib/audit'
 import { PrivacySelector } from '../components/PrivacySelector'
 import { SyncPanel } from '../components/SyncPanel'
 import { StaffPanel } from '../components/StaffPanel'
 import { deidentify, type DeidentLevel } from '../lib/deidentify'
+import type { NerBackend } from '../lib/openmed'
 import { LANG_LABELS, useI18n } from '../i18n'
 import type { LangCode } from '../db/schema'
 
@@ -85,14 +88,50 @@ export function Settings() {
    * the chosen privacy level. Aggregate reports are exempt by construction:
    * they contain counts, never records.
    */
+  /**
+   * The neural de-identification backend, or null.
+   *
+   * Resolved once per export rather than held in state: it is only ever needed
+   * at the moment an export runs, and loading a 67 MB graph to render a
+   * settings screen would be absurd.
+   */
+  async function neuralBackend(): Promise<NerBackend | undefined> {
+    if (level === 'identified') return undefined
+    return (await loadBackend()) ?? undefined
+  }
+
+  const [piiState, setPiiState] = useState<'absent' | 'checking' | 'ready'>('checking')
+
+  useEffect(() => {
+    isModelAvailable().then((ready) => setPiiState(ready ? 'ready' : 'absent'))
+  }, [])
+
   async function prepareRecords() {
     const [patients, encounters] = await Promise.all([livePatients(), liveEncounters()])
-    const result = await deidentify(patients, encounters, { level, salt: await facilitySalt() })
+    const result = await deidentify(patients, encounters, {
+      level,
+      salt: await facilitySalt(),
+      nerBackend: await neuralBackend(),
+    })
     if (level !== 'identified') {
-      setLastExport(`${result.manifest.freeTextRedactions} ${t.redactionSummary}`)
+      const neural = result.manifest.neuralRedactions
+      setLastExport(
+        `${result.manifest.freeTextRedactions} ${t.redactionSummary}` +
+          // Reported separately rather than summed: the two passes answer
+          // different questions, and a facility deciding whether the 67 MB was
+          // worth downloading needs to see what it actually bought.
+          (neural !== undefined ? ` · ${neural} ${t.neuralRedactionSummary}` : ''),
+      )
     } else {
       setLastExport('')
     }
+    // Exports are the disclosure event, so they are the one thing the audit
+    // trail must never miss.
+    await recordAudit({
+      action: 'export',
+      subjectType: 'export',
+      detail: `level=${level} patients=${result.patients.length} encounters=${result.encounters.length}`,
+    })
     return result
   }
 
@@ -233,6 +272,27 @@ export function Settings() {
               </Button>
             )}
             {ocrState === 'error' && <p className="text-sm text-danger-700">{t.ocrFailed}</p>}
+          </Card>
+        </section>
+
+        <section>
+          <SectionTitle>{t.piiPack}</SectionTitle>
+          <Card className="flex flex-col gap-3">
+            <p className="text-sm text-slate-600">{t.piiPackHint}</p>
+            {piiState === 'ready' ? (
+              <p className="flex items-center gap-2 font-semibold text-ok-700">
+                <CheckCircle2 size={20} />
+                {t.piiPackReady}
+              </p>
+            ) : piiState === 'checking' ? (
+              <p className="text-sm text-slate-400">…</p>
+            ) : (
+              // No download button: the model is placed on the server by the
+              // deployer (`npm run vendor:openmed`), not fetched by a phone
+              // from the Hub. A facility on a filtered connection cannot reach
+              // huggingface.co, which is the whole reason it is self-hosted.
+              <p className="text-sm text-slate-500">{t.piiPackAbsent}</p>
+            )}
           </Card>
         </section>
 

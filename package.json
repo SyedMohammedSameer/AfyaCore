@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "vendor:ocr": "node scripts/vendor-ocr.mjs",
+    "vendor:openmed": "node scripts/vendor-openmed.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "sync": "node server/sync-server.mjs",
     "admin": "node server/cli.mjs"
@@ -31,6 +32,7 @@
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

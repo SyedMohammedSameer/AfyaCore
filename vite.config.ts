@@ -33,9 +33,13 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // The OCR runtime is ~7 MB. Precaching it would defeat the whole point
         // of a small install, so it is fetched on demand and cached below.
-        globIgnores: ['**/models/**', '**/ocr/**'],
+        // transformers.js is ~148 kB gzip and is only ever loaded by a facility
+        // that installed the optional PII model. Precaching it would put it in
+        // every install, including the ones that never use it, which is exactly
+        // the cost this app is built to avoid.
+        globIgnores: ['**/models/**', '**/ocr/**', '**/transformers*', '**/ort-*'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/ocr\//],
+        navigateFallbackDenylist: [/^\/ocr\//, /^\/models\//],
         cleanupOutdatedCaches: true,
         // Raise the per-file precache ceiling for the app's own chunks only.
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
@@ -48,6 +52,22 @@ export default defineConfig({
             options: {
               cacheName: 'afyacore-ocr',
               cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // The OpenMed PII model, same bargain as the OCR pack: ~67 MB that
+            // a facility downloads once while it has signal, and must then keep
+            // working with no network at all. Never precached, because the
+            // whole premise is a 130 kB install over 2G.
+            urlPattern: ({ url }: { url: URL }) =>
+              url.pathname.startsWith('/models/') ||
+              /\/(transformers|ort-).*\.(js|wasm|mjs)$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'afyacore-models',
+              cacheableResponse: { statuses: [0, 200] },
+              // Range requests: onnxruntime streams large graphs in pieces.
+              rangeRequests: true,
             },
           },
         ],

@@ -20,6 +20,7 @@
  */
 import type { Encounter, Patient } from '../db/schema'
 import { patientAge } from '../db/repo'
+import { applyEntities, MODEL_REPO, type NerBackend } from './openmed'
 
 export type DeidentLevel =
   /** No change. Identifiers included. */
@@ -39,6 +40,15 @@ export interface DeidentOptions {
   salt?: string
   /** Reduce encounter dates to the first of the month. */
   generaliseDates?: boolean
+  /**
+   * Optional neural PII pass, run *after* the deterministic scrub and only ever
+   * adding redactions. See src/lib/openmed.ts.
+   *
+   * Absent by default, and absent is the shipped behaviour: the model is a
+   * separate ~67 MB download a facility opts into. An export must never be less
+   * de-identified because a download failed, so nothing here can subtract.
+   */
+  nerBackend?: NerBackend
 }
 
 export interface DeidentResult {
@@ -52,6 +62,14 @@ export interface DeidentResult {
     encountersProcessed: number
     fieldsRemoved: string[]
     freeTextRedactions: number
+    /**
+     * Redactions the neural pass added beyond the deterministic scrub, and the
+     * model that made them. Recorded in the manifest that travels with the
+     * export so a recipient knows how the file was produced, and so the claim
+     * can be audited rather than taken on trust.
+     */
+    neuralRedactions?: number
+    neuralModel?: string
   }
 }
 
@@ -257,6 +275,14 @@ export async function deidentify(
     }
   })
 
+  // The neural pass runs last, over text the deterministic scrub has already
+  // been through. Ordering is the safety argument: the roster-based scrub is
+  // exact and always runs, and this can only ever add to what it removed.
+  let neuralRedactions: number | undefined
+  if (options.nerBackend) {
+    neuralRedactions = await neuralPass(outEncounters, options.nerBackend)
+  }
+
   return {
     patients: outPatients,
     encounters: outEncounters,
@@ -275,6 +301,47 @@ export async function deidentify(
         'attachments',
       ],
       freeTextRedactions,
+      ...(neuralRedactions !== undefined
+        ? { neuralRedactions, neuralModel: MODEL_REPO }
+        : {}),
     },
   }
+}
+
+/**
+ * Run the neural backend over every free-text field of an encounter set.
+ *
+ * Mutates in place because it operates on the copies `deidentify` has already
+ * built; the caller's records were never touched.
+ *
+ * One backend failure must not fail an export. If the model throws part-way
+ * through, whatever it managed to redact stands and the rest keeps the
+ * deterministic scrub's output, which is the shipped default anyway.
+ */
+async function neuralPass(encounters: Encounter[], backend: NerBackend): Promise<number> {
+  let added = 0
+
+  const pass = async (value: string | undefined): Promise<string | undefined> => {
+    if (!value) return value
+    try {
+      const { text, redactions } = applyEntities(value, await backend(value), {
+        redacted: REDACTED,
+      })
+      added += redactions
+      return text
+    } catch {
+      return value
+    }
+  }
+
+  for (const encounter of encounters) {
+    encounter.chiefComplaint = await pass(encounter.chiefComplaint)
+    encounter.diagnosis = await pass(encounter.diagnosis)
+    encounter.notes = await pass(encounter.notes)
+    for (const [key, provenance] of Object.entries(encounter.provenance)) {
+      encounter.provenance[key] = { ...provenance, rawText: await pass(provenance.rawText) }
+    }
+  }
+
+  return added
 }
