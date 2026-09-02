@@ -49,7 +49,7 @@ function TimelineEntry({
     <li className="animate-rise relative flex gap-3 pb-3" style={riseStyle(index)}>
       <div className="flex flex-col items-center pt-4">
         <span className={cx('size-2.5 shrink-0 rounded-full ring-4 ring-slate-50', dot)} />
-        {!isLast && <span className="mt-1 w-px flex-1 bg-slate-200" />}
+        {!isLast && <span className="mt-1 w-px flex-1 bg-line" />}
       </div>
 
       <Link
@@ -58,16 +58,16 @@ function TimelineEntry({
             ? `/patient/${patientId}/encounter/${encounter.id}`
             : `/patient/${patientId}/encounter/${encounter.id}/review`
         }
-        className="press press-active glass-panel group min-w-0 flex-1 rounded-card p-3.5 hover:-translate-y-0.5 hover:shadow-float"
+        className="press press-active surface-card group min-w-0 flex-1 rounded-card p-3.5 hover:-translate-y-0.5 hover:shadow-float"
       >
         <div className="mb-1 flex items-center justify-between gap-2">
-          <span className="text-xs font-bold tracking-wide text-slate-400 uppercase">
+          <span className="text-xs font-bold tracking-wide text-ink-4 uppercase">
             {formatDate(encounter.occurredAt, lang)}
           </span>
           {draft && <Badge tone="watch">{t.draft}</Badge>}
         </div>
 
-        <p className="leading-snug font-bold text-slate-900">
+        <p className="leading-snug font-bold text-ink">
           {encounter.diagnosis || encounter.chiefComplaint || t.notes}
         </p>
 
@@ -85,7 +85,7 @@ function TimelineEntry({
                       ? 'bg-danger-50 text-danger-700'
                       : severity === 'watch'
                         ? 'bg-warn-50 text-warn-700'
-                        : 'bg-slate-100 text-slate-600',
+                        : 'bg-sunken text-ink-2',
                   )}
                 >
                   {formatVital(k, value)}
@@ -96,7 +96,7 @@ function TimelineEntry({
         )}
 
         {encounter.prescriptions.length > 0 && (
-          <p className="mt-2 truncate text-sm text-slate-500">
+          <p className="mt-2 truncate text-sm text-ink-3">
             {encounter.prescriptions.map((p) => p.drug).join(' · ')}
           </p>
         )}
@@ -194,10 +194,10 @@ export function PatientProfile() {
         <Card className="flex items-center gap-4">
           <Avatar familyName={patient.familyName} givenName={patient.givenName} size="lg" />
           <div className="min-w-0 flex-1">
-            <p className="text-xl leading-tight font-extrabold tracking-[-0.045em] text-slate-900">
+            <p className="text-xl leading-tight font-extrabold tracking-[-0.045em] text-ink">
               {patient.familyName} {patient.givenName}
             </p>
-            <p className="numeric mt-0.5 text-sm text-slate-500">
+            <p className="numeric mt-0.5 text-sm text-ink-3">
               {[age !== undefined ? `${age} ${t.years}` : null, sexLabel].filter(Boolean).join(' · ')}
             </p>
             {patient.phone && (
@@ -215,8 +215,8 @@ export function PatientProfile() {
         {details.length > 0 && (
           <Card className="flex flex-col gap-2 py-3 text-sm">
             {details.map(({ icon: Icon, text }, i) => (
-              <div key={i} className="flex items-center gap-2.5 text-slate-600">
-                <Icon size={16} className="shrink-0 text-slate-400" />
+              <div key={i} className="flex items-center gap-2.5 text-ink-2">
+                <Icon size={16} className="shrink-0 text-ink-4" />
                 <span className="truncate">{text}</span>
               </div>
             ))}

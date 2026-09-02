@@ -35,19 +35,30 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   full?: boolean
 }
 
+/*
+ * A solid fill, a hairline, and nothing else.
+ *
+ * The primary button used a gradient and a lifted shadow, which reads as a
+ * marketing call to action. Here the primary action is "save this
+ * consultation", and a flat brand fill with a darker active state is both
+ * calmer and easier to hit correctly on a screen with a cracked digitiser.
+ */
 const BUTTON_STYLES: Record<ButtonVariant, string> = {
   primary:
-    'bg-brand-gradient text-white shadow-lift ring-1 ring-white/20 hover:shadow-float active:brightness-95 disabled:bg-slate-300 disabled:shadow-none',
+    'bg-brand-600 text-white shadow-xs hover:bg-brand-700 active:bg-brand-800 ' +
+    'disabled:bg-line-strong disabled:text-white disabled:shadow-none',
   secondary:
-    'glass-subtle text-slate-800 hover:bg-white/80 hover:shadow-lift disabled:text-slate-400 disabled:shadow-none',
-  ghost: 'bg-transparent text-slate-600 hover:bg-white/55 active:bg-white/75 disabled:text-slate-400',
-  danger: 'bg-danger-600 text-white shadow-lift ring-1 ring-white/20 hover:bg-danger-700 disabled:bg-slate-300',
-  onDark: 'bg-white/13 text-white ring-1 ring-white/28 hover:bg-white/21 backdrop-blur-md',
+    'bg-surface text-ink border border-line shadow-xs hover:bg-sunken active:bg-line/60 ' +
+    'disabled:text-ink-4 disabled:shadow-none',
+  ghost: 'bg-transparent text-ink-2 hover:bg-line/50 active:bg-line disabled:text-ink-4',
+  danger:
+    'bg-danger-600 text-white shadow-xs hover:bg-danger-700 active:bg-danger-700 disabled:bg-line-strong',
+  onDark: 'bg-white/12 text-white ring-1 ring-white/25 hover:bg-white/20',
 }
 
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  md: 'px-4 py-3 text-base gap-2',
-  lg: 'px-5 py-4 text-lg gap-2.5',
+  md: 'px-4 py-2.5 text-[0.9375rem] gap-2',
+  lg: 'px-5 py-3.5 text-base gap-2.5',
 }
 
 export function Button({ variant = 'primary', size = 'md', icon, full, className, children, ...rest }: ButtonProps) {
@@ -55,7 +66,7 @@ export function Button({ variant = 'primary', size = 'md', icon, full, className
     <button
       className={cx(
         'tap-safe press press-active inline-flex items-center justify-center rounded-field',
-        'font-semibold tracking-[-0.01em] select-none',
+        'font-semibold tracking-[-0.006em] select-none',
         BUTTON_STYLES[variant],
         BUTTON_SIZES[size],
         full && 'w-full',
@@ -72,25 +83,26 @@ export function Button({ variant = 'primary', size = 'md', icon, full, className
 // ------------------------------------------------------------------ Card ---
 
 /**
- * `glass` is the default surface. `plain` exists because `glass-panel` sets the
- * `background` *shorthand*, which silently wins over any `bg-*` class passed in
- * `className`: a card asking for a dark or tinted background got the white glass
- * gradient anyway, and white-on-white text with it. A card that supplies its own
- * background must therefore opt out of the glass, not fight it.
+ * The default surface: opaque white, one hairline, a shadow you have to look
+ * for. `plain` opts out of the border and fill entirely, for a card that brings
+ * its own background — a tinted callout, or the dark instruction sheet.
+ *
+ * Kept as a variant rather than something a caller can override with a `bg-*`
+ * class, because `surface-card` sets `background` and would silently win.
  */
 export function Card({
   children,
   className,
   as: As = 'div',
-  variant = 'glass',
+  variant = 'default',
 }: {
   children: ReactNode
   className?: string
   as?: 'div' | 'section' | 'li'
-  variant?: 'glass' | 'plain'
+  variant?: 'default' | 'plain'
 }) {
   return (
-    <As className={cx(variant === 'glass' ? 'glass-panel' : 'shadow-card', 'rounded-card p-4', className)}>
+    <As className={cx(variant === 'default' && 'surface-card', 'rounded-card p-4', className)}>
       {children}
     </As>
   )
@@ -98,9 +110,11 @@ export function Card({
 
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="mb-2.5 flex items-center justify-between gap-2">
-      <h2 className="flex items-center gap-2 text-[0.7rem] font-extrabold tracking-[0.14em] text-slate-500 uppercase">
-        <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+    <div className="mb-2.5 flex items-baseline justify-between gap-3">
+      {/* The dot went. A coloured marker on every section header spends
+          semantic colour on decoration, which is exactly what makes a real
+          warning stop registering. */}
+      <h2 className="text-[0.6875rem] font-semibold tracking-[0.09em] text-ink-3 uppercase">
         {children}
       </h2>
       {action}
@@ -123,7 +137,7 @@ export function Field({ label, hint, error, required, adornment, children }: Fie
   return (
     <label className="block">
       <span className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-sm font-semibold text-slate-700">
+        <span className="text-[0.8125rem] font-semibold text-ink-2">
           {label}
           {required && <span className="ml-0.5 text-danger-600">*</span>}
         </span>
@@ -131,18 +145,26 @@ export function Field({ label, hint, error, required, adornment, children }: Fie
       </span>
       {children}
       {error ? (
-        <span className="mt-1.5 block text-sm font-medium text-danger-600">{error}</span>
+        <span className="mt-1.5 block text-[0.8125rem] font-medium text-danger-700">{error}</span>
       ) : hint ? (
-        <span className="mt-1.5 block text-sm text-slate-500">{hint}</span>
+        <span className="mt-1.5 block text-[0.8125rem] text-ink-3">{hint}</span>
       ) : null}
     </label>
   )
 }
 
+/*
+ * White fill, hairline border, and a focus ring that is unmissable.
+ *
+ * The old control was translucent over a gradient, so its edge moved with
+ * whatever sat behind it. A form field has to look like a slot you can put
+ * something into, in daylight, at a glance.
+ */
 const CONTROL_BASE =
-  'w-full rounded-field border border-white/75 bg-white/65 px-3.5 py-3 text-slate-900 ' +
-  'shadow-[inset_0_1px_0_rgb(255_255_255_/_0.82),0_6px_18px_rgb(15_23_42_/_0.04)] ' +
-  'placeholder:text-slate-400 transition-[box-shadow,border-color,background-color] focus:border-brand-300 focus:bg-white/85 focus:ring-2 focus:ring-brand-500/25'
+  'w-full rounded-field border border-line-strong bg-surface px-3.5 py-2.5 text-ink ' +
+  'shadow-xs placeholder:text-ink-4 transition-[box-shadow,border-color] ' +
+  'focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none ' +
+  'disabled:bg-sunken disabled:text-ink-3'
 
 export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cx(CONTROL_BASE, 'tap-safe', className)} {...rest} />
@@ -165,19 +187,19 @@ export function Select({ className, children, ...rest }: SelectHTMLAttributes<HT
 type Tone = 'neutral' | 'brand' | 'urgent' | 'watch' | 'ok' | 'accent'
 
 const TONE_STYLES: Record<Tone, string> = {
-  neutral: 'bg-slate-100/75 text-slate-600 ring-slate-200/80',
-  brand: 'bg-brand-50/90 text-brand-800 ring-brand-200/80',
-  urgent: 'bg-danger-50/90 text-danger-700 ring-danger-200/80',
-  watch: 'bg-warn-50/90 text-warn-700 ring-warn-200/80',
-  ok: 'bg-ok-50/90 text-ok-700 ring-ok-200/80',
-  accent: 'bg-accent-50/90 text-accent-700 ring-accent-100',
+  neutral: 'bg-sunken text-ink-2 ring-line',
+  brand: 'bg-brand-50 text-brand-800 ring-brand-200',
+  urgent: 'bg-danger-50 text-danger-700 ring-danger-200',
+  watch: 'bg-warn-50 text-warn-700 ring-warn-200',
+  ok: 'bg-ok-50 text-ok-700 ring-ok-200',
+  accent: 'bg-info-50 text-info-700 ring-info-200',
 }
 
 export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 backdrop-blur-sm',
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.75rem] font-semibold ring-1',
         TONE_STYLES[tone],
       )}
     >
@@ -198,11 +220,11 @@ export function Avatar({
   size?: 'sm' | 'md' | 'lg'
 }) {
   const { bg, fg } = avatarColour(`${familyName}${givenName ?? ''}`)
-  const dims = size === 'lg' ? 'size-16 text-xl' : size === 'sm' ? 'size-9 text-xs' : 'size-12 text-sm'
+  const dims = size === 'lg' ? 'size-14 text-lg' : size === 'sm' ? 'size-9 text-xs' : 'size-11 text-sm'
   return (
     <span
       aria-hidden
-      className={cx('grid shrink-0 place-items-center rounded-2xl font-bold shadow-sm ring-2 ring-white/80', dims, bg, fg)}
+      className={cx('grid shrink-0 place-items-center rounded-xl font-semibold', dims, bg, fg)}
     >
       {makeInitials(familyName, givenName)}
     </span>
@@ -229,16 +251,20 @@ export function StatTile({
     <Tag
       onClick={onClick}
       className={cx(
-        'glass-subtle flex flex-col gap-0.5 rounded-card px-3 py-3 text-left',
-        TONE_STYLES[tone],
-        onClick && 'press press-active',
+        'surface-card flex flex-col gap-1.5 rounded-card px-3.5 py-3 text-left',
+        tone !== 'neutral' && TONE_STYLES[tone],
+        onClick && 'press press-active hover:border-line-strong',
       )}
     >
-      <span className="flex items-center gap-1.5 text-xs font-semibold opacity-80">
+      {/* Label above value, not below: the eye lands on the number and needs
+          to already know what it is looking at. */}
+      <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-[0.06em] text-ink-3 uppercase">
         {icon}
         <span className="truncate">{label}</span>
       </span>
-      <span className="numeric text-2xl leading-none font-extrabold tracking-tight">{value}</span>
+      <span className="numeric text-[1.75rem] leading-none font-semibold tracking-[-0.03em] text-ink">
+        {value}
+      </span>
     </Tag>
   )
 }
@@ -257,12 +283,12 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="glass-subtle animate-rise flex flex-col items-center gap-3 rounded-[2rem] px-6 py-14 text-center">
+    <div className="surface-card animate-rise flex flex-col items-center gap-3 rounded-card px-6 py-14 text-center">
       {icon && (
         <span className="grid size-16 place-items-center rounded-3xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">{icon}</span>
       )}
-      <p className="text-lg font-bold text-slate-800">{title}</p>
-      {hint && <p className="max-w-xs text-sm leading-relaxed text-slate-500">{hint}</p>}
+      <p className="text-base font-semibold text-ink">{title}</p>
+      {hint && <p className="max-w-xs text-sm leading-relaxed text-ink-3">{hint}</p>}
       {action}
     </div>
   )
@@ -273,7 +299,7 @@ export function SkeletonRows({ count = 4 }: { count?: number }) {
   return (
     <ul className="flex flex-col gap-2" aria-hidden>
       {Array.from({ length: count }, (_, i) => (
-        <li key={i} className="glass-subtle flex items-center gap-3 rounded-card p-3.5">
+        <li key={i} className="surface-card flex items-center gap-3 rounded-card p-3.5">
           <span className="skeleton size-12 rounded-2xl" />
           <span className="flex-1 space-y-2">
             <span className="skeleton block h-3.5 w-2/5 rounded-full" />
@@ -287,8 +313,8 @@ export function SkeletonRows({ count = 4 }: { count?: number }) {
 
 export function Spinner({ label }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-3 py-10 text-slate-500" role="status">
-      <span className="size-5 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600" />
+    <div className="flex items-center justify-center gap-3 py-10 text-ink-3" role="status">
+      <span className="size-5 animate-spin rounded-full border-2 border-line border-t-brand-600" />
       {label && <span className="text-sm">{label}</span>}
     </div>
   )
@@ -306,7 +332,7 @@ export function ActionBar({ children }: { children: ReactNode }) {
     // viewport when the page is short; `sticky` keeps it there once it scrolls.
     // Without both, a short screen strands the bar halfway down with dead space
     // beneath it.
-    <div className="glass-panel sticky bottom-0 z-20 -mx-3 mt-auto rounded-t-[1.5rem] border-x-0 border-b-0 px-3 pt-3 pb-safe">
+    <div className="sticky bottom-0 z-20 -mx-3 mt-auto border-t border-line bg-surface px-3 pt-3 pb-safe">
       <div className="mx-auto flex max-w-5xl gap-2.5">{children}</div>
     </div>
   )
@@ -371,7 +397,7 @@ export function MoreMenu({ label, items }: { label: string; items: MenuItem[] })
         aria-label={label}
         aria-expanded={at !== null}
         aria-haspopup="menu"
-        className="tap-safe press press-active grid shrink-0 place-items-center rounded-2xl bg-white/55 text-slate-700 hover:bg-white"
+        className="tap-safe press press-active grid shrink-0 place-items-center rounded-field text-ink-2 hover:bg-line/60"
       >
         <MoreVertical size={20} />
       </button>
@@ -385,13 +411,13 @@ export function MoreMenu({ label, items }: { label: string; items: MenuItem[] })
               onClick={() => setAt(null)}
               className="fixed inset-0 z-[60] cursor-default bg-transparent"
             />
-            {/* Opaque, not `glass-panel`. A translucent surface is fine for a
+            {/* Opaque, not `surface-card`. A translucent surface is fine for a
                 panel sitting in the page flow, but a menu floats over arbitrary
                 content and has to stay readable against whatever is under it. */}
             <div
               role="menu"
               style={{ top: at.top, right: at.right }}
-              className="animate-rise fixed z-[61] flex w-60 flex-col gap-0.5 rounded-[1.25rem] bg-white p-1.5 shadow-float ring-1 ring-slate-200/80"
+              className="animate-rise fixed z-[61] flex w-60 flex-col gap-0.5 rounded-card bg-surface p-1.5 shadow-float ring-1 ring-line"
             >
               {items.map((item) => (
                 <button
@@ -405,7 +431,7 @@ export function MoreMenu({ label, items }: { label: string; items: MenuItem[] })
                     'press press-active flex items-center gap-2.5 rounded-2xl px-3 py-3 text-left text-sm font-semibold',
                     item.danger
                       ? 'text-danger-700 hover:bg-danger-50'
-                      : 'text-slate-700 hover:bg-slate-100',
+                      : 'text-ink-2 hover:bg-sunken',
                   )}
                 >
                   <span className="grid size-5 shrink-0 place-items-center">{item.icon}</span>

@@ -66,13 +66,13 @@ export function MergePatient() {
       showBack
     >
       <div className="flex flex-col gap-4 pb-6">
-        <Card className="flex gap-3 text-sm text-slate-600">
+        <Card className="flex gap-3 text-sm text-ink-2">
           <Merge size={18} className="mt-0.5 shrink-0 text-brand-600" />
           <p>{t.mergeHint}</p>
         </Card>
 
         <div className="relative">
-          <Search size={19} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-slate-400" />
+          <Search size={19} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-ink-4" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -98,12 +98,12 @@ export function MergePatient() {
                     <button
                       disabled={busy}
                       onClick={() => merge(p.id, name)}
-                      className="press press-active glass-panel flex w-full items-center gap-3 rounded-card p-3 text-left disabled:opacity-50"
+                      className="press press-active surface-card flex w-full items-center gap-3 rounded-card p-3 text-left disabled:opacity-50"
                     >
                       <Avatar familyName={p.familyName} givenName={p.givenName} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-extrabold text-slate-900">{name}</span>
-                        <span className="mt-0.5 block truncate text-sm text-slate-500">
+                        <span className="block truncate font-extrabold text-ink">{name}</span>
+                        <span className="mt-0.5 block truncate text-sm text-ink-3">
                           {[
                             age !== undefined ? `${age} ${t.years}` : null,
                             p.registerNo ? `${t.registerNo} ${p.registerNo}` : null,
@@ -113,7 +113,7 @@ export function MergePatient() {
                             .join(' · ')}
                         </span>
                       </span>
-                      <Merge size={18} className="shrink-0 text-slate-300" />
+                      <Merge size={18} className="shrink-0 text-ink-4" />
                     </button>
                   </li>
                 )

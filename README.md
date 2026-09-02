@@ -10,7 +10,7 @@
   <a href="https://github.com/SyedMohammedSameer/AfyaCore/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/SyedMohammedSameer/AfyaCore/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="Licence: MIT" src="https://img.shields.io/badge/licence-MIT-0d8b7d.svg"></a>
   <img alt="PWA" src="https://img.shields.io/badge/PWA-installable-0d8b7d.svg">
-  <img alt="Bundle" src="https://img.shields.io/badge/initial%20load-~135%20kB%20gzip-0d8b7d.svg">
+  <img alt="Bundle" src="https://img.shields.io/badge/initial%20load-~137%20kB%20gzip-0d8b7d.svg">
   <img alt="Offline" src="https://img.shields.io/badge/offline-first-0d8b7d.svg">
 </p>
 
@@ -46,6 +46,28 @@ breathe:
   <img src="docs/screenshots/desktop-roster.webp" alt="Patient roster on desktop" width="820"><br><br>
   <img src="docs/screenshots/desktop-settings.webp" alt="Reporting, sync and export privacy settings" width="820">
 </p>
+
+## The interface
+
+Flat, cool and high-contrast, on an opaque `#F4F6F8` ground. The earlier treatment was glass and
+gradient, which reads as a consumer app and, more to the point, spends contrast on decoration:
+translucency over a coloured ground is exactly what fails on a cheap LCD held under a metal roof at
+midday. Depth here comes from a 1px hairline and a shadow you have to look for. Colour is reserved
+for meaning — a red pill on this screen means a vital is out of range and nothing else.
+
+The palette is cool because the systems this app has to sit beside are cool. DHIS2, IBM Carbon
+(which OpenMRS 3 is built on) and the NHS design system are all blue-grey or neutral, and those are
+the tools the people deploying this already use.
+
+Type is **IBM Plex Sans**, and it is now actually shipped. The stack previously named `Inter` and
+never loaded it, so on an Android phone the app silently rendered in whatever the system happened to
+have — which is also what every screenshot in this README used to show. One variable file covers
+every weight. Only the latin subset is declared, by hand: the package's own stylesheet declares six
+subsets, and while a browser fetches only the range it needs, the *bundler* does not — vite emitted
+all six and the service worker precached 162 kB of fonts for scripts this app has no strings in.
+French, Malagasy and English all fit inside latin, so 45 kB is the whole typographic budget, paid
+once and then cached permanently.
+
 
 ## In code
 
@@ -328,8 +350,9 @@ dependency (~7 MB) and it is downloaded only when someone asks for it. Every mod
 [`docs/MODEL-RESEARCH.md`](docs/MODEL-RESEARCH.md) is an upgrade path behind an interface, not a
 launch blocker, which is what keeps the install small enough for a 2G connection.
 
-Initial download: **~135 kB gzipped** (125 kB JS + 10 kB CSS), service-worker precache 535 kB.
-Routes beyond the home screen load on demand and are then cached permanently by the service worker.
+Initial download: **~137 kB gzipped** (the entry chunk and its stylesheet) plus a 45 kB font.
+Routes beyond the home screen load on demand and are then cached permanently by the service worker;
+the full precached shell is 226 kB over the wire, 612 KiB on disk.
 
 ## One app, every device
 
@@ -473,8 +496,9 @@ destroyed. Accuracy numbers never fail a build; correctness failures do.
 
 | Install | |
 |---|---|
-| Initial load, blocking | 138 kB gzip |
-| Precached shell, background | 181 kB gzip |
+| Initial load, blocking | 137 kB gzip |
+| Interface font, `font-display: swap` | 45 kB raw |
+| Precached shell, background | 226 kB |
 | On demand, never precached | OCR ~7 MB · PII model ~67 MB |
 
 Three things this table is careful about:

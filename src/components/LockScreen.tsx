@@ -110,7 +110,7 @@ function FirstAccountForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <Card className="flex flex-col gap-3">
-      <p className="text-sm text-slate-600">{t.firstRunHint}</p>
+      <p className="text-sm text-ink-2">{t.firstRunHint}</p>
 
       <Field label={t.yourName}>
         <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
@@ -226,7 +226,7 @@ function SignInForm() {
       )}
 
       {staff.length === 1 && (
-        <p className="flex items-center justify-center gap-2 text-base font-semibold text-slate-700">
+        <p className="flex items-center justify-center gap-2 text-base font-semibold text-ink-2">
           <UserRound size={18} />
           {staff[0]!.name}
         </p>
@@ -240,7 +240,7 @@ function SignInForm() {
             key={i}
             className={cx(
               'size-3.5 rounded-full transition-colors',
-              i < pin.length ? 'bg-brand-600' : 'bg-slate-200',
+              i < pin.length ? 'bg-brand-600' : 'bg-line',
             )}
           />
         ))}
@@ -288,7 +288,7 @@ function Keypad({
 }: { children: React.ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      className="tap-safe press press-active flex h-14 items-center justify-center rounded-field bg-white/70 text-xl font-semibold text-slate-800 ring-1 ring-slate-200/70 hover:bg-white active:bg-slate-50"
+      className="tap-safe press press-active flex h-14 items-center justify-center rounded-field bg-white/70 text-xl font-semibold text-ink ring-1 ring-line/70 hover:bg-white active:bg-sunken"
       {...rest}
     >
       {children}

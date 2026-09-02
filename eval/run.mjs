@@ -255,8 +255,12 @@ async function runDeident(scrubFreeText, deidentifyText) {
  *
  *   initial    the entry chunk and its stylesheet, what a cold visit blocks on
  *   precached  everything the service worker pulls in the background, which
- *              includes every lazily-imported route
+ *              includes every lazily-imported route and the interface font
  *   onDemand   fetched only if a facility asks for the feature, never precached
+ *
+ * The font is counted raw and reported separately. woff2 is Brotli-compressed
+ * inside the container, so gzipping it again measures nothing, and folding it
+ * silently into a gzip total would understate what the phone actually pulls.
  */
 async function measureBundle() {
   const assets = join(root, 'dist', 'assets')
@@ -270,6 +274,7 @@ async function measureBundle() {
   let initialGzip = 0
   let precachedGzip = 0
   let onDemandRaw = 0
+  let fontRaw = 0
 
   for (const file of files) {
     const path = join(assets, file)
@@ -278,6 +283,10 @@ async function measureBundle() {
     // Mirrors globIgnores in vite.config.ts: these never enter the precache.
     if (/transformers|ort-/.test(file)) {
       onDemandRaw += size
+      continue
+    }
+    if (/\.woff2?$/.test(file)) {
+      fontRaw += size
       continue
     }
     if (!/\.(js|css)$/.test(file)) continue
@@ -291,7 +300,8 @@ async function measureBundle() {
 
   return {
     initialGzipKb: Number((initialGzip / 1024).toFixed(1)),
-    precachedGzipKb: Number((precachedGzip / 1024).toFixed(1)),
+    precachedGzipKb: Number(((precachedGzip + fontRaw) / 1024).toFixed(1)),
+    fontRawKb: Number((fontRaw / 1024).toFixed(1)),
     onDemandRawKb: Number((onDemandRaw / 1024).toFixed(1)),
   }
 }
@@ -371,7 +381,8 @@ function printReport(report) {
     line(`  ${b.error}`)
   } else {
     line(`  initial load (blocking)       ${String(b.initialGzipKb).padStart(7)} kB gzip`)
-    line(`  precached shell (background)  ${String(b.precachedGzipKb).padStart(7)} kB gzip`)
+    line(`  interface font (swap, cached) ${String(b.fontRawKb).padStart(7)} kB raw`)
+    line(`  precached shell (background)  ${String(b.precachedGzipKb).padStart(7)} kB`)
     line(`  on demand, never precached    ${String(b.onDemandRawKb).padStart(7)} kB raw`)
   }
 

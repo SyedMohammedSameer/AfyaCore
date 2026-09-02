@@ -26,7 +26,7 @@ export function LanguageMenu({ onDark = false, expand = false }: { onDark?: bool
         expand ? 'w-full justify-between px-3 py-2.5 text-sm' : 'px-2.5 py-2',
         onDark
           ? 'bg-white/13 text-white/90 ring-white/20 hover:bg-white/20'
-          : 'bg-white/70 text-slate-700 ring-slate-200/80 hover:bg-white',
+          : 'bg-white/70 text-ink-2 ring-line/80 hover:bg-white',
       )}
     >
       <span className="inline-flex items-center gap-1.5">

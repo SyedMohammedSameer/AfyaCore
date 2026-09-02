@@ -1,8 +1,8 @@
 import { Link, useNavigate } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowUpRight, CalendarPlus, ClipboardList, FileEdit, Sparkles, UserPlus, Users } from 'lucide-react'
+import { ArrowUpRight, CalendarPlus, ClipboardList, FileEdit, Sparkles, UserPlus } from 'lucide-react'
 import { AppShell } from '../components/AppShell'
-import { Avatar, Badge, Button, Card, EmptyState, SectionTitle, SkeletonRows, riseStyle } from '../components/ui'
+import { Avatar, Badge, Button, EmptyState, SectionTitle, SkeletonRows, riseStyle } from '../components/ui'
 import { db } from '../db/db'
 import { seedDemoData } from '../db/seed'
 import { liveEncounters, livePatientCount, patientAge } from '../db/repo'
@@ -25,11 +25,19 @@ interface Overview {
   recent: { patient: Patient; lastVisit?: number }[]
 }
 
-function Metric({ label, value, bright = false }: { label: string; value: number; bright?: boolean }) {
+/**
+ * One number and what it counts.
+ *
+ * Label above value: the eye lands on the digit, and it should already know
+ * what the digit means rather than having to travel back up.
+ */
+function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className={bright ? 'rounded-2xl bg-white/18 p-3.5 ring-1 ring-white/20 backdrop-blur-sm' : 'glass-subtle rounded-2xl p-3.5'}>
-      <p className={bright ? 'text-xs font-bold tracking-wide text-white/65' : 'text-xs font-bold tracking-wide text-slate-500'}>{label}</p>
-      <p className={bright ? 'numeric mt-1 text-3xl leading-none font-extrabold tracking-[-0.06em] text-white' : 'numeric mt-1 text-3xl leading-none font-extrabold tracking-[-0.06em] text-slate-900'}>{value}</p>
+    <div className="surface-card rounded-card px-3.5 py-3">
+      <p className="text-[0.6875rem] font-semibold tracking-[0.06em] text-ink-3 uppercase">{label}</p>
+      <p className="numeric mt-1.5 text-[1.75rem] leading-none font-semibold tracking-[-0.03em] text-ink">
+        {value}
+      </p>
     </div>
   )
 }
@@ -83,37 +91,44 @@ export function HomeScreen() {
     <AppShell
       title={t.today}
       subtitle={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}
-      variant="hero"
       tabs
-      heroContent={
-        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="relative overflow-hidden rounded-[1.55rem] bg-white/10 p-4 ring-1 ring-white/18 backdrop-blur-sm">
-            <div className="pointer-events-none absolute -top-10 -right-8 size-32 rounded-full bg-white/12 blur-2xl" />
-            <div className="relative">
-              <p className="flex items-center gap-2 text-[0.7rem] font-extrabold tracking-[0.14em] text-white/65 uppercase">
-                <Sparkles size={14} /> {t.quickActions}
-              </p>
-              <p className="mt-2 max-w-md text-lg font-bold tracking-[-0.035em] text-white">{t.newEncounter}</p>
-              <p className="mt-1 max-w-md text-sm leading-relaxed text-white/68">{t.noActivityHint}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button variant="onDark" icon={<CalendarPlus size={18} />} onClick={() => navigate('/patients')}>
-                  {t.newEncounter}
-                </Button>
-                <Button variant="onDark" icon={<UserPlus size={18} />} onClick={() => navigate('/patient/new')}>
-                  {t.newPatient}
-                </Button>
-              </div>
-            </div>
+    >
+      {/*
+        The primary action leads, then the numbers, then the work.
+
+        This was a brand-gradient panel whose top third carried no information
+        at all: a heading that repeated the button beneath it, on a coloured
+        slab. A clinician opening this screen wants one of two things, and both
+        are now the first thing they can touch.
+      */}
+      <div className="flex flex-col gap-5 pb-4">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="lg"
+              icon={<CalendarPlus size={18} />}
+              onClick={() => navigate('/patients')}
+              className="flex-1 sm:flex-none"
+            >
+              {t.newEncounter}
+            </Button>
+            <Button
+              size="lg"
+              variant="secondary"
+              icon={<UserPlus size={18} />}
+              onClick={() => navigate('/patient/new')}
+              className="flex-1 sm:flex-none"
+            >
+              {t.newPatient}
+            </Button>
           </div>
-          <div className="grid grid-cols-3 gap-2.5 self-end">
-            <Metric label={t.consultationsToday} value={data?.todayCount ?? 0} bright />
-            <Metric label={t.thisMonth} value={data?.monthCount ?? 0} bright />
-            <Metric label={t.patients} value={total} bright />
+          <div className="grid grid-cols-3 gap-2.5">
+            <Metric label={t.consultationsToday} value={data?.todayCount ?? 0} />
+            <Metric label={t.thisMonth} value={data?.monthCount ?? 0} />
+            <Metric label={t.patients} value={total} />
           </div>
         </div>
-      }
-    >
-      <div className="flex flex-col gap-5 pb-4">
+
         {data === undefined ? (
           <SkeletonRows count={4} />
         ) : (
@@ -126,20 +141,19 @@ export function HomeScreen() {
                     <Link
                       key={draft.id}
                       to={`/patient/${draft.patientId}/encounter/${draft.id}`}
-                      className="press press-active glass-panel group relative overflow-hidden rounded-card p-4"
+                      className="press press-active surface-card group relative overflow-hidden rounded-card p-4"
                       style={riseStyle(index)}
                     >
-                      <div className="pointer-events-none absolute top-0 right-0 size-20 rounded-bl-[2.5rem] bg-warn-100/70" />
                       <div className="relative flex items-start gap-3">
-                        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-warn-100 text-warn-700 ring-1 ring-warn-200">
+                        <span className="grid size-10 shrink-0 place-items-center rounded-field bg-warn-50 text-warn-700 ring-1 ring-warn-200">
                           <FileEdit size={20} />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-base font-extrabold text-slate-900">
+                          <span className="block truncate text-[0.9375rem] font-semibold text-ink">
                             {draft.patient ? `${draft.patient.familyName} ${draft.patient.givenName}` : t.unknown}
                           </span>
-                          <span className="mt-1 block truncate text-sm text-slate-500">{draft.chiefComplaint || draft.diagnosis || t.draft}</span>
-                          <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-warn-700">
+                          <span className="mt-1 block truncate text-sm text-ink-3">{draft.chiefComplaint || draft.diagnosis || t.draft}</span>
+                          <span className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold text-warn-700">
                             <Badge tone="watch">{t.resumeDraft}</Badge>
                             <ArrowUpRight size={14} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                           </span>
@@ -151,82 +165,59 @@ export function HomeScreen() {
               </section>
             )}
 
-            <div className="grid gap-5 lg:grid-cols-[1.42fr_0.9fr]">
-              <section>
-                <SectionTitle
+            <section>
+              <SectionTitle
+                action={
+                  <Link to="/patients" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800">
+                    {t.seeAll}<ArrowUpRight size={14} />
+                  </Link>
+                }
+              >
+                {t.recentPatients}
+              </SectionTitle>
+              {data.recent.length === 0 ? (
+                <EmptyState
+                  icon={<ClipboardList size={30} />}
+                  title={t.noActivityToday}
+                  hint={t.noActivityHint}
                   action={
-                    <Link to="/patients" className="inline-flex items-center gap-1 text-xs font-extrabold text-brand-700">
-                      {t.seeAll}<ArrowUpRight size={14} />
-                    </Link>
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                      <Button variant="secondary" icon={<Sparkles size={18} />} onClick={() => void seedDemoData()}>
+                        {t.loadDemo}
+                      </Button>
+                      <Button icon={<UserPlus size={18} />} onClick={() => navigate('/patient/new')}>
+                        {t.newPatient}
+                      </Button>
+                    </div>
                   }
-                >
-                  {t.recentPatients}
-                </SectionTitle>
-                {data.recent.length === 0 ? (
-                  <EmptyState
-                    icon={<ClipboardList size={30} />}
-                    title={t.noActivityToday}
-                    hint={t.noActivityHint}
-                    action={
-                      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                        <Button variant="secondary" icon={<Sparkles size={18} />} onClick={() => void seedDemoData()}>
-                          {t.loadDemo}
-                        </Button>
-                        <Button icon={<UserPlus size={18} />} onClick={() => navigate('/patient/new')}>
-                          {t.newPatient}
-                        </Button>
-                      </div>
-                    }
-                  />
-                ) : (
-                  <div className="glass-panel overflow-hidden rounded-card p-1.5">
-                    <ul className="divide-y divide-slate-200/70">
-                      {data.recent.map(({ patient, lastVisit }, index) => {
-                        const age = patientAge(patient)
-                        return (
-                          <li key={patient.id} className="animate-rise" style={riseStyle(index)}>
-                            <Link
-                              to={`/patient/${patient.id}`}
-                              className="press press-active group flex items-center gap-3 rounded-[1.15rem] px-3 py-3.5 hover:bg-white/68"
-                            >
-                              <Avatar familyName={patient.familyName} givenName={patient.givenName} />
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate font-extrabold text-slate-900">{patient.familyName} {patient.givenName}</span>
-                                <span className="mt-0.5 block truncate text-sm text-slate-500">
-                                  {[age !== undefined ? `${age} ${t.years}` : null, lastVisit ? Date.now() - lastVisit < DAY ? t.today : `${t.lastSeen} ${formatDate(lastVisit, lang)}` : t.never].filter(Boolean).join(' · ')}
-                                </span>
+                />
+              ) : (
+                <div className="surface-card overflow-hidden rounded-card p-1.5">
+                  <ul className="divide-y divide-line/70">
+                    {data.recent.map(({ patient, lastVisit }, index) => {
+                      const age = patientAge(patient)
+                      return (
+                        <li key={patient.id} className="animate-rise" style={riseStyle(index)}>
+                          <Link
+                            to={`/patient/${patient.id}`}
+                            className="press press-active group flex items-center gap-3 rounded-[1.15rem] px-3 py-3.5 hover:bg-white/68"
+                          >
+                            <Avatar familyName={patient.familyName} givenName={patient.givenName} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-extrabold text-ink">{patient.familyName} {patient.givenName}</span>
+                              <span className="mt-0.5 block truncate text-sm text-ink-3">
+                                {[age !== undefined ? `${age} ${t.years}` : null, lastVisit ? Date.now() - lastVisit < DAY ? t.today : `${t.lastSeen} ${formatDate(lastVisit, lang)}` : t.never].filter(Boolean).join(' · ')}
                               </span>
-                              <ArrowUpRight size={18} className="shrink-0 text-slate-300 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand-600" />
-                            </Link>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </div>
-                )}
-              </section>
-
-              <section>
-                <SectionTitle>{t.patients}</SectionTitle>
-                {/* `flex` on the card and `flex-1` on the content, not `h-full`:
-                    a percentage height against a parent that only has `min-h`
-                    is indeterminate, so the column collapsed to its content and
-                    the `mt-auto` below never pushed anything anywhere. */}
-                <Card variant="plain" className="relative flex min-h-[14rem] flex-col overflow-hidden bg-slate-950 text-white">
-                  <div className="grid-dots pointer-events-none absolute inset-0 opacity-25" />
-                  <div className="pointer-events-none absolute -top-12 -right-12 size-40 rounded-full bg-brand-400/30 blur-2xl" />
-                  <div className="relative flex flex-1 flex-col">
-                    <span className="grid size-11 place-items-center rounded-2xl bg-white/10 text-brand-200 ring-1 ring-white/15"><Users size={21} /></span>
-                    <p className="numeric mt-5 text-5xl leading-none font-extrabold tracking-[-0.07em]">{total}</p>
-                    <p className="mt-1 text-sm font-semibold text-white/65">{t.patientCount}</p>
-                    <Link to="/patients" className="press mt-auto inline-flex items-center gap-2 self-start rounded-xl bg-white/12 px-3 py-2 text-sm font-bold text-white ring-1 ring-white/16 hover:bg-white/18">
-                      {t.seeAll}<ArrowUpRight size={16} />
-                    </Link>
-                  </div>
-                </Card>
-              </section>
-            </div>
-          </>
+                            </span>
+                            <ArrowUpRight size={18} className="shrink-0 text-ink-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand-600" />
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )}
+            </section>          </>
         )}
       </div>
     </AppShell>

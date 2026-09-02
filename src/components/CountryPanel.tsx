@@ -50,7 +50,7 @@ export function CountryPanel() {
     <section>
       <SectionTitle>{t.country}</SectionTitle>
       <Card className="flex flex-col gap-3">
-        <p className="text-sm text-slate-600">{t.countryHint}</p>
+        <p className="text-sm text-ink-2">{t.countryHint}</p>
 
         <Field label={t.country}>
           <Select
@@ -71,33 +71,33 @@ export function CountryPanel() {
             {t.save}
           </Button>
         )}
-        {!editable && <p className="text-sm text-slate-500">{t.adminOnly}</p>}
+        {!editable && <p className="text-sm text-ink-3">{t.adminOnly}</p>}
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 rounded-field bg-white/50 p-3 text-sm">
-          <dt className="text-slate-500">{t.clinicalLanguage}</dt>
-          <dd className="font-medium text-slate-800">{profile.clinicalLang.toUpperCase()}</dd>
+          <dt className="text-ink-3">{t.clinicalLanguage}</dt>
+          <dd className="font-medium text-ink">{profile.clinicalLang.toUpperCase()}</dd>
 
-          <dt className="text-slate-500">{t.facilityType}</dt>
-          <dd className="font-medium text-slate-800">{profile.facilityTerm}</dd>
+          <dt className="text-ink-3">{t.facilityType}</dt>
+          <dd className="font-medium text-ink">{profile.facilityTerm}</dd>
 
-          <dt className="text-slate-500">{t.reportingSystem}</dt>
-          <dd className="font-medium text-slate-800">{profile.hmis}</dd>
+          <dt className="text-ink-3">{t.reportingSystem}</dt>
+          <dd className="font-medium text-ink">{profile.hmis}</dd>
 
-          <dt className="text-slate-500">{t.dataProtectionLaw}</dt>
-          <dd className="font-medium text-slate-800">{law.law}</dd>
+          <dt className="text-ink-3">{t.dataProtectionLaw}</dt>
+          <dd className="font-medium text-ink">{law.law}</dd>
 
-          <dt className="text-slate-500">{t.regulator}</dt>
-          <dd className="font-medium text-slate-800">{law.regulator}</dd>
+          <dt className="text-ink-3">{t.regulator}</dt>
+          <dd className="font-medium text-ink">{law.regulator}</dd>
 
-          <dt className="text-slate-500">{t.breachWindow}</dt>
-          <dd className="font-medium text-slate-800">
+          <dt className="text-ink-3">{t.breachWindow}</dt>
+          <dd className="font-medium text-ink">
             {/* "Unconfirmed" rather than a plausible-looking default. A wrong
                 number here gets followed; a missing one gets asked about. */}
             {law.breachNotificationHours ? `${law.breachNotificationHours} h` : t.unconfirmed}
           </dd>
 
-          <dt className="text-slate-500">{t.retention}</dt>
-          <dd className="font-medium text-slate-800">
+          <dt className="text-ink-3">{t.retention}</dt>
+          <dd className="font-medium text-ink">
             {law.retentionYears ? `${law.retentionYears} ${t.years}` : t.unconfirmed}
           </dd>
         </dl>

@@ -105,7 +105,7 @@ export function Review() {
       }
     >
       <div className="flex flex-col gap-5 pb-4">
-        <p className="text-sm text-slate-500">{formatDateTime(encounter.occurredAt, lang)}</p>
+        <p className="text-sm text-ink-3">{formatDateTime(encounter.occurredAt, lang)}</p>
 
         {isDraft && uncertain.length > 0 && (
           <Card variant="plain" className="bg-warn-50 ring-1 ring-warn-200">
@@ -132,7 +132,7 @@ export function Review() {
                   <SectionTitle>{t.chiefComplaint}</SectionTitle>
                   <ProvenanceChip provenance={encounter.provenance.chiefComplaint} />
                 </div>
-                <p className="text-slate-900">{encounter.chiefComplaint}</p>
+                <p className="text-ink">{encounter.chiefComplaint}</p>
               </Card>
             )}
             {encounter.diagnosis && (
@@ -141,7 +141,7 @@ export function Review() {
                   <SectionTitle>{t.diagnosis}</SectionTitle>
                   <ProvenanceChip provenance={encounter.provenance.diagnosis} />
                 </div>
-                <p className="text-lg font-semibold text-slate-900">{encounter.diagnosis}</p>
+                <p className="text-lg font-semibold text-ink">{encounter.diagnosis}</p>
               </Card>
             )}
           </section>
@@ -159,7 +159,7 @@ export function Review() {
                     <div key={k} className="min-w-0">
                       {/* Wraps rather than colliding: "Tension (sys)" plus an
                           "À vérifier" chip does not fit one line on a phone. */}
-                      <dt className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-semibold text-slate-500">
+                      <dt className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-semibold text-ink-3">
                         <span>{vitalLabel(k, t)}</span>
                         <ProvenanceChip provenance={encounter.provenance[`vitals.${k}`]} />
                       </dt>
@@ -169,7 +169,7 @@ export function Review() {
                             ? 'text-danger-600'
                             : severity === 'watch'
                               ? 'text-warn-700'
-                              : 'text-slate-900'
+                              : 'text-ink'
                         }`}
                       >
                         {formatVital(k, value)}
@@ -200,7 +200,7 @@ export function Review() {
                     <div className="min-w-0">
                       {/* The clinician's own language. The patient sheet is the
                           screen that follows the patient's, not this one. */}
-                      <p className="font-semibold text-slate-900">{prescriptionInstruction(p, lang)}</p>
+                      <p className="font-semibold text-ink">{prescriptionInstruction(p, lang)}</p>
                       <ProvenanceChip provenance={encounter.provenance[`prescription.${p.id}`]} />
                     </div>
                   </li>
@@ -214,7 +214,7 @@ export function Review() {
           <section>
             <SectionTitle>{t.notes}</SectionTitle>
             <Card>
-              <p className="whitespace-pre-wrap text-slate-700">{encounter.notes}</p>
+              <p className="whitespace-pre-wrap text-ink-2">{encounter.notes}</p>
             </Card>
           </section>
         )}
