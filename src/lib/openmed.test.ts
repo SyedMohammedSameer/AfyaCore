@@ -9,7 +9,14 @@
  * "an I- tag with no B- before it was silently dropped and a surname survived".
  */
 import { describe, expect, it } from 'vitest'
-import { applyEntities, decodeBio, mergeSpans, REDACTABLE_LABELS, type NerEntity } from './openmed'
+import {
+  applyEntities,
+  decodeBio,
+  isModelAvailable,
+  mergeSpans,
+  REDACTABLE_LABELS,
+  type NerEntity,
+} from './openmed'
 import { deidentify, REDACTED } from './deidentify'
 import type { Encounter, Patient } from '../db/schema'
 
@@ -265,5 +272,52 @@ describe('the neural pass inside deidentify', () => {
     })
     expect(called).toBe(false)
     expect(result.encounters[0]!.notes).toBe('Hanta')
+  })
+})
+
+/**
+ * Whether the model is present.
+ *
+ * The test that exists because the app got this wrong: a single-page app serves
+ * index.html with HTTP 200 for any unknown path, so a status-code check
+ * reported a model that had never been downloaded as installed, and Settings
+ * told the facility that neural de-identification was active when nothing was
+ * running. A false claim that a privacy control is on is the worst bug this
+ * codebase can have.
+ */
+describe('detecting whether the model is installed', () => {
+  const respond = (init: { ok: boolean; body?: unknown; throws?: boolean }) =>
+    (async () => ({
+      ok: init.ok,
+      json: async () => {
+        if (init.throws) throw new SyntaxError('Unexpected token < in JSON')
+        return init.body
+      },
+    })) as unknown as typeof fetch
+
+  it('accepts a real token-classification config', async () => {
+    const impl = respond({ ok: true, body: { model_type: 'bert', id2label: { 0: 'O' } } })
+    expect(await isModelAvailable(impl)).toBe(true)
+  })
+
+  it('rejects the SPA fallback, which answers 200 with HTML', async () => {
+    const impl = respond({ ok: true, throws: true })
+    expect(await isModelAvailable(impl)).toBe(false)
+  })
+
+  it('rejects a 200 carrying JSON that is not a model config', async () => {
+    const impl = respond({ ok: true, body: { hello: 'world' } })
+    expect(await isModelAvailable(impl)).toBe(false)
+  })
+
+  it('rejects a 404', async () => {
+    expect(await isModelAvailable(respond({ ok: false }))).toBe(false)
+  })
+
+  it('rejects when the request itself fails', async () => {
+    const impl = (async () => {
+      throw new Error('offline')
+    }) as unknown as typeof fetch
+    expect(await isModelAvailable(impl)).toBe(false)
   })
 })

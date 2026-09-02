@@ -15,6 +15,8 @@ import { recordAudit } from '../lib/audit'
 import { PrivacySelector } from '../components/PrivacySelector'
 import { SyncPanel } from '../components/SyncPanel'
 import { StaffPanel } from '../components/StaffPanel'
+import { CountryPanel } from '../components/CountryPanel'
+import { getFacilityCountry } from '../lib/facility'
 import { deidentify, type DeidentLevel } from '../lib/deidentify'
 import type { NerBackend } from '../lib/openmed'
 import { LANG_LABELS, useI18n } from '../i18n'
@@ -111,6 +113,7 @@ export function Settings() {
     const result = await deidentify(patients, encounters, {
       level,
       salt: await facilitySalt(),
+      country: await getFacilityCountry(),
       nerBackend: await neuralBackend(),
     })
     if (level !== 'identified') {
@@ -322,6 +325,8 @@ export function Settings() {
             </Button>
           </Card>
         </section>
+
+        <CountryPanel />
 
         <SyncPanel />
 
