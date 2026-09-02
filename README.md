@@ -49,15 +49,20 @@ breathe:
 
 ## The interface
 
-Flat, cool and high-contrast, on an opaque `#F4F6F8` ground. The earlier treatment was glass and
-gradient, which reads as a consumer app and, more to the point, spends contrast on decoration:
+Flat, warm and high-contrast, on an opaque `#F7F5F0` paper ground. The earlier treatment was glass
+and gradient, which reads as a consumer app and, more to the point, spends contrast on decoration:
 translucency over a coloured ground is exactly what fails on a cheap LCD held under a metal roof at
 midday. Depth here comes from a 1px hairline and a shadow you have to look for. Colour is reserved
 for meaning — a red pill on this screen means a vital is out of range and nothing else.
 
-The palette is cool because the systems this app has to sit beside are cool. DHIS2, IBM Carbon
-(which OpenMRS 3 is built on) and the NHS design system are all blue-grey or neutral, and those are
-the tools the people deploying this already use.
+The ground is paper, not screen. Cool blue-grey is the safe choice and it is what DHIS2 and IBM
+Carbon (which OpenMRS 3 is built on) do, but it also makes a phone in a hot room look like a
+hospital IT system. Warm grey holds the same contrast ratios against the ink and the white cards
+while reading as a form on a desk, and the screen this runs on is usually being held right next to
+an actual paper register. Warmth is carried all the way through rather than dropped on top: the ink
+is a green-black rather than a blue-black (`#1C2321`), the hairlines are warm, and shadows are cast
+in the ink's own hue. A warm ground under cool grey lines is the one combination that looks worse
+than either done properly.
 
 Type is **IBM Plex Sans**, and it is now actually shipped. The stack previously named `Inter` and
 never loaded it, so on an Android phone the app silently rendered in whatever the system happened to

@@ -110,7 +110,7 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
           aria-pressed={listening}
           className={cx(
             'press press-active relative grid size-16 shrink-0 place-items-center rounded-[1.35rem] text-white shadow-lift ring-1 ring-white/25',
-            'disabled:bg-slate-300 disabled:shadow-none',
+            'disabled:bg-line disabled:text-ink-4 disabled:shadow-none',
             listening ? 'bg-danger-600' : 'bg-brand-gradient active:brightness-95',
           )}
         >

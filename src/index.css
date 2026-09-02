@@ -37,75 +37,83 @@
 /*
   AfyaCore visual language
 
-  Cool, flat and high-contrast. The previous treatment was glass and gradient,
-  which reads as a consumer app and, more practically, spends contrast on
-  decoration: translucency over a coloured ground is exactly what fails on a
-  cheap LCD held under a metal roof in daylight.
+  Warm, flat and high-contrast, on a paper ground.
 
-  So: an opaque cool ground, white surfaces, a hairline instead of a shadow, and
-  colour reserved for meaning. Depth comes from a 1px border and a shadow you
-  have to look for, not from blur.
+  The previous treatment was glass and gradient, which reads as a consumer app
+  and, more practically, spends contrast on decoration: translucency over a
+  coloured ground is exactly what fails on a cheap LCD held under a metal roof
+  in daylight. So: an opaque ground, white surfaces, a hairline instead of a
+  shadow, and colour reserved for meaning. Depth comes from a 1px border and a
+  shadow you have to look for, not from blur.
 
-  The palette is cool because the systems this app has to sit beside are cool.
-  DHIS2, IBM Carbon and the NHS design system are all blue-grey or neutral, and
-  those are the tools the people deploying this already use every day.
+  The ground is #F7F5F0 — paper, not screen. A cool blue-grey is the safe
+  choice, and it is what DHIS2 and IBM Carbon do, but it also makes a phone in
+  a hot room look like a hospital IT system. Warm grey holds exactly the same
+  contrast ratios against the ink and the white cards, and reads as a form on a
+  desk. The screen this runs on is usually being held next to an actual paper
+  register, and matching that is worth more here than matching a dashboard.
+
+  Warmth is carried all the way through rather than dropped on top: the ink is
+  a green-black rather than a blue-black, the hairlines are warm, and the
+  shadows are cast in the ink's own hue. A warm ground under cool grey lines is
+  the one combination that looks worse than either done properly.
 */
 @theme {
   /* --- Ground and surfaces ------------------------------------------- */
-  --color-ground: #f4f6f8;
+  --color-ground: #f7f5f0;
   --color-surface: #ffffff;
-  --color-sunken: #f8fafc;
-  --color-line: #e3e8ee;
-  --color-line-strong: #cbd5e1;
+  --color-sunken: #fbf9f5;
+  --color-line: #e4dfd5;
+  --color-line-strong: #cfc8ba;
 
-  /* --- Ink. Cool near-black, never pure black: #000 on white vibrates - */
-  --color-ink: #101828;
-  --color-ink-2: #475467;
-  --color-ink-3: #667085;
-  --color-ink-4: #98a2b3;
+  /* --- Ink. Warm near-black, never pure black: #000 on paper vibrates - */
+  --color-ink: #1c2321;
+  --color-ink-2: #4a5551;
+  --color-ink-3: #5d6b66;
+  --color-ink-4: #8c948f;
 
-  /* --- Brand. A deep teal: AfyaCore's own, cooled to sit on the ground - */
-  --color-brand-50: #edf9f7;
-  --color-brand-100: #d3f0ea;
-  --color-brand-200: #a8e1d6;
-  --color-brand-300: #6fcbba;
-  --color-brand-400: #35ae99;
-  --color-brand-500: #12907c;
-  --color-brand-600: #0c7768;
-  --color-brand-700: #0a6055;
-  --color-brand-800: #084c44;
-  --color-brand-900: #063c36;
+  /* --- Brand. AfyaCore's teal, pulled green to sit on the paper ------- */
+  --color-brand-50: #edf6f1;
+  --color-brand-100: #d5ebe0;
+  --color-brand-200: #a9d7c3;
+  --color-brand-300: #6fbb9e;
+  --color-brand-400: #33997a;
+  --color-brand-500: #128063;
+  --color-brand-600: #0a6b52;
+  --color-brand-700: #085541;
+  --color-brand-800: #064334;
+  --color-brand-900: #05352a;
 
   /*
     Semantic colour is separate from the brand and never used decoratively.
     On this screen a red pill means a vital is out of range, and nothing else.
   */
-  --color-danger-50: #fef3f2;
-  --color-danger-100: #fee4e2;
-  --color-danger-200: #fecdca;
-  --color-danger-500: #f04438;
-  --color-danger-600: #d92d20;
-  --color-danger-700: #b42318;
+  --color-danger-50: #fdeceb;
+  --color-danger-100: #f9d8d6;
+  --color-danger-200: #f2b8b5;
+  --color-danger-500: #c33a3c;
+  --color-danger-600: #a4262c;
+  --color-danger-700: #861f22;
 
-  --color-warn-50: #fffaeb;
-  --color-warn-100: #fef0c7;
-  --color-warn-200: #fedf89;
-  --color-warn-500: #f79009;
-  --color-warn-600: #dc6803;
-  --color-warn-700: #b54708;
+  --color-warn-50: #fdf3e0;
+  --color-warn-100: #f9e6c2;
+  --color-warn-200: #f1d193;
+  --color-warn-500: #c07c11;
+  --color-warn-600: #a06509;
+  --color-warn-700: #8a5300;
 
-  --color-ok-50: #ecfdf3;
-  --color-ok-100: #dcfae6;
-  --color-ok-200: #abefc6;
-  --color-ok-500: #17b26a;
-  --color-ok-600: #079455;
-  --color-ok-700: #067647;
+  --color-ok-50: #edf6ee;
+  --color-ok-100: #d3ebd7;
+  --color-ok-200: #a8d6b1;
+  --color-ok-500: #3d9a56;
+  --color-ok-600: #2d7e44;
+  --color-ok-700: #246536;
 
-  --color-info-50: #eff8ff;
-  --color-info-100: #d1e9ff;
-  --color-info-200: #b2ddff;
-  --color-info-600: #1570ef;
-  --color-info-700: #175cd3;
+  --color-info-50: #eff4fa;
+  --color-info-100: #dae6f2;
+  --color-info-200: #b7cfe6;
+  --color-info-600: #2a6299;
+  --color-info-700: #1f4d7b;
 
   --font-sans:
     'IBM Plex Sans Variable', 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system,
@@ -118,11 +126,13 @@
   /*
     Shadows do almost nothing on purpose. A 1px line separates a card from the
     ground; the shadow only says which of two overlapping things is on top.
+    Cast in the ink's hue, because a neutral-grey shadow on a warm ground reads
+    as dirt on the screen.
   */
-  --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.05);
-  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04);
-  --shadow-lift: 0 4px 8px -2px rgb(16 24 40 / 0.08), 0 2px 4px -2px rgb(16 24 40 / 0.04);
-  --shadow-float: 0 12px 16px -4px rgb(16 24 40 / 0.1), 0 4px 6px -2px rgb(16 24 40 / 0.04);
+  --shadow-xs: 0 1px 2px rgb(28 35 33 / 0.06);
+  --shadow-card: 0 1px 2px rgb(28 35 33 / 0.05);
+  --shadow-lift: 0 4px 8px -2px rgb(28 35 33 / 0.09), 0 2px 4px -2px rgb(28 35 33 / 0.05);
+  --shadow-float: 0 12px 16px -4px rgb(28 35 33 / 0.1), 0 4px 6px -2px rgb(28 35 33 / 0.05);
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -131,14 +141,14 @@
     min-height: 100%;
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
-    background: #f4f6f8;
+    background: #f7f5f0;
   }
 
   body {
     min-height: 100%;
-    color: #101828;
+    color: #1c2321;
     /* Flat. Nothing behind the content competing with it for attention. */
-    background: #f4f6f8;
+    background: #f7f5f0;
     font-synthesis-weight: none;
   }
 
@@ -160,7 +170,7 @@
     use this on a cracked screen; a subtle focus state is no focus state.
   */
   :focus-visible {
-    outline: 2px solid #0c7768;
+    outline: 2px solid #0a6b52;
     outline-offset: 2px;
     border-radius: 0.375rem;
   }
@@ -199,7 +209,7 @@
 }
 
 /*
-  The card surface. Opaque white on the cool ground, separated by a hairline
+  The card surface. Opaque white on the paper ground, separated by a hairline
   rather than a drop shadow, which is what keeps a screen of eight cards from
   looking like eight floating objects.
 */
@@ -221,7 +231,7 @@
   costs nothing. Deep enough that white text clears AA comfortably.
 */
 @utility bg-brand-gradient {
-  background-image: linear-gradient(160deg, #063c36 0%, #0a6055 55%, #0c7768 100%);
+  background-image: linear-gradient(160deg, #05352a 0%, #085541 55%, #0a6b52 100%);
 }
 
 @utility press {
@@ -279,7 +289,7 @@
 .skeleton {
   position: relative;
   overflow: hidden;
-  background: rgb(203 213 225 / 0.35);
+  background: rgb(207 200 186 / 0.4);
 }
 
 .skeleton::after {
