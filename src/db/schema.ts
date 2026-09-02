@@ -139,6 +139,74 @@ export interface Attachment {
   createdAt: number
 }
 
+/**
+ * Staff roles.
+ *
+ * Two, on purpose. A permission model with twenty flags is one nobody
+ * configures correctly, and in a facility of four people the only distinction
+ * that matters is between recording care and changing how the facility is set
+ * up. See `PERMISSIONS` in src/lib/identity.ts.
+ */
+export type Role = 'clinician' | 'admin'
+
+export interface Clinician {
+  id: string
+  name: string
+  role: Role
+  /** `pbkdf2$iterations$salt$hash`. Never the PIN itself. */
+  pinHash: string
+  createdAt: number
+  lastSignInAt?: number
+  /**
+   * Accounts are disabled, never deleted: audit entries reference the account
+   * that made them, and deleting the row leaves a trail pointing at nobody.
+   */
+  disabledAt?: number
+}
+
+export type AuditAction =
+  | 'signin'
+  | 'signin.failed'
+  | 'signout'
+  | 'patient.create'
+  | 'patient.view'
+  | 'patient.update'
+  | 'patient.delete'
+  | 'patient.merge'
+  | 'encounter.create'
+  | 'encounter.view'
+  | 'encounter.update'
+  | 'encounter.finalise'
+  | 'encounter.amend'
+  | 'encounter.delete'
+  | 'export'
+  | 'sync'
+  | 'account.create'
+  | 'account.disable'
+  | 'device.enrol'
+  | 'device.unenrol'
+
+/**
+ * One entry in the local, hash-chained audit trail. See src/lib/audit.ts.
+ *
+ * `detail` carries context such as a count or a format name. It must never
+ * carry clinical content: an audit log that quotes the note it describes is a
+ * second copy of the medical record with none of its protections.
+ */
+export interface AuditEntry {
+  /** Stringified `seq`, so Dexie has a primary key and ordering is explicit. */
+  id: string
+  seq: number
+  actorId?: string
+  action: AuditAction
+  subjectType?: 'patient' | 'encounter' | 'export' | 'device' | 'account'
+  subjectId?: string
+  detail?: string
+  at: number
+  prevHash: string
+  hash: string
+}
+
 /** Free-form key/value settings, kept in IndexedDB so they survive offline. */
 export interface Setting {
   key: string
