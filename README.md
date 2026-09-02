@@ -124,6 +124,8 @@ for (const remote of encounters) {
 - **Sync** between the devices at a facility, with a zero-dependency server you can self-host
 - **De-identified export**, identifiers stripped before anything leaves the device, with a stable
   pseudonym so a patient stays trackable across exports without being identifiable
+- **Optional on-device neural de-identification**, an Apache-2.0 OpenMed French PII model that
+  catches names the roster does not hold; it runs after the deterministic scrub and can only add
 
 ## Languages
 
@@ -336,6 +338,12 @@ npm run preview    # serve the production build
 `node_modules` and fetches the French model into `public/ocr/`. Those files are ~7 MB and are **not
 committed**, they are regenerated at build time, and the fetched model is cached in `.cache/`.
 
+`npm run vendor:openmed` is separate and optional. It fetches the ~67 MB OpenMed French PII model
+and the ONNX Runtime core into `public/models/` and `public/ort/`, enabling the neural
+de-identification pass. It is deliberately **not** part of `npm run build`: the pass is an accuracy
+upgrade over a scrub that already works, and making it a build step would break the build anywhere
+the Hub is unreachable.
+
 Load `Settings → Load demo workspace` for synthetic patients to click through.
 
 ### Layout
@@ -452,6 +460,27 @@ These are structural, not conventions:
 Draft encounters are excluded from every export, an unconfirmed record must never leave the device
 or reach a national statistic.
 
+### Neural de-identification (optional)
+
+The deterministic scrub matches identifiers against the roster the device already holds, which gives
+100% recall on the dominant leak, a patient's own name in their own note, at zero megabytes. What it
+cannot catch is an identifier the roster does not hold, and those are routine: *sa fille Hanta*,
+*adressé par le Dr Rakoto*, a village nobody is registered in.
+
+So an [OpenMed](https://huggingface.co/OpenMed) French PII model (Apache-2.0,
+[arXiv:2508.01630](https://arxiv.org/abs/2508.01630)) runs as an **extra pass**: 33M parameters, 67 MB
+fp16, on-device via WebAssembly, self-hosted rather than pulled from a CDN for the same reason the
+OCR pack is.
+
+The ordering is the safety argument. The deterministic scrub runs first and always; the model can
+only ever *add* redactions. If it is absent, fails to load, or throws, the export is exactly as
+de-identified as it was before, and the manifest records which passes actually ran. Nothing
+model-derived reaches a clinician or a dose: a mistake here costs a redaction, not a wrong treatment.
+
+⚠️ **Its French recall on real notes is unmeasured.** The span logic, BIO decoding and failure
+behaviour are tested; the weights are not, because the environment this was built in cannot reach
+huggingface.co. `docs/MODEL-RESEARCH.md` §4b says exactly what is and is not verified.
+
 ### Export privacy
 
 Every record-level export passes through one de-identification step, so no export path can bypass
@@ -492,8 +521,8 @@ Roughly in order of what would block a real deployment:
    correction or deletion.
 4. **Offline ASR** (`whisper-base` ONNX int8, ~80 MB, on demand), which removes the last hard
    network dependency.
-5. **Optional neural PII pass** over free text (OpenMed ONNX) for names *not* on the roster; the
-   deterministic scrub already covers the ones that are. See `docs/MODEL-RESEARCH.md` §4b.
+5. **Measure the OpenMed pass on real notes.** It is wired and tested, but its French recall on our
+   own data is unmeasured; see `docs/MODEL-RESEARCH.md` §4b.
 6. **Malagasy instruction phrase bank** as pre-rendered audio, working around the missing Android TTS.
 
 ## Contributing

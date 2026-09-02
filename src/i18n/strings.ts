@@ -162,6 +162,13 @@ export interface Strings {
   you: string
   lastAdmin: string
   auditVerifiedFrom: string
+  // Optional on-device PII model (OpenMed). An accuracy upgrade over the
+  // deterministic scrub, never a replacement for it.
+  piiPack: string
+  piiPackHint: string
+  piiPackReady: string
+  piiPackAbsent: string
+  neuralRedactionSummary: string
   // Device enrolment. Replaces the typed facility id: a device is joined to a
   // facility once, with a single-use code an administrator reads out.
   enrolHint: string
@@ -395,6 +402,11 @@ const fr: Strings = {
   you: 'vous',
   lastAdmin: 'Dernier administrateur : impossible de désactiver ce compte.',
   auditVerifiedFrom: 'vérifié à partir de l’entrée',
+  piiPack: 'Modèle d’anonymisation',
+  piiPackHint: 'Repère dans les notes les noms que le registre ne contient pas, par exemple un parent cité en passant. Le nettoyage de base fonctionne sans lui.',
+  piiPackReady: 'Modèle installé, anonymisation renforcée active',
+  piiPackAbsent: 'Non installé. L’anonymisation déterministe reste active. L’administrateur peut l’installer sur le serveur.',
+  neuralRedactionSummary: 'par le modèle',
   enrolHint: 'Demandez un code d’inscription à l’administrateur du serveur, puis saisissez-le ici. Une seule fois par appareil.',
   enrolCode: 'Code d’inscription',
   enrolDevice: 'Inscrire cet appareil',
@@ -623,6 +635,11 @@ const mg: Strings = {
   you: 'ianao',
   lastAdmin: 'Mpitantana farany: tsy azo akanana ity kaonty ity.',
   auditVerifiedFrom: 'nohamarinina nanomboka tamin’ny laharana',
+  piiPack: 'Modely fanafenana anarana',
+  piiPackHint: 'Mahita anarana tsy ao amin’ny rejisitra ao anaty naotra, ohatra havana voatonona. Miasa ihany ny fanadiovana fototra na tsy misy izy.',
+  piiPackReady: 'Voapetraka ny modely',
+  piiPackAbsent: 'Tsy voapetraka. Mbola miasa ny fanadiovana fototra.',
+  neuralRedactionSummary: 'avy amin’ny modely',
   enrolHint: 'Angataho amin’ny mpitantana ny serivera ny kaody fisoratana anarana, dia soraty eto. Indray mandeha isaky ny finday.',
   enrolCode: 'Kaody fisoratana anarana',
   enrolDevice: 'Hisoratra anarana ity finday ity',
@@ -850,6 +867,11 @@ const en: Strings = {
   you: 'you',
   lastAdmin: 'Last administrator: this account cannot be disabled.',
   auditVerifiedFrom: 'verified from entry',
+  piiPack: 'De-identification model',
+  piiPackHint: 'Finds names in notes that the roster does not hold, such as a relative mentioned in passing. The deterministic scrub works without it.',
+  piiPackReady: 'Model installed, neural pass active',
+  piiPackAbsent: 'Not installed. The deterministic scrub still runs. An administrator can install it on the server.',
+  neuralRedactionSummary: 'by the model',
   enrolHint: 'Ask the server administrator for an enrolment code, then enter it here. Once per device.',
   enrolCode: 'Enrolment code',
   enrolDevice: 'Enrol this device',

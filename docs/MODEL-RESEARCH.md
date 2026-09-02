@@ -110,55 +110,93 @@ Measured on a synthetic printed French consultation form: temperature, pulse, bl
 
 ---
 
-## 4b. OpenMed (Maziyar Panahi), assessed, partially adopted
+## 4b. OpenMed (Maziyar Panahi), adopted for de-identification
+
+Status: **revised September 2026.** The August assessment below was correct when written and is now
+out of date in our favour. It is kept rather than rewritten, because the thing that changed is
+instructive: the blocker was language coverage, and language coverage moved.
 
 [OpenMed](https://huggingface.co/OpenMed) is a large Apache-2.0 collection of medical NER models
-(~475 on the Hub, ~29M downloads; [paper](https://huggingface.co/papers/2508.01630)). The licence is
-ideal and the engineering is serious. The fit for AfyaCore is narrower than the size of the
-collection suggests.
+([paper](https://arxiv.org/abs/2508.01630)). The licence is ideal and the engineering is serious.
 
-**Most of it is the wrong domain.** The bulk of the models detect genes, proteins, DNA, cell lines,
-oncology and species entities, biocuration and research targets. A rural outpatient clinic records
-fever, malaria, pneumonia and paracetamol. Only two families map to our domain:
+### What was true in August, and still is
 
-| Model family | Relevance | Blocker |
-|---|---|---|
-| [`OpenMed-NER-DiseaseDetect-*`](https://hf.co/OpenMed/OpenMed-NER-DiseaseDetect-BioMed-335M) | Diagnoses | Trained on NCBI-Disease, **English PubMed**, not French consultation notes |
-| [`OpenMed-NER-PharmaDetect-*`](https://hf.co/OpenMed/OpenMed-NER-PharmaDetect-SuperClinical-434M) | Drug names | Same: English chemical/drug corpora |
+**Most of the collection is the wrong domain.** The bulk of the models detect genes, proteins, DNA,
+cell lines, oncology and species entities. A rural outpatient clinic records fever, malaria,
+pneumonia and paracetamol.
 
-**Language is the blocker.** Essentially every model is tagged `en`. Some use XLM-RoBERTa backbones,
-so cross-lingual transfer to French is plausible, but it is unvalidated, and an unvalidated model
-does not belong between a clinician and a drug name. Replacing our deterministic French extractor
-with one would also be a *regression*: rules score ~100% on a bounded formulary at 0 MB, where a
-110M-parameter English encoder would cost ~110 MB to do worse on French text.
+**Replacing the French rule extractor would still be a regression.** Rules score ~100% on a bounded
+formulary at 0 MB. A 110M-parameter encoder would cost ~110 MB to do worse on French consultation
+text. That recommendation stands unchanged.
 
-**What is genuinely worth adopting: PII de-identification.**
+### What changed
 
-[`OpenMed/OpenMed-PII-SuperClinical-Small-44M-v1-onnx-android`](https://hf.co/OpenMed/OpenMed-PII-SuperClinical-Small-44M-v1-onnx-android), 44M DeBERTa-v2, **already quantised to ONNX**, tagged `webassembly` / `webgpu` / `android`,
-Apache-2.0. The project reports 55+ PHI types across 34 PII languages.
+Two things, neither of which existed when §4b was first written:
 
-This addresses a real gap: our FHIR and DHIS2 exports currently carry names, phone numbers and
-villages off the device. A de-identified export mode would let a facility share clinical content for
-reporting or research without shipping identifiers. At ~45 MB it fits the same download-on-demand
-pattern as the OCR pack, and it is a *filter over output* rather than something between the
-clinician and the record, so a mistake costs a redaction, not a wrong dose.
+1. **Per-language PII models shipped in February 2026**, French among them, ~15 variants. The
+   original blocker was that every model was tagged `en` and cross-lingual transfer from an English
+   encoder to French clinical text was unvalidated. There is now a French model trained for it.
+2. **ONNX builds tagged `webassembly` / `webgpu` shipped in July 2026**, which is what makes
+   on-device inference in a PWA possible rather than theoretical.
 
-**Status:** the de-identified export shipped in v0.4 **without** a model. Because the roster is on
-the device, every identifier it holds is matched exactly and removed, 100% recall on the common
-case at 0 MB. The OpenMed PII model remains the right upgrade for identifiers we do *not* hold (a
-relative named in passing), and slots in behind `scrubFreeText` as an extra pass. It could not be
-fetched or validated in this environment, so it is not yet wired in.
+Also new, and worth tracking rather than adopting: `OpenMed-ClinicalNER-SuperClinical-434M` carries
+44 genuinely clinical labels (`Drug_Name`, `Dosage`, `Frequency`, `Duration`, `Symptom`,
+`Disease_Syndrome_Disorder`, `Vital_Signs`), which is our extraction domain rather than the
+biocuration domain the rest of the collection covers. It is English-only and 434M parameters, so it
+is not a candidate to replace the extractor. It is a useful **baseline to measure the rule extractor
+against**, which is what `npm run eval` does.
 
-**Recommendation**
-1. **Do not** replace the French rule extractor with OpenMed NER. English models on French clinical
-   text, at 100 MB+, for worse accuracy.
-2. **Do** add an opt-in de-identified export backed by the 44M ONNX PII model. Well-scoped,
-   permissively licensed, and it closes a genuine privacy gap. Verify its French recall on our own
-   data first, the model card says `en`.
-3. **Track** the project for French clinical NER. If OpenMed's 21-language claim reaches French
-   disease/drug models, revisit, the licence and the on-device packaging are exactly right.
+### What we adopted, and why that one
 
----
+`OpenMed/OpenMed-PII-French-ClinicalE5-Small-33M-v1-onnx-android`, wired in behind `scrubFreeText`
+as an optional extra pass (`src/lib/openmed.ts`).
+
+Chosen as the **smallest French PII model that exists**, because every megabyte is a megabyte a
+health post downloads over 2G:
+
+| Candidate | fp16 | Tokenizer | Verdict |
+|---|---|---|---|
+| **`PII-French-ClinicalE5-Small-33M`** | **66.8 MB** | 0.7 MB | **Adopted.** Smallest French option. |
+| `PII-French-LiteClinical-Small-66M` | 130.7 MB | 0.7 MB | Twice the size for one more layer of depth. |
+| `PII-French-SuperClinical-Small-44M` | 283.4 MB | 8.3 MB | DeBERTa-v2. 566 MB fp32; not a field download. |
+| `PII-French-BiomedBERT-Large-340M` | ~680 MB | — | Out of the question on a phone. |
+
+Note that the `int8` export in this family is *larger* than `fp16` (69.6 MB against 66.8 MB),
+because the embedding table stays at higher precision. We take fp16.
+
+### Why it is a filter over output, not a step in capture
+
+It runs at **export time only**, over text the deterministic scrub has already processed, and it can
+only ever *add* redactions. That ordering is the safety argument:
+
+- If the model is absent, fails to load, or throws, the export is exactly as de-identified as it was
+  before. No export path becomes less safe because a download failed.
+- A false positive costs one redacted word in a research file. A false negative leaks a name. The
+  confidence threshold (0.35) is set low deliberately, in the same direction as the rest of the
+  de-identification code: when unsure, remove.
+- Nothing model-derived ever reaches a clinician or a dose. A mistake here costs a redaction, not a
+  wrong treatment.
+
+`AGE` and `DATE` are excluded from the redactable label set even though the model emits them. Age
+drives the WHO/IMCI bands the entire DHIS2 report is disaggregated by, and is already capped at 89
+structurally; dates are generalised to the month at the `anonymous` level. Blanking them mid-sentence
+would damage the clinical record to remove something the export already handles correctly.
+
+### ⚠️ What is not yet validated
+
+**The model's French recall on our own data has not been measured.** huggingface.co is unreachable
+from the environment this was built in, so the weights could not be downloaded, and no inference has
+been run against them here.
+
+What *has* been verified, with tests that fail if it stops being true: BIO decoding (including the
+orphan `I-` tag that a strict decoder would silently drop, losing a surname), span merging so one
+name yields one marker rather than leaking how many name parts there were, label filtering,
+thresholding, the interaction with the deterministic pass, and the failure behaviour when the backend
+throws.
+
+Before any deployment relies on this, run `npm run vendor:openmed` followed by `npm run eval` on a
+held-out set of real notes and record the recall. Until somebody does that, the honest claim is
+"wired, tested, and unmeasured", and the deterministic scrub remains what the safety case rests on.
 
 ## 5. Licensing summary
 
