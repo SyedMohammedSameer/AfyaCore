@@ -328,7 +328,8 @@ npm install
 npm run dev        # dev server
 npm run sync       # sync server on :8787
 npm run admin      # server administration: facilities, enrolment codes, devices, audit
-npm test           # extraction, merge, FHIR and reporting suites
+npm test           # extraction, merge, FHIR, de-identification, auth and audit suites
+npm run eval       # accuracy, de-identification recall and install cost
 npm run typecheck  # tsc --noEmit, no build
 npm run build      # vendor OCR assets + typecheck + production build
 npm run preview    # serve the production build
@@ -354,6 +355,7 @@ src/lib/         extraction, locales, de-identification, FHIR, DHIS2, sync clien
                  identity and the local audit chain
 src/routes/      one file per screen
 src/components/  UI primitives and the app shell
+eval/            evaluation harness and its synthetic corpus
 src/i18n/        interface strings, one object per language
 server/          zero-dependency sync server: store, auth, audit chain, admin CLI
 docs/            model research and the reasoning behind what was not built
@@ -411,6 +413,52 @@ These are structural, not conventions:
    `draft`: it was confirmed by a human once, and a correction is still a confirmed record rather
    than something that has to be re-approved.
 
+## Measured
+
+`npm run eval` scores the extractor and the de-identification against a
+[synthetic corpus](eval/corpus/) and measures what a phone actually downloads. It runs in CI, and it
+fails the build if an identifier the roster *holds* survives a scrub, or if clinical content is
+destroyed. Accuracy numbers never fail a build; correctness failures do.
+
+| | French | English |
+|---|---|---|
+| Extraction P / R / F1 | 100% / 100% / 100% | 100% / 100% / 100% |
+| Cases | 12 | 10 |
+| Median latency | 0.44 ms | 0.51 ms |
+
+| De-identification | |
+|---|---|
+| Identifiers **on** the roster removed | **100%** (6/6) |
+| Identifiers **off** the roster removed | **0%** (0/5) |
+| Clinical content retained | 100% (18/18 terms) |
+| Median latency | 0.10 ms |
+
+| Install | |
+|---|---|
+| Initial load, blocking | 138 kB gzip |
+| Precached shell, background | 181 kB gzip |
+| On demand, never precached | OCR ~7 MB · PII model ~67 MB |
+
+Three things this table is careful about:
+
+**The off-roster row is the whole case for the neural pass**, and it is 0% by construction: exact
+matching cannot reach a name the device does not hold. That is the number a 67 MB download has to
+move, and it is reported separately precisely so a combined figure cannot hide it.
+
+**Clinical retention is not decoration.** A scrubber that redacts every word scores 100% recall and
+destroys the record, so precision is measured against clinical terms that must survive, including
+drug names, which look like proper nouns to any NER model.
+
+**The corpus is synthetic and was written alongside the implementation.** These numbers bound
+correctness on cases we anticipated. They are *not* evidence of performance on real clinical
+dictation, which remains unmeasured, and the harness says so in its own output rather than in a
+footnote.
+
+The harness earned its keep immediately: it found that `centimètres` begins with `cent`, a French
+number word, so `taille quatre-vingt-quinze centimètres` was parsing as 95 × 100 = 9500, failing the
+plausibility check, and silently dropping every height dictated in French. A missing field is a
+much quieter bug than a wrong one.
+
 ## Known limits
 
 - ⚠️ **Malagasy strings are an unreviewed draft.** They need a native speaker before any real
@@ -445,6 +493,8 @@ These are structural, not conventions:
   The fix is a pre-rendered Opus phrase bank (§3), not a model.
 - **Malagasy dates fall back to French formatting.** No browser ships `mg-MG` Intl data, so the
   alternative was the *device's* locale, which is worse.
+- ⚠️ **The evaluation corpus is synthetic.** It bounds correctness on anticipated cases; it says
+  nothing about real dictation, real accents, or a real consultation room.
 - **Not validated against a real workflow.** The clinical scope is a reasonable general-outpatient
   guess and should be expected to change on contact with an actual facility.
 

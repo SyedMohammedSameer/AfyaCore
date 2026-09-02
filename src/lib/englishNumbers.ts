@@ -103,4 +103,10 @@ export function parseEnglishNumber(input: string): number | undefined {
  */
 const ALT = [...EN_NUMBER_WORDS].sort((a, b) => b.length - a.length).join('|')
 
-export const EN_NUMBER_PATTERN = `(?:\\d+(?:[.,]\\d+)?|(?:${ALT})(?:[\\s-]+(?:${ALT}))*)`
+/**
+ * The trailing `\b` matters for the same reason it does in the French pattern:
+ * a number word that prefixes a unit word ("ten" in "tenderness", "one" in
+ * "onset") would otherwise be swallowed into the number run and change the
+ * value that gets parsed.
+ */
+export const EN_NUMBER_PATTERN = `(?:\\d+(?:[.,]\\d+)?|(?:${ALT})(?:[\\s-]+(?:${ALT}))*)\\b`

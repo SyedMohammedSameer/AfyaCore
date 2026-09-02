@@ -307,3 +307,55 @@ describe('locale selection', () => {
     expect(FR_LOCALE.speechLang).toBe('fr-FR')
   })
 })
+
+/**
+ * Unit words that begin with a number word.
+ *
+ * Found by the eval harness rather than by anyone reading the code, because the
+ * failure mode is a *missing* field rather than a visibly wrong one: the number
+ * run swallowed the unit, the value came out two orders of magnitude too large,
+ * and the plausibility check quietly discarded it. Every French height dictated
+ * in centimetres was lost this way.
+ */
+describe('number runs stop at a word boundary', () => {
+  it('reads a French height in centimetres', () => {
+    // "cent" is a number word and "centimetres" starts with it.
+    const result = extractClinical('taille quatre-vingt-quinze centimètres', FR_LOCALE)
+    expect(result.vitals.height?.value).toBe(95)
+  })
+
+  it('reads a three-digit French height in centimetres', () => {
+    const result = extractClinical('taille cent soixante centimètres', FR_LOCALE)
+    expect(result.vitals.height?.value).toBe(160)
+  })
+
+  it('still reads a height given in digits', () => {
+    expect(extractClinical('taille 95 centimètres', FR_LOCALE).vitals.height?.value).toBe(95)
+  })
+
+  it('does not let a unit word inflate a weight', () => {
+    const result = extractClinical('poids quatre-vingts kilos', FR_LOCALE)
+    expect(result.vitals.weight?.value).toBe(80)
+  })
+
+  it('reads an English height in centimetres', () => {
+    const result = extractClinical('height one hundred and seventy two centimetres', EN_LOCALE)
+    expect(result.vitals.height?.value).toBe(172)
+  })
+})
+
+describe('cardiometabolic formulary', () => {
+  it('recognises amlodipine, which hypertension follow-up runs on', () => {
+    const result = extractClinical('Amlodipine 5 mg od for 30/7.', EN_LOCALE)
+    expect(result.prescriptions[0]).toMatchObject({
+      drug: expect.stringMatching(/amlodipine/i),
+      frequencyPerDay: 1,
+      durationDays: 30,
+    })
+  })
+
+  it('recognises metformin', () => {
+    const result = extractClinical('Metformin 500 mg bd.', EN_LOCALE)
+    expect(result.prescriptions[0]?.drug).toMatch(/metformin/i)
+  })
+})

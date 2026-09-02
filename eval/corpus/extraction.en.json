@@ -1,0 +1,128 @@
+{
+  "_comment": [
+    "Gold-standard extraction cases, English. ENTIRELY SYNTHETIC.",
+    "",
+    "Written in the register of Commonwealth-trained clinicians, because that is",
+    "who an English deployment of this app serves: Kenya, Nigeria, Ghana, Uganda,",
+    "Tanzania. od/bd/tds/qds for frequency and 5/7 for duration are standard on",
+    "handwritten charts across anglophone Africa, and an English pack that cannot",
+    "read `tds` is close to useless in the places it would actually be deployed.",
+    "",
+    "The cmHg cases are the mirror image of the French ones: '12 over 8' in English",
+    "is a value to question rather than silently multiply by ten."
+  ],
+  "locale": "en",
+  "cases": [
+    {
+      "id": "en-01-basic",
+      "notes": "Baseline, with Commonwealth shorthand for both frequency and duration.",
+      "text": "Presenting complaint fever for three days. Temperature thirty-eight point five, pulse ninety-two, blood pressure 120 over 80. Diagnosis uncomplicated malaria. Paracetamol 500 mg tds for 5/7.",
+      "expect": {
+        "vitals": { "temperature": 38.5, "pulse": 92, "systolic": 120, "diastolic": 80 },
+        "chiefComplaint": "fever for three days",
+        "diagnosis": "uncomplicated malaria",
+        "prescriptions": [
+          { "drug": "paracetamol", "dose": "500 mg", "frequencyPerDay": 3, "durationDays": 5 }
+        ]
+      }
+    },
+    {
+      "id": "en-02-no-cmhg-conversion",
+      "notes": "The key divergence from the French pack. '12 over 8' is implausible in English and must be REJECTED, not read as 120/80.",
+      "text": "Blood pressure 12 over 8.",
+      "expect": { "vitals": {} }
+    },
+    {
+      "id": "en-03-frequency-shorthand",
+      "notes": "od / bd / tds / qds across four drugs, each with its own duration.",
+      "text": "Amoxicillin 500 mg tds for 7/7, metronidazole 400 mg bd for 5/7, folic acid 5 mg od for 30/7.",
+      "expect": {
+        "prescriptions": [
+          { "drug": "amoxicillin", "dose": "500 mg", "frequencyPerDay": 3, "durationDays": 7 },
+          { "drug": "metronidazole", "dose": "400 mg", "frequencyPerDay": 2, "durationDays": 5 },
+          { "drug": "folic acid", "dose": "5 mg", "frequencyPerDay": 1, "durationDays": 30 }
+        ]
+      }
+    },
+    {
+      "id": "en-04-fixed-dose-combination",
+      "notes": "Artemether lumefantrine is one drug. Also the standard 3-day ACT course.",
+      "text": "Diagnosis malaria. Artemether lumefantrine bd for three days.",
+      "expect": {
+        "diagnosis": "malaria",
+        "prescriptions": [
+          { "drug": "artemether lumefantrine", "frequencyPerDay": 2, "durationDays": 3 }
+        ]
+      }
+    },
+    {
+      "id": "en-05-implausible-rejected",
+      "notes": "Dropped decimal. 385 is not a temperature.",
+      "text": "Temperature three hundred and eighty five.",
+      "expect": { "vitals": {} }
+    },
+    {
+      "id": "en-06-paediatric",
+      "notes": "IMCI fast-breathing case: respiratory rate is the trigger and must not be read as pulse.",
+      "text": "Presenting complaint cough for four days. Temperature thirty-nine point two, respiratory rate fifty, pulse one hundred and forty, oxygen saturation ninety-one percent. Diagnosis severe pneumonia.",
+      "expect": {
+        "vitals": {
+          "temperature": 39.2,
+          "respiratoryRate": 50,
+          "pulse": 140,
+          "oxygenSaturation": 91
+        },
+        "chiefComplaint": "cough for four days",
+        "diagnosis": "severe pneumonia"
+      }
+    },
+    {
+      "id": "en-07-weight-height",
+      "notes": "Decimal weight, integer height.",
+      "text": "Weight sixty-eight point five kilograms, height one hundred and seventy two centimetres.",
+      "expect": { "vitals": { "weight": 68.5, "height": 172 } }
+    },
+    {
+      "id": "en-08-hypertension",
+      "notes": "Adult follow-up. Values already in mmHg.",
+      "text": "Presenting complaint headache. Blood pressure 165 over 100, pulse 78. Diagnosis hypertension. Amlodipine 5 mg od for 30/7.",
+      "expect": {
+        "vitals": { "systolic": 165, "diastolic": 100, "pulse": 78 },
+        "chiefComplaint": "headache",
+        "diagnosis": "hypertension",
+        "prescriptions": [
+          { "drug": "amlodipine", "dose": "5 mg", "frequencyPerDay": 1, "durationDays": 30 }
+        ]
+      }
+    },
+    {
+      "id": "en-09-no-measurements",
+      "notes": "Narrative only. Anything extracted is invented.",
+      "text": "Presenting complaint back pain. Diagnosis mechanical low back pain.",
+      "expect": {
+        "chiefComplaint": "back pain",
+        "diagnosis": "mechanical low back pain"
+      }
+    },
+    {
+      "id": "en-10-full-consultation",
+      "notes": "End-to-end, the shape a real dictation takes.",
+      "text": "Presenting complaint fever and vomiting for two days. Temperature thirty-eight point eight, pulse one hundred and four, blood pressure 105 over 65, respiratory rate 22. Diagnosis uncomplicated malaria. Artemether lumefantrine bd for 3/7 and paracetamol 1 g tds for 3/7.",
+      "expect": {
+        "vitals": {
+          "temperature": 38.8,
+          "pulse": 104,
+          "systolic": 105,
+          "diastolic": 65,
+          "respiratoryRate": 22
+        },
+        "chiefComplaint": "fever and vomiting for two days",
+        "diagnosis": "uncomplicated malaria",
+        "prescriptions": [
+          { "drug": "artemether lumefantrine", "frequencyPerDay": 2, "durationDays": 3 },
+          { "drug": "paracetamol", "dose": "1 g", "frequencyPerDay": 3, "durationDays": 3 }
+        ]
+      }
+    }
+  ]
+}

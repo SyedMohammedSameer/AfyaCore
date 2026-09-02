@@ -1,0 +1,138 @@
+{
+  "_comment": [
+    "Gold-standard extraction cases, French. ENTIRELY SYNTHETIC: no real person,",
+    "consultation or facility is represented, and none of these came from a real",
+    "record. CONTRIBUTING.md forbids real patient data in any fixture and this is",
+    "the file that rule most obviously applies to.",
+    "",
+    "Written as dictation transcripts, because that is what the extractor actually",
+    "receives: the browser's recogniser emits a run-on string with no punctuation",
+    "to speak of, spoken numerals, and no field boundaries. Cases lifted from",
+    "clean written prose would measure something the app never sees.",
+    "",
+    "`expect` holds only what a rule should find. A field absent from `expect` and",
+    "present in the output is a false positive; present in `expect` and absent from",
+    "the output is a false negative. `notes` explains what each case is testing so",
+    "a failure is diagnosable without reverse-engineering the string."
+  ],
+  "locale": "fr",
+  "cases": [
+    {
+      "id": "fr-01-basic",
+      "notes": "Baseline. Spoken numerals, decimal as 'virgule', cmHg blood pressure convention.",
+      "text": "Motif fièvre depuis trois jours. Température trente-huit virgule cinq, pouls quatre-vingt-douze, tension douze sur huit. Diagnostic paludisme simple. Paracétamol 500 mg trois fois par jour pendant cinq jours.",
+      "expect": {
+        "vitals": { "temperature": 38.5, "pulse": 92, "systolic": 120, "diastolic": 80 },
+        "chiefComplaint": "fièvre depuis trois jours",
+        "diagnosis": "paludisme simple",
+        "prescriptions": [
+          { "drug": "paracétamol", "dose": "500 mg", "frequencyPerDay": 3, "durationDays": 5 }
+        ]
+      }
+    },
+    {
+      "id": "fr-02-seventies-nineties",
+      "notes": "The irregular French compounds: soixante-quinze, quatre-vingt-dix-huit.",
+      "text": "Pouls soixante-quinze, saturation quatre-vingt-dix-huit pour cent, température trente-sept.",
+      "expect": {
+        "vitals": { "pulse": 75, "oxygenSaturation": 98, "temperature": 37 }
+      }
+    },
+    {
+      "id": "fr-03-fixed-dose-combination",
+      "notes": "Artéméther luméfantrine is ONE drug, not two. Splitting it produces two wrong prescriptions.",
+      "text": "Diagnostic paludisme. Artéméther luméfantrine matin et soir pendant trois jours.",
+      "expect": {
+        "diagnosis": "paludisme",
+        "prescriptions": [
+          { "drug": "artéméther luméfantrine", "frequencyPerDay": 2, "durationDays": 3 }
+        ]
+      }
+    },
+    {
+      "id": "fr-04-prescription-scoping",
+      "notes": "Two drugs. Each one's modifiers must stop at the next drug, or the first steals the second's frequency.",
+      "text": "Amoxicilline 500 mg trois fois par jour pendant sept jours et paracétamol 1 g deux fois par jour pendant trois jours.",
+      "expect": {
+        "prescriptions": [
+          { "drug": "amoxicilline", "dose": "500 mg", "frequencyPerDay": 3, "durationDays": 7 },
+          { "drug": "paracétamol", "dose": "1 g", "frequencyPerDay": 2, "durationDays": 3 }
+        ]
+      }
+    },
+    {
+      "id": "fr-05-implausible-rejected",
+      "notes": "A recogniser dropping a decimal turns 38.5 into 385. That must be discarded, not recorded.",
+      "text": "Température trois cent quatre-vingt-cinq degrés.",
+      "expect": { "vitals": {} }
+    },
+    {
+      "id": "fr-06-mmhg-not-converted",
+      "notes": "Already in mmHg. The cmHg rule must not fire and multiply by ten.",
+      "text": "Tension 130 sur 85, pouls 88.",
+      "expect": {
+        "vitals": { "systolic": 130, "diastolic": 85, "pulse": 88 }
+      }
+    },
+    {
+      "id": "fr-07-weight-height",
+      "notes": "Paediatric weight with a decimal, plus height.",
+      "text": "Poids douze virgule quatre kilos, taille quatre-vingt-quinze centimètres.",
+      "expect": { "vitals": { "weight": 12.4, "height": 95 } }
+    },
+    {
+      "id": "fr-08-respiratory",
+      "notes": "Respiratory rate, the IMCI pneumonia trigger, must be extracted not confused with pulse.",
+      "text": "Fréquence respiratoire quarante-deux par minute, pouls cent trente.",
+      "expect": { "vitals": { "respiratoryRate": 42, "pulse": 130 } }
+    },
+    {
+      "id": "fr-09-antenatal",
+      "notes": "Antenatal visit. No prescription; a spurious one would be a false positive.",
+      "text": "Motif consultation prénatale. Tension onze sur sept, poids soixante-deux kilos. Diagnostic grossesse évolutive.",
+      "expect": {
+        "vitals": { "systolic": 110, "diastolic": 70, "weight": 62 },
+        "chiefComplaint": "consultation prénatale",
+        "diagnosis": "grossesse évolutive"
+      }
+    },
+    {
+      "id": "fr-10-no-vitals",
+      "notes": "Narrative with no measurements at all. Anything extracted here is invented.",
+      "text": "Motif douleur abdominale. Diagnostic gastrite.",
+      "expect": {
+        "chiefComplaint": "douleur abdominale",
+        "diagnosis": "gastrite"
+      }
+    },
+    {
+      "id": "fr-11-diarrhoea-child",
+      "notes": "Common paediatric presentation with ORS, which has no numeric dose.",
+      "text": "Motif diarrhée depuis deux jours. Température trente-sept virgule huit, poids neuf kilos. Diagnostic diarrhée aiguë. Sels de réhydratation orale après chaque selle.",
+      "expect": {
+        "vitals": { "temperature": 37.8, "weight": 9 },
+        "chiefComplaint": "diarrhée depuis deux jours",
+        "diagnosis": "diarrhée aiguë",
+        "prescriptions": [{ "drug": "sels de réhydratation orale" }]
+      }
+    },
+    {
+      "id": "fr-12-respiratory-infection",
+      "notes": "Full consultation, the shape a real dictation takes end to end.",
+      "text": "Motif toux et fièvre depuis cinq jours. Température trente-neuf, pouls cent dix, fréquence respiratoire vingt-huit, saturation quatre-vingt-quatorze pour cent. Diagnostic infection respiratoire basse. Amoxicilline 1 g trois fois par jour pendant sept jours.",
+      "expect": {
+        "vitals": {
+          "temperature": 39,
+          "pulse": 110,
+          "respiratoryRate": 28,
+          "oxygenSaturation": 94
+        },
+        "chiefComplaint": "toux et fièvre depuis cinq jours",
+        "diagnosis": "infection respiratoire basse",
+        "prescriptions": [
+          { "drug": "amoxicilline", "dose": "1 g", "frequencyPerDay": 3, "durationDays": 7 }
+        ]
+      }
+    }
+  ]
+}
