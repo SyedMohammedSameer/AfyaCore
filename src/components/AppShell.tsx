@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router'
 import { Activity, ArrowLeft, Cloud, CloudOff, HardDrive, Home, SlidersHorizontal, Users } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { pendingSyncCount } from '../db/db'
-import { getSyncSettings } from '../lib/sync'
+import { getSyncSettings, isEnrolled } from '../lib/sync'
 import { useI18n } from '../i18n'
 import { LanguageMenu } from './LanguageMenu'
 import { cx } from './ui'
@@ -38,8 +38,7 @@ export function SyncStatus({ onDark = false }: { onDark?: boolean }) {
   const pending = useLiveQuery(() => pendingSyncCount(), [], 0)
   const configured = useLiveQuery(
     async () => {
-      const { serverUrl, facilityId } = await getSyncSettings()
-      return Boolean(serverUrl && facilityId)
+      return isEnrolled(await getSyncSettings())
     },
     [],
     false,
