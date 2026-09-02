@@ -48,7 +48,7 @@ function TimelineEntry({
   return (
     <li className="animate-rise relative flex gap-3 pb-3" style={riseStyle(index)}>
       <div className="flex flex-col items-center pt-4">
-        <span className={cx('size-2.5 shrink-0 rounded-full ring-4 ring-slate-50', dot)} />
+        <span className={cx('size-2.5 shrink-0 rounded-full ring-4 ring-ground', dot)} />
         {!isLast && <span className="mt-1 w-px flex-1 bg-line" />}
       </div>
 

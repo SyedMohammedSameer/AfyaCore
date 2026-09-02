@@ -46,13 +46,18 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const BUTTON_STYLES: Record<ButtonVariant, string> = {
   primary:
     'bg-brand-600 text-white shadow-xs hover:bg-brand-700 active:bg-brand-800 ' +
-    'disabled:bg-line-strong disabled:text-white disabled:shadow-none',
+    // Disabled is a filled-in slot, not a paler button. White on the hairline
+    // colour reads as a second live action on a warm ground, which is exactly
+    // the mistake to avoid on a lock screen where the only button is disabled
+    // until the PIN is long enough.
+    'disabled:bg-line disabled:text-ink-4 disabled:shadow-none',
   secondary:
     'bg-surface text-ink border border-line shadow-xs hover:bg-sunken active:bg-line/60 ' +
     'disabled:text-ink-4 disabled:shadow-none',
   ghost: 'bg-transparent text-ink-2 hover:bg-line/50 active:bg-line disabled:text-ink-4',
   danger:
-    'bg-danger-600 text-white shadow-xs hover:bg-danger-700 active:bg-danger-700 disabled:bg-line-strong',
+    'bg-danger-600 text-white shadow-xs hover:bg-danger-700 active:bg-danger-700 ' +
+    'disabled:bg-line disabled:text-ink-4 disabled:shadow-none',
   onDark: 'bg-white/12 text-white ring-1 ring-white/25 hover:bg-white/20',
 }
 
