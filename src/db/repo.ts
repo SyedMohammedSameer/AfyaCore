@@ -1,5 +1,6 @@
 import { db } from './db'
 import { newId } from '../lib/id'
+import { recordAudit } from '../lib/audit'
 import type { Encounter, FieldProvenance, Patient, Prescription, Vitals } from './schema'
 
 /** Strip diacritics and case so "Rakotoarisoa" and "RAKOTOÀRISOA" match. */
@@ -27,6 +28,7 @@ export async function createPatient(input: NewPatientInput): Promise<string> {
     updatedAt: now,
   }
   await db.patients.add(patient)
+  await recordAudit({ action: 'patient.create', subjectType: 'patient', subjectId: patient.id })
   return patient.id
 }
 
@@ -40,6 +42,15 @@ export async function updatePatient(id: string, changes: Partial<NewPatientInput
     updatedAt: Date.now(),
     // Any local edit invalidates the previous server acknowledgement.
     syncedAt: undefined,
+  })
+  // Field names, never values. Knowing that a phone number was changed is
+  // governance; recording what it was changed to would put the identifier in a
+  // second place with weaker protections.
+  await recordAudit({
+    action: 'patient.update',
+    subjectType: 'patient',
+    subjectId: id,
+    detail: Object.keys(changes).join(','),
   })
 }
 
@@ -76,6 +87,11 @@ export async function createDraftEncounter(patientId: string): Promise<string> {
     updatedAt: now,
   }
   await db.encounters.add(encounter)
+  await recordAudit({
+    action: 'encounter.create',
+    subjectType: 'encounter',
+    subjectId: encounter.id,
+  })
   return encounter.id
 }
 
@@ -90,6 +106,15 @@ export interface EncounterPatch {
   provenance?: Record<string, FieldProvenance>
 }
 
+/**
+ * Deliberately not audited.
+ *
+ * This fires on every field edit while a consultation is being typed, so an
+ * entry per call would bury the log in hundreds of rows per patient and make
+ * the entries that matter unfindable. The pair that brackets it, `create` and
+ * `finalise`/`amend`, is what a reviewer actually needs: a draft's intermediate
+ * states are working notes, and the record is the thing a human confirmed.
+ */
 export async function patchEncounter(id: string, patch: EncounterPatch): Promise<void> {
   await db.transaction('rw', db.encounters, async () => {
     const existing = await db.encounters.get(id)
@@ -106,7 +131,16 @@ export async function patchEncounter(id: string, patch: EncounterPatch): Promise
 
 /** Promote a draft to a permanent record. The only place `status` becomes final. */
 export async function finaliseEncounter(id: string): Promise<void> {
+  const existing = await db.encounters.get(id)
   await db.encounters.update(id, { status: 'final', updatedAt: Date.now(), syncedAt: undefined })
+  // Amending an already-final record is a different act from confirming a draft
+  // for the first time, and a reviewer asking "was this changed after it was
+  // signed off" needs the two to be distinguishable.
+  await recordAudit({
+    action: existing?.status === 'final' ? 'encounter.amend' : 'encounter.finalise',
+    subjectType: 'encounter',
+    subjectId: id,
+  })
 }
 
 /**
@@ -128,6 +162,7 @@ export async function deleteEncounter(id: string): Promise<void> {
       syncedAt: undefined,
     })
   })
+  await recordAudit({ action: 'encounter.delete', subjectType: 'encounter', subjectId: id })
 }
 
 /**
@@ -144,7 +179,7 @@ export async function deleteEncounter(id: string): Promise<void> {
  * here large enough that keeping them would be a real cost.
  */
 export async function deletePatient(id: string): Promise<void> {
-  await db.transaction('rw', db.patients, db.encounters, db.attachments, async () => {
+  await db.transaction('rw', db.patients, db.encounters, db.attachments, db.audit, async () => {
     const now = Date.now()
     const encounters = await db.encounters.where('patientId').equals(id).toArray()
 
@@ -159,6 +194,15 @@ export async function deletePatient(id: string): Promise<void> {
     }
 
     await db.patients.update(id, { deletedAt: now, updatedAt: now, syncedAt: undefined })
+    // The consultation count is the part that matters on review: deleting a
+    // patient with eleven consultations is a different act from deleting an
+    // empty registration made by mistake.
+    await recordAudit({
+      action: 'patient.delete',
+      subjectType: 'patient',
+      subjectId: id,
+      detail: `${encounters.length} encounters`,
+    })
   })
 }
 
@@ -237,7 +281,7 @@ export function mergeFields(
 export async function mergePatients(keepId: string, duplicateId: string): Promise<MergeOutcome> {
   if (keepId === duplicateId) throw new Error('Cannot merge a patient into itself')
 
-  return db.transaction('rw', db.patients, db.encounters, async () => {
+  return db.transaction('rw', db.patients, db.encounters, db.audit, async () => {
     const [keep, duplicate] = await Promise.all([db.patients.get(keepId), db.patients.get(duplicateId)])
     if (!keep) throw new Error(`Patient ${keepId} not found`)
     if (!duplicate) throw new Error(`Patient ${duplicateId} not found`)
@@ -262,6 +306,13 @@ export async function mergePatients(keepId: string, duplicateId: string): Promis
       syncedAt: undefined,
     })
     await db.patients.update(duplicateId, { deletedAt: now, updatedAt: now, syncedAt: undefined })
+
+    await recordAudit({
+      action: 'patient.merge',
+      subjectType: 'patient',
+      subjectId: keepId,
+      detail: `from=${duplicateId} moved=${encounters.length} filled=${filled.join(',')}`,
+    })
 
     return { moved: encounters.length, filled }
   })

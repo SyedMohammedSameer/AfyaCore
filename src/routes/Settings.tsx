@@ -12,6 +12,7 @@ import { aggregateMonth, toAggregateCsv, toDhis2DataValueSet, indicatorLabel } f
 import { isOcrReady, preloadOcr } from '../lib/ocr'
 import { PrivacySelector } from '../components/PrivacySelector'
 import { SyncPanel } from '../components/SyncPanel'
+import { StaffPanel } from '../components/StaffPanel'
 import { deidentify, type DeidentLevel } from '../lib/deidentify'
 import { LANG_LABELS, useI18n } from '../i18n'
 import type { LangCode } from '../db/schema'
@@ -263,6 +264,8 @@ export function Settings() {
         </section>
 
         <SyncPanel />
+
+        <StaffPanel />
 
         <PrivacySelector value={level} onChange={changeLevel} />
 
