@@ -130,4 +130,18 @@ export function parseFrenchNumber(input: string): number | undefined {
  */
 const ALT = [...NUMBER_WORDS].sort((a, b) => b.length - a.length).join('|')
 
-export const NUMBER_PATTERN = `(?:\\d+(?:[.,]\\d+)?|(?:${ALT})(?:[\\s-]+(?:${ALT}))*)`
+/**
+ * The trailing `\b` is load-bearing, not decoration.
+ *
+ * `cent` is a number word and `centimetres` begins with it, so without a
+ * boundary the run matches "quatre-vingt-quinze cent" out of
+ * "quatre-vingt-quinze centimetres" and parses as 95 x 100 = 9500. That is
+ * exactly the height case: the value then fails the plausibility check and the
+ * measurement is silently dropped. Found by the eval harness, which is the only
+ * reason anyone noticed, since the failure mode is a missing field rather than
+ * a visibly wrong one.
+ *
+ * With the boundary, the greedy match backtracks off `cent` and settles on
+ * "quatre-vingt-quinze", which is the intended reading.
+ */
+export const NUMBER_PATTERN = `(?:\\d+(?:[.,]\\d+)?|(?:${ALT})(?:[\\s-]+(?:${ALT}))*)\\b`
