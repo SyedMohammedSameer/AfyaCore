@@ -4,19 +4,28 @@ AfyaCore handles clinical records. This file is deliberately blunt about what it
 does and does not protect, because a health tool that overstates its security is
 worse than one that has none.
 
-## Status: prototype. Do not use with real patient data.
+## Status: pilot candidate. Not yet validated in a live facility.
 
-v0.0.1 is not ready for a live facility. The gaps below are known, deliberate and
-tracked, not oversights waiting to be discovered.
+The gaps below are known, deliberate and tracked, not oversights waiting to be
+discovered. Where a row says "implemented", there is a test that fails if it
+stops being true.
+
+## Implemented controls
+
+| Control | What it does |
+|---|---|
+| **Device enrolment and bearer tokens** | A device joins a facility once, with a single-use code that expires in 24 hours. Facility scope is a property of the token; the server ignores any facility id in the request body, so a caller can only ever reach the facility their token was issued for. Tokens are stored as hashes, and `cli.mjs device:revoke` cuts off a lost phone immediately. |
+| **Tamper-evident audit trail** | Every enrolment, sync, and administrative action is appended to a hash-chained log. Editing or deleting an entry breaks every hash after it, and `cli.mjs audit:verify` reports the first break. |
+| **Rate limiting** | 10 enrolment attempts per minute per address, which turns a ~38-bit code from guessable into not. |
+| **Origin allow-listing** | CORS is restricted to origins the deployer names. It previously allowed `*`, meaning any page on the internet could drive a facility's server. |
 
 ## Known gaps
 
 | Gap | Impact | Status |
 |---|---|---|
-| **The sync server has no authentication** | Anyone who can reach the server and guess a facility ID can read and write that facility's entire record set | Not implemented. Use only on a trusted network, or not at all. |
-| **No audit trail** | Nothing records who created, amended or deleted a record | Not implemented |
+| **The audit chain is single-server** | A hash chain makes tampering detectable, not impossible. An administrator with filesystem access can rewrite the whole chain. | Mitigate by recording the head hash off-box; anchoring is not automated. |
 | **No encryption at rest** | Records sit in IndexedDB and in the server's SQLite file in plain text. Anyone with the unlocked device or the server's filesystem can read them | Relies on device and disk encryption |
-| **No transport security by default** | The sync server speaks plain HTTP. Put it behind a TLS-terminating reverse proxy | Deployer's responsibility |
+| **No transport security by default** | The sync server speaks plain HTTP unless `AFYACORE_TLS_CERT`/`AFYACORE_TLS_KEY` are set. Put it behind a TLS-terminating reverse proxy, or set those. | Deployer's responsibility, and the server says so on boot |
 | **Deleting a confirmed consultation changes figures already reported** | A monthly aggregate re-exported after a deletion will not match what was submitted | Warned in the UI, not enforced |
 
 ## What the app does protect
@@ -61,6 +70,5 @@ If you find a gap already listed in the table above, it is known, but a
 In scope: the web app, the sync server and protocol, the de-identification
 pipeline, and the export formats.
 
-Out of scope: findings that reduce to "the prototype has no authentication",
-issues in the browser or OS itself, and anything requiring physical access to an
-unlocked device.
+Out of scope: issues in the browser or OS itself, and anything requiring
+physical access to an unlocked device.

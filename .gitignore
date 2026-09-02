@@ -15,3 +15,5 @@ public/ocr/
 .cache/
 server/data/
 .npm-cache
+# Server database and WAL files, created at runtime
+server/data/

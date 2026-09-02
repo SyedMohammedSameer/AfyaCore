@@ -18,9 +18,9 @@
   <img src="docs/screenshots/desktop-today.webp" alt="AfyaCore dashboard on a laptop" width="820">
 </p>
 
-> **Status: v0.0.1 prototype.** Not yet validated with a facility or an NGO, and the sync server has
-> no authentication. Do not put real patient data on a public instance. See
-> [Known limits](#known-limits) and [SECURITY.md](SECURITY.md).
+> **Status: pilot candidate.** Not yet validated with a facility or an NGO. The sync server now
+> authenticates devices and keeps a tamper-evident audit trail; records are still stored unencrypted
+> on the device. See [Known limits](#known-limits) and [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -186,16 +186,38 @@ something the interface waits on: a facility offline for a week notices nothing 
 count.
 
 ```bash
-node server/sync-server.mjs     # PORT=8787, AFYACORE_DB=./server/data/afyacore.db
+node server/cli.mjs facility:add csb2-ambohimanga "CSB2 Ambohimanga" MG
+node server/cli.mjs enrol:code   csb2-ambohimanga     # read this to the phone
+node server/sync-server.mjs                           # PORT=8787
 ```
 
-Zero dependencies. `node:sqlite` and `node:http` are both standard library from Node 22, because
-whoever runs this is likely an NGO IT volunteer on a small VPS and "nothing to install" is worth more
-than framework convenience.
+Zero dependencies. `node:sqlite`, `node:http` and `node:crypto` are all standard library from Node
+22, because whoever runs this is likely an NGO IT volunteer on a small VPS and "nothing to install"
+is worth more than framework convenience.
 
-**Protocol.** One POST does push then pull. Push first, so a record that loses a conflict comes back
-in the same round trip. The cursor is a server-assigned sequence rather than a timestamp, so a phone
-with a wrong clock cannot skip records on pull.
+**Protocol.** One authenticated POST does push then pull. Push first, so a record that loses a
+conflict comes back in the same round trip. The cursor is a server-assigned sequence rather than a
+timestamp, so a phone with a wrong clock cannot skip records on pull.
+
+**Authentication.** A device enrols once, exchanging a single-use code for a bearer token. The
+facility a device belongs to is a property of that token, and the server ignores any facility id in
+the request body. Previously a facility id was typed into Settings, which meant guessing one was
+enough to read a facility's entire record set.
+
+The code is 8 characters from an alphabet with no O/0 or I/1/L, because it gets read down a phone
+line. It expires in 24 hours, works once, and enrolment is rate limited to 10 attempts a minute, so
+a code overheard afterwards is worth nothing.
+
+**Audit.** Every enrolment, sync and administrative action is appended to a hash-chained log:
+`hash = SHA-256(prev_hash || entry)`. Altering or deleting an entry breaks every hash after it, and
+`cli.mjs audit:verify` names the first break. This makes tampering *detectable*, not impossible; an
+administrator with filesystem access can still rewrite the whole chain, and the fix for that is
+recording the head hash somewhere off the server. Entries carry counts, never record contents: an
+audit log that duplicates the clinical record doubles the blast radius of losing it.
+
+**Administration is a CLI, not an HTTP surface.** An admin API is a second thing to authenticate,
+and the failure mode for a small deployment is that it gets left open. Requiring shell access means
+the server exposes exactly two endpoints: enrol and sync.
 
 **Conflicts** are last write wins on `updatedAt`, decided by the server. Defensible here because
 records are replaced whole and never merged field by field. Two rules protect work:
@@ -210,11 +232,13 @@ learn that a row it still holds is gone.
 
 Attachments do not sync: they are large, and the value per byte over a metered connection is low.
 
-**Until a server is configured**, the status chip reads *Saved on device* rather than a pending
-count. A count of records "waiting" on a server that does not exist can only ever climb, and it
-reads as a growing pile of stuck work when nothing is stuck.
+**Until a device is enrolled**, the status chip reads *Saved on device* rather than a pending count.
+A count of records "waiting" on a server that does not exist can only ever climb, and it reads as a
+growing pile of stuck work when nothing is stuck.
 
-⚠️ **The server has no authentication yet.** Do not put real patient data on a public instance.
+⚠️ **Serve it over TLS.** The server speaks plain HTTP unless `AFYACORE_TLS_CERT` and
+`AFYACORE_TLS_KEY` are set, and it says so on boot. A bearer token over plain HTTP is a bearer token
+in the clear.
 
 ## The design bet
 
@@ -271,6 +295,7 @@ requested on launch so a phone low on space cannot silently evict a week of cons
 npm install
 npm run dev        # dev server
 npm run sync       # sync server on :8787
+npm run admin      # server administration: facilities, enrolment codes, devices, audit
 npm test           # extraction, merge, FHIR and reporting suites
 npm run typecheck  # tsc --noEmit, no build
 npm run build      # vendor OCR assets + typecheck + production build
@@ -291,7 +316,7 @@ src/lib/         extraction, locales, de-identification, FHIR, DHIS2, sync clien
 src/routes/      one file per screen
 src/components/  UI primitives and the app shell
 src/i18n/        interface strings, one object per language
-server/          zero-dependency sync server
+server/          zero-dependency sync server: store, auth, audit chain, admin CLI
 docs/            model research and the reasoning behind what was not built
 ```
 
@@ -353,8 +378,9 @@ These are structural, not conventions:
   deployment, wrong dosage wording is a safety issue, not a polish issue.
 - **Dictation needs network** (browser recogniser). Manual entry always works offline. Offline
   ASR is the first planned upgrade.
-- ⚠️ **Sync has no authentication.** Anyone who can reach the server and guess a facility ID can read
-  and write that facility's records. Use only on a trusted network until auth exists.
+- ⚠️ **Records are not encrypted at rest.** IndexedDB on the device and SQLite on the server are both
+  plain text, so an unlocked phone or the server's filesystem gives up the roster. Device encryption
+  is the only thing protecting them today.
 - **Malagasy dictation is not supported** and falls back to French. See `docs/MODEL-RESEARCH.md` §2.2.
 - ⚠️ **The DHIS2 export contains placeholder UIDs.** DHIS2 identifies data elements by
   instance-specific IDs we do not have. The JSON is structurally valid and will import once
@@ -427,15 +453,14 @@ a single reported number.
 Roughly in order of what would block a real deployment:
 
 1. **Native-speaker review of every Malagasy string.** Wrong dosage wording is a safety issue.
-2. **Authentication and an audit trail on the sync server**, before any real patient data touches it.
-3. **Real DHIS2 UIDs** from the target instance, replacing the placeholders.
-4. **A reporting lock**, so a month that has been exported cannot be silently altered by a later
+2. **Real DHIS2 UIDs** from the target instance, replacing the placeholders.
+3. **A reporting lock**, so a month that has been exported cannot be silently altered by a later
    correction or deletion.
-5. **Offline ASR** (`whisper-base` ONNX int8, ~80 MB, on demand), which removes the last hard
+4. **Offline ASR** (`whisper-base` ONNX int8, ~80 MB, on demand), which removes the last hard
    network dependency.
-6. **Optional neural PII pass** over free text (OpenMed 44M ONNX) for names *not* on the roster; the
+5. **Optional neural PII pass** over free text (OpenMed ONNX) for names *not* on the roster; the
    deterministic scrub already covers the ones that are. See `docs/MODEL-RESEARCH.md` §4b.
-7. **Malagasy instruction phrase bank** as pre-rendered audio, working around the missing Android TTS.
+6. **Malagasy instruction phrase bank** as pre-rendered audio, working around the missing Android TTS.
 
 ## Contributing
 

@@ -16,15 +16,27 @@
  * vanishingly rare compared with the cost of a merge algorithm nobody can
  * reason about. Where it is not defensible, we refuse instead. See `applyPulled`.
  *
- * NOT IMPLEMENTED YET, deliberately: authentication. Treat any server as
- * untrusted infrastructure until that exists.
+ * A device authenticates with a bearer token obtained once, by enrolling with a
+ * single-use code an administrator reads out. The facility a device belongs to
+ * is a property of that token, not something the client asserts: a typed
+ * facility id was previously the only thing standing between a stranger and a
+ * facility's entire record set.
  */
 import { db, unsyncedRecords } from '../db/db'
 import type { Encounter, Patient } from '../db/schema'
 
 export interface SyncSettings {
   serverUrl: string
+  /** Set by enrolment, never typed. Empty until this device is enrolled. */
   facilityId: string
+  /** Bearer token issued at enrolment. Empty until this device is enrolled. */
+  token: string
+  deviceId: string
+}
+
+/** A device can sync only once it holds a token for a configured server. */
+export function isEnrolled(settings: SyncSettings): boolean {
+  return Boolean(settings.serverUrl && settings.token)
 }
 
 export interface SyncOutcome {
@@ -42,28 +54,114 @@ export interface SyncOutcome {
 const SETTING_KEYS = {
   url: 'sync.serverUrl',
   facility: 'sync.facilityId',
+  token: 'sync.token',
+  deviceId: 'sync.deviceId',
   cursor: 'sync.cursor',
   lastResult: 'sync.lastResult',
 } as const
 
+const asString = (value: unknown) => (typeof value === 'string' ? value : '')
+
 export async function getSyncSettings(): Promise<SyncSettings> {
-  const [url, facility] = await Promise.all([
+  const [url, facility, token, deviceId] = await Promise.all([
     db.settings.get(SETTING_KEYS.url),
     db.settings.get(SETTING_KEYS.facility),
+    db.settings.get(SETTING_KEYS.token),
+    db.settings.get(SETTING_KEYS.deviceId),
   ])
   return {
-    serverUrl: typeof url?.value === 'string' ? url.value : '',
-    facilityId: typeof facility?.value === 'string' ? facility.value : '',
+    serverUrl: asString(url?.value),
+    facilityId: asString(facility?.value),
+    token: asString(token?.value),
+    deviceId: asString(deviceId?.value),
   }
 }
 
-export async function setSyncSettings(next: Partial<SyncSettings>): Promise<void> {
+/**
+ * The server URL is the only sync setting a person may type.
+ *
+ * Narrower than `Partial<SyncSettings>` on purpose: facility, token and device
+ * id are issued by enrolment, and a signature that still accepted them would
+ * let a caller believe it had set a facility when it had not.
+ */
+export async function setSyncSettings(next: { serverUrl?: string }): Promise<void> {
   if (next.serverUrl !== undefined) {
     await db.settings.put({ key: SETTING_KEYS.url, value: next.serverUrl.trim().replace(/\/+$/, '') })
   }
-  if (next.facilityId !== undefined) {
-    await db.settings.put({ key: SETTING_KEYS.facility, value: next.facilityId.trim() })
+}
+
+export interface EnrolmentResult {
+  ok: boolean
+  facilityId?: string
+  error?: 'not_configured' | 'invalid_code' | 'rate_limited' | 'network' | 'timeout' | string
+}
+
+/**
+ * Exchange a single-use code for this device's token.
+ *
+ * Run once per phone, in front of whoever is setting it up. The code is read
+ * out by an administrator, is valid for a day, and cannot be used twice, so a
+ * code overheard after the fact is worth nothing.
+ */
+export async function enrolDevice(
+  code: string,
+  deviceName: string,
+  options: SyncOptions = {},
+): Promise<EnrolmentResult> {
+  const { timeoutMs = 30_000, fetchImpl = fetch } = options
+  const { serverUrl } = await getSyncSettings()
+  if (!serverUrl) return { ok: false, error: 'not_configured' }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetchImpl(`${serverUrl}/enrol`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({ code, deviceName }),
+    })
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as { error?: string }
+      return { ok: false, error: body.error ?? `http_${response.status}` }
+    }
+    const payload = (await response.json()) as {
+      token: string
+      deviceId: string
+      facilityId: string
+    }
+    await db.settings.bulkPut([
+      { key: SETTING_KEYS.token, value: payload.token },
+      { key: SETTING_KEYS.deviceId, value: payload.deviceId },
+      { key: SETTING_KEYS.facility, value: payload.facilityId },
+      // A newly enrolled device has seen nothing, so it pulls from the start.
+      { key: SETTING_KEYS.cursor, value: 0 },
+    ])
+    return { ok: true, facilityId: payload.facilityId }
+  } catch (err) {
+    const aborted = err instanceof Error && err.name === 'AbortError'
+    return { ok: false, error: aborted ? 'timeout' : 'network' }
+  } finally {
+    clearTimeout(timer)
   }
+}
+
+/**
+ * Forget this device's credentials.
+ *
+ * Local records are deliberately left alone: un-enrolling is what someone does
+ * when a phone changes hands or moves facility, and it must not be a way to
+ * destroy a clinic's consultations by accident. Revoking the token server-side
+ * is a separate administrative act (`cli.mjs device:revoke`), because a phone
+ * that has been stolen cannot be asked to un-enrol itself.
+ */
+export async function unenrolDevice(): Promise<void> {
+  await db.settings.bulkPut([
+    { key: SETTING_KEYS.token, value: '' },
+    { key: SETTING_KEYS.deviceId, value: '' },
+    { key: SETTING_KEYS.facility, value: '' },
+    { key: SETTING_KEYS.cursor, value: 0 },
+  ])
 }
 
 async function getCursor(): Promise<number> {
@@ -149,6 +247,14 @@ export interface SyncOptions {
   /** Abort if the server does not answer. Field connections are slow but finite. */
   timeoutMs?: number
   fetchImpl?: typeof fetch
+  /**
+   * The clinician this sync is attributed to in the server's audit log.
+   *
+   * Carried as an opaque local account id, never a name: the audit trail has to
+   * answer "which account moved these records" without itself becoming a
+   * directory of who works at the facility.
+   */
+  actorId?: string
 }
 
 /**
@@ -156,7 +262,7 @@ export interface SyncOptions {
  * attempt because the local store is only updated after a successful response.
  */
 export async function runSync(options: SyncOptions = {}): Promise<SyncOutcome> {
-  const { timeoutMs = 30_000, fetchImpl = fetch } = options
+  const { timeoutMs = 30_000, fetchImpl = fetch, actorId } = options
   const settings = await getSyncSettings()
   const base: SyncOutcome = {
     ok: false,
@@ -168,7 +274,7 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncOutcome> {
     finishedAt: Date.now(),
   }
 
-  if (!settings.serverUrl || !settings.facilityId) {
+  if (!isEnrolled(settings)) {
     return { ...base, error: 'not_configured', finishedAt: Date.now() }
   }
 
@@ -179,17 +285,27 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncOutcome> {
   try {
     const response = await fetchImpl(`${settings.serverUrl}/sync`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${settings.token}`,
+      },
       signal: controller.signal,
       body: JSON.stringify({
-        facilityId: settings.facilityId,
         cursor: base.cursor,
+        actorId,
         changes,
       }),
     })
 
     if (!response.ok) {
-      const outcome = { ...base, error: `http_${response.status}`, finishedAt: Date.now() }
+      // 401 means the token is gone: revoked by an administrator, or the
+      // server's database was rebuilt. Either way this device is no longer
+      // enrolled, and saying so is more useful than repeating "http_401".
+      const outcome = {
+        ...base,
+        error: response.status === 401 ? 'unauthorised' : `http_${response.status}`,
+        finishedAt: Date.now(),
+      }
       await db.settings.put({ key: SETTING_KEYS.lastResult, value: outcome })
       return outcome
     }
@@ -248,8 +364,7 @@ export function startAutoSync(): () => void {
 
   const attempt = async () => {
     if (running || !navigator.onLine) return
-    const { serverUrl, facilityId } = await getSyncSettings()
-    if (!serverUrl || !facilityId) return
+    if (!isEnrolled(await getSyncSettings())) return
     running = true
     try {
       await runSync()

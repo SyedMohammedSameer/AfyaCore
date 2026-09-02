@@ -113,7 +113,6 @@ export interface Strings {
   sync: string
   syncHint: string
   serverUrl: string
-  facilityId: string
   syncNow: string
   syncing: string
   lastSync: string
@@ -121,7 +120,21 @@ export interface Strings {
   syncNotConfigured: string
   syncFailed: string
   syncSummary: string
-  syncNoAuthWarning: string
+  // Device enrolment. Replaces the typed facility id: a device is joined to a
+  // facility once, with a single-use code an administrator reads out.
+  enrolHint: string
+  enrolCode: string
+  enrolDevice: string
+  enrolling: string
+  enrolFailed: string
+  enrolInvalidCode: string
+  enrolRateLimited: string
+  deviceName: string
+  deviceNamePlaceholder: string
+  deviceEnrolled: string
+  unenrol: string
+  unenrolConfirm: string
+  syncUnauthorised: string
   privacy: string
   privacyHint: string
   levelIdentified: string
@@ -289,7 +302,6 @@ const fr: Strings = {
   sync: 'Synchronisation',
   syncHint: 'Les enregistrements restent sur cet appareil. La synchronisation les partage avec les autres appareils du centre.',
   serverUrl: 'Adresse du serveur',
-  facilityId: 'Identifiant du centre',
   syncNow: 'Synchroniser',
   syncing: 'Synchronisation en cours…',
   lastSync: 'Dernière synchronisation',
@@ -297,7 +309,19 @@ const fr: Strings = {
   syncNotConfigured: 'Renseignez l’adresse du serveur et l’identifiant du centre.',
   syncFailed: 'Échec de la synchronisation',
   syncSummary: 'envoyés / reçus',
-  syncNoAuthWarning: 'Le serveur n’a pas encore d’authentification. À réserver à un réseau de confiance.',
+  enrolHint: 'Demandez un code d’inscription à l’administrateur du serveur, puis saisissez-le ici. Une seule fois par appareil.',
+  enrolCode: 'Code d’inscription',
+  enrolDevice: 'Inscrire cet appareil',
+  enrolling: 'Inscription…',
+  enrolFailed: 'Échec de l’inscription',
+  enrolInvalidCode: 'Code invalide, expiré ou déjà utilisé. Demandez-en un nouveau.',
+  enrolRateLimited: 'Trop de tentatives. Réessayez dans une minute.',
+  deviceName: 'Nom de l’appareil',
+  deviceNamePlaceholder: 'Téléphone consultation 1',
+  deviceEnrolled: 'Appareil inscrit',
+  unenrol: 'Désinscrire cet appareil',
+  unenrolConfirm: 'Désinscrire cet appareil ? Les dossiers restent sur le téléphone, mais la synchronisation s’arrête jusqu’à une nouvelle inscription.',
+  syncUnauthorised: 'Cet appareil n’est plus autorisé. Son accès a été révoqué ; demandez un nouveau code.',
   privacy: 'Confidentialité des exports',
   privacyHint: 'Choisissez ce que les fichiers exportés contiennent avant qu’ils ne quittent l’appareil.',
   levelIdentified: 'Identifié',
@@ -462,7 +486,6 @@ const mg: Strings = {
   sync: 'Fampifanarahana',
   syncHint: 'Mijanona eto amin’ity finday ity ny rakitra. Ny fampifanarahana no mizara azy.',
   serverUrl: 'Adiresin’ny serivera',
-  facilityId: 'Laharan’ny toeram-pitsaboana',
   syncNow: 'Ampifanaraho',
   syncing: 'Eo am-panaovana…',
   lastSync: 'Farany',
@@ -470,7 +493,19 @@ const mg: Strings = {
   syncNotConfigured: 'Fenoy ny adiresy sy ny laharana.',
   syncFailed: 'Tsy nahomby',
   syncSummary: 'nalefa / noraisina',
-  syncNoAuthWarning: 'Mbola tsy misy fiarovana ny serivera.',
+  enrolHint: 'Angataho amin’ny mpitantana ny serivera ny kaody fisoratana anarana, dia soraty eto. Indray mandeha isaky ny finday.',
+  enrolCode: 'Kaody fisoratana anarana',
+  enrolDevice: 'Hisoratra anarana ity finday ity',
+  enrolling: 'Misoratra anarana…',
+  enrolFailed: 'Tsy nahomby ny fisoratana anarana',
+  enrolInvalidCode: 'Kaody diso, lany daty, na efa nampiasaina. Mangataha vaovao.',
+  enrolRateLimited: 'Betsaka loatra ny fanandramana. Andramo indray afaka iray minitra.',
+  deviceName: 'Anaran’ny finday',
+  deviceNamePlaceholder: 'Finday fitsaboana 1',
+  deviceEnrolled: 'Voasoratra anarana ny finday',
+  unenrol: 'Esory ny fisoratana anarana',
+  unenrolConfirm: 'Esorina ny fisoratana anarana? Mijanona ao amin’ny finday ny rakitra, fa mijanona ny fampifanarahana mandra-pisoratra anarana indray.',
+  syncUnauthorised: 'Tsy manan-dalana intsony ity finday ity. Nofoanana ny fidirany; mangataha kaody vaovao.',
   privacy: 'Fiarovana ny rakitra',
   privacyHint: 'Fidio izay ao anatin’ny rakitra havoaka.',
   levelIdentified: 'Misy anarana',
@@ -634,7 +669,6 @@ const en: Strings = {
   sync: 'Sync',
   syncHint: 'Records stay on this device. Sync shares them with the other devices at this facility.',
   serverUrl: 'Server address',
-  facilityId: 'Facility ID',
   syncNow: 'Sync now',
   syncing: 'Syncing…',
   lastSync: 'Last sync',
@@ -642,7 +676,19 @@ const en: Strings = {
   syncNotConfigured: 'Set the server address and facility ID.',
   syncFailed: 'Sync failed',
   syncSummary: 'sent / received',
-  syncNoAuthWarning: 'The server has no authentication yet. Use only on a trusted network.',
+  enrolHint: 'Ask the server administrator for an enrolment code, then enter it here. Once per device.',
+  enrolCode: 'Enrolment code',
+  enrolDevice: 'Enrol this device',
+  enrolling: 'Enrolling…',
+  enrolFailed: 'Enrolment failed',
+  enrolInvalidCode: 'Code is invalid, expired or already used. Ask for a new one.',
+  enrolRateLimited: 'Too many attempts. Try again in a minute.',
+  deviceName: 'Device name',
+  deviceNamePlaceholder: 'Consultation phone 1',
+  deviceEnrolled: 'Device enrolled',
+  unenrol: 'Un-enrol this device',
+  unenrolConfirm: 'Un-enrol this device? Records stay on the phone, but syncing stops until it is enrolled again.',
+  syncUnauthorised: 'This device is no longer authorised. Its access was revoked; ask for a new code.',
   privacy: 'Export privacy',
   privacyHint: 'Choose what exported files contain before they leave this device.',
   levelIdentified: 'Identified',
