@@ -34,10 +34,10 @@ Every screenshot below is the real build against the synthetic demo workspace, r
 | <img src="docs/screenshots/mobile-today.webp" alt="Today screen" width="240"> | <img src="docs/screenshots/mobile-roster.webp" alt="Patient roster with search and filters" width="240"> | <img src="docs/screenshots/mobile-encounter.webp" alt="Consultation capture with dictation panel and vitals" width="240"> |
 | Drafts first, then the roster. Nothing waits on the network. | Accent-insensitive search over names, register numbers and phone numbers. | Dictate or type. Every vital is range-checked at input. |
 
-| Patient history | Review | Patient instructions |
+| Sign in | Review | Patient instructions |
 |---|---|---|
-| <img src="docs/screenshots/mobile-patient.webp" alt="Patient timeline" width="240"> | <img src="docs/screenshots/mobile-review.webp" alt="Review screen showing per-field provenance" width="240"> | <img src="docs/screenshots/mobile-instructions.webp" alt="Patient instruction sheet in Malagasy with dosing icons" width="240"> |
-| A timeline, because the question is always "what changed since last time". | Per-field provenance. Low-confidence values are flagged *Check this* before anything is saved. | Rendered in the **patient's** language, with dosing icons for anyone who cannot read. |
+| <img src="docs/screenshots/mobile-lock.webp" alt="PIN entry lock screen" width="240"> | <img src="docs/screenshots/mobile-review.webp" alt="Review screen showing per-field provenance" width="240"> | <img src="docs/screenshots/mobile-instructions.webp" alt="Patient instruction sheet in Malagasy with dosing icons" width="240"> |
+| A shared phone needs to know who is holding it, or the audit trail says "someone at this facility". | Per-field provenance. Low-confidence values are flagged *Check this* before anything is saved. | Rendered in the **patient's** language, with dosing icons for anyone who cannot read. |
 
 The same build on a laptop, where the roster becomes a rail and the reporting screen has room to
 breathe:
@@ -115,6 +115,10 @@ for (const remote of encounters) {
   on the critical path
 - **Correcting the record**, patients can be edited, deleted or merged when the same person was
   registered twice; a confirmed consultation can be amended or deleted
+- **Staff accounts and a device lock**, PIN entry per clinician, two roles, an idle timeout, and a
+  lockout after repeated wrong PINs
+- **A tamper-evident audit trail**, hash-chained locally and on the server, recording who created,
+  amended, merged, deleted or exported what
 - **Trilingual interface**, French, Malagasy and English, switched from the header on any screen
 - **Exports**, FHIR R4 bundle, DHIS2 monthly `dataValueSet`, aggregate CSV, and a raw JSON dump
 - **Sync** between the devices at a facility, with a zero-dependency server you can self-host
@@ -240,6 +244,32 @@ growing pile of stuck work when nothing is stuck.
 `AFYACORE_TLS_KEY` are set, and it says so on boot. A bearer token over plain HTTP is a bearer token
 in the clear.
 
+## Who did what
+
+A consultation-room phone is shared, put down mid-task, and picked up by whoever is next. An audit
+trail is worth nothing if the name on it is not the person who was actually holding the device, so
+identity is a gate in front of the whole app rather than a guard on each screen.
+
+- **A PIN per clinician**, on a numeric keypad rather than the system keyboard, because this is
+  entered dozens of times a day on a phone held in one hand.
+- **Two roles.** Everyone records care; only an administrator enrols a device, adds an account,
+  exports identified data, or reads the audit log. A permission model with twenty flags is one
+  nobody configures correctly.
+- **An idle timeout**, because the failure mode is not forgetting to lock, it is a phone left face
+  up on a desk with a queue in the room.
+- **The session lives in memory only.** A phone picked up off a desk is never already signed in, and
+  a reload asks again. This is stricter than convenient, deliberately.
+- **Five wrong attempts** locks the device for five minutes, and 0000, 1111 and 1234 are refused at
+  the point they are chosen, which is what makes five attempts a real limit.
+
+Stated plainly: **a 4-digit PIN is not what protects the records** from someone who takes the phone
+away and has time. Device encryption is. What the PIN does is bind attribution and stop the casual
+case. `SECURITY.md` says the same thing in the same words.
+
+Every write is appended to a hash-chained audit log, on the device and again on the server. Entries
+name a record id and a field list, never clinical content: an audit log that quotes the note it
+describes is a second copy of the medical record with none of its protections.
+
 ## The design bet
 
 Madagascar's clinical documentation is written **in French**; most patients **do not speak French**;
@@ -312,7 +342,8 @@ Load `Settings → Load demo workspace` for synthetic patients to click through.
 
 ```
 src/db/          schema, Dexie setup, repository (the only place records are written)
-src/lib/         extraction, locales, de-identification, FHIR, DHIS2, sync client, OCR
+src/lib/         extraction, locales, de-identification, FHIR, DHIS2, sync client, OCR,
+                 identity and the local audit chain
 src/routes/      one file per screen
 src/components/  UI primitives and the app shell
 src/i18n/        interface strings, one object per language
@@ -378,6 +409,9 @@ These are structural, not conventions:
   deployment, wrong dosage wording is a safety issue, not a polish issue.
 - **Dictation needs network** (browser recogniser). Manual entry always works offline. Offline
   ASR is the first planned upgrade.
+- ⚠️ **The audit chain detects tampering, it does not prevent it.** A hash chain makes an edited or
+  deleted entry visible, but anyone who can rewrite the whole chain leaves no trace. Recording the
+  head hash off the device is the mitigation, and it is manual.
 - ⚠️ **Records are not encrypted at rest.** IndexedDB on the device and SQLite on the server are both
   plain text, so an unlocked phone or the server's filesystem gives up the roster. Device encryption
   is the only thing protecting them today.

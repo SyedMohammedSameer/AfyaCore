@@ -120,6 +120,48 @@ export interface Strings {
   syncNotConfigured: string
   syncFailed: string
   syncSummary: string
+  // Sign-in and device lock. The phone is shared and put down constantly, so
+  // the audit trail is only meaningful if the name on it is the person who was
+  // actually holding it.
+  lockSubtitle: string
+  firstRunSubtitle: string
+  firstRunHint: string
+  yourName: string
+  nameRequired: string
+  choosePin: string
+  confirmPin: string
+  pin: string
+  pinHint: string
+  pinMismatch: string
+  pinWrong: string
+  pinLockedOut: string
+  attemptsRemaining: string
+  pinPolicy: Record<'too_short' | 'too_long' | 'not_numeric' | 'sequential' | 'repeated', string>
+  createAccount: string
+  signInAs: string
+  unlock: string
+  signOut: string
+  clear: string
+  backspace: string
+  // Staff and audit
+  staff: string
+  addStaff: string
+  role: string
+  roleClinician: string
+  roleAdmin: string
+  disableAccount: string
+  disableAccountConfirm: string
+  auditTrail: string
+  auditVerify: string
+  auditIntact: string
+  auditBroken: string
+  auditEntries: string
+  idleTimeout: string
+  idleTimeoutHint: string
+  adminOnly: string
+  you: string
+  lastAdmin: string
+  auditVerifiedFrom: string
   // Device enrolment. Replaces the typed facility id: a device is joined to a
   // facility once, with a single-use code an administrator reads out.
   enrolHint: string
@@ -309,6 +351,50 @@ const fr: Strings = {
   syncNotConfigured: 'Renseignez l’adresse du serveur et l’identifiant du centre.',
   syncFailed: 'Échec de la synchronisation',
   syncSummary: 'envoyés / reçus',
+  lockSubtitle: 'Saisissez votre code pour continuer',
+  firstRunSubtitle: 'Configuration du premier compte',
+  firstRunHint: 'Ce premier compte est administrateur : il pourra inscrire l’appareil et ajouter des collègues.',
+  yourName: 'Votre nom',
+  nameRequired: 'Le nom est obligatoire.',
+  choosePin: 'Choisissez un code',
+  confirmPin: 'Confirmez le code',
+  pin: 'Code',
+  pinHint: '4 à 12 chiffres. Évitez 0000 ou 1234.',
+  pinMismatch: 'Les deux codes ne correspondent pas.',
+  pinWrong: 'Code incorrect.',
+  pinLockedOut: 'Trop de tentatives. Appareil bloqué pendant',
+  attemptsRemaining: 'essai(s) restant(s).',
+  pinPolicy: {
+    too_short: 'Le code doit comporter au moins 4 chiffres.',
+    too_long: 'Le code ne peut pas dépasser 12 chiffres.',
+    not_numeric: 'Le code ne doit contenir que des chiffres.',
+    sequential: 'Évitez une suite comme 1234.',
+    repeated: 'Évitez un code répété comme 0000.',
+  },
+  createAccount: 'Créer le compte',
+  signInAs: 'Se connecter en tant que',
+  unlock: 'Déverrouiller',
+  signOut: 'Se déconnecter',
+  clear: 'Effacer',
+  backspace: 'Retour',
+  staff: 'Personnel',
+  addStaff: 'Ajouter un compte',
+  role: 'Rôle',
+  roleClinician: 'Soignant',
+  roleAdmin: 'Administrateur',
+  disableAccount: 'Désactiver le compte',
+  disableAccountConfirm: 'Désactiver ce compte ? Il ne pourra plus se connecter, mais son historique reste dans le journal.',
+  auditTrail: 'Journal d’audit',
+  auditVerify: 'Vérifier le journal',
+  auditIntact: 'Journal intact',
+  auditBroken: 'Journal altéré à l’entrée',
+  auditEntries: 'entrées',
+  idleTimeout: 'Verrouillage automatique',
+  idleTimeoutHint: 'Délai d’inactivité avant que l’appareil redemande le code.',
+  adminOnly: 'Réservé aux administrateurs.',
+  you: 'vous',
+  lastAdmin: 'Dernier administrateur : impossible de désactiver ce compte.',
+  auditVerifiedFrom: 'vérifié à partir de l’entrée',
   enrolHint: 'Demandez un code d’inscription à l’administrateur du serveur, puis saisissez-le ici. Une seule fois par appareil.',
   enrolCode: 'Code d’inscription',
   enrolDevice: 'Inscrire cet appareil',
@@ -493,6 +579,50 @@ const mg: Strings = {
   syncNotConfigured: 'Fenoy ny adiresy sy ny laharana.',
   syncFailed: 'Tsy nahomby',
   syncSummary: 'nalefa / noraisina',
+  lockSubtitle: 'Ampidiro ny kaodinao mba hanohizana',
+  firstRunSubtitle: 'Famoronana ny kaonty voalohany',
+  firstRunHint: 'Mpitantana ity kaonty voalohany ity: afaka manoratra anarana ny finday sy manampy mpiara-miasa.',
+  yourName: 'Ny anaranao',
+  nameRequired: 'Ilaina ny anarana.',
+  choosePin: 'Misafidiana kaody',
+  confirmPin: 'Hamafiso ny kaody',
+  pin: 'Kaody',
+  pinHint: 'Isa 4 ka hatramin’ny 12. Aza mampiasa 0000 na 1234.',
+  pinMismatch: 'Tsy mitovy ny kaody roa.',
+  pinWrong: 'Diso ny kaody.',
+  pinLockedOut: 'Betsaka loatra ny fanandramana. Voahidy ny finday mandritra ny',
+  attemptsRemaining: 'fanandramana sisa.',
+  pinPolicy: {
+    too_short: 'Tsy maintsy isa 4 farafahakeliny ny kaody.',
+    too_long: 'Tsy mahazo mihoatra ny isa 12 ny kaody.',
+    not_numeric: 'Isa ihany no azo ampiasaina.',
+    sequential: 'Aza mampiasa filaharana toy ny 1234.',
+    repeated: 'Aza mampiasa kaody miverimberina toy ny 0000.',
+  },
+  createAccount: 'Hamorona kaonty',
+  signInAs: 'Hiditra amin’ny anarana hoe',
+  unlock: 'Hanokatra',
+  signOut: 'Hivoaka',
+  clear: 'Hamafa',
+  backspace: 'Hiverina',
+  staff: 'Mpiasa',
+  addStaff: 'Hanampy kaonty',
+  role: 'Andraikitra',
+  roleClinician: 'Mpitsabo',
+  roleAdmin: 'Mpitantana',
+  disableAccount: 'Hanakana ny kaonty',
+  disableAccountConfirm: 'Hakanana ity kaonty ity? Tsy afaka miditra intsony izy, fa mijanona ao amin’ny rejisitra ny tantarany.',
+  auditTrail: 'Rejisitry ny fanaraha-maso',
+  auditVerify: 'Hamarino ny rejisitra',
+  auditIntact: 'Tsy misy diso ny rejisitra',
+  auditBroken: 'Nisy niova ny rejisitra teo amin’ny laharana',
+  auditEntries: 'soratra',
+  idleTimeout: 'Fanidiana automatika',
+  idleTimeoutHint: 'Fotoana tsy fiasana alohan’ny hangatahan’ny finday ny kaody indray.',
+  adminOnly: 'Ho an’ny mpitantana ihany.',
+  you: 'ianao',
+  lastAdmin: 'Mpitantana farany: tsy azo akanana ity kaonty ity.',
+  auditVerifiedFrom: 'nohamarinina nanomboka tamin’ny laharana',
   enrolHint: 'Angataho amin’ny mpitantana ny serivera ny kaody fisoratana anarana, dia soraty eto. Indray mandeha isaky ny finday.',
   enrolCode: 'Kaody fisoratana anarana',
   enrolDevice: 'Hisoratra anarana ity finday ity',
@@ -676,6 +806,50 @@ const en: Strings = {
   syncNotConfigured: 'Set the server address and facility ID.',
   syncFailed: 'Sync failed',
   syncSummary: 'sent / received',
+  lockSubtitle: 'Enter your PIN to continue',
+  firstRunSubtitle: 'Set up the first account',
+  firstRunHint: 'This first account is an administrator: it can enrol the device and add colleagues.',
+  yourName: 'Your name',
+  nameRequired: 'A name is required.',
+  choosePin: 'Choose a PIN',
+  confirmPin: 'Confirm PIN',
+  pin: 'PIN',
+  pinHint: '4 to 12 digits. Avoid 0000 or 1234.',
+  pinMismatch: 'The two PINs do not match.',
+  pinWrong: 'Wrong PIN.',
+  pinLockedOut: 'Too many attempts. Device locked for',
+  attemptsRemaining: 'attempt(s) left.',
+  pinPolicy: {
+    too_short: 'The PIN must be at least 4 digits.',
+    too_long: 'The PIN cannot be longer than 12 digits.',
+    not_numeric: 'The PIN must be digits only.',
+    sequential: 'Avoid a run like 1234.',
+    repeated: 'Avoid a repeated PIN like 0000.',
+  },
+  createAccount: 'Create account',
+  signInAs: 'Sign in as',
+  unlock: 'Unlock',
+  signOut: 'Sign out',
+  clear: 'Clear',
+  backspace: 'Backspace',
+  staff: 'Staff',
+  addStaff: 'Add an account',
+  role: 'Role',
+  roleClinician: 'Clinician',
+  roleAdmin: 'Administrator',
+  disableAccount: 'Disable account',
+  disableAccountConfirm: 'Disable this account? It can no longer sign in, but its history stays in the audit log.',
+  auditTrail: 'Audit trail',
+  auditVerify: 'Verify the log',
+  auditIntact: 'Log intact',
+  auditBroken: 'Log altered at entry',
+  auditEntries: 'entries',
+  idleTimeout: 'Automatic lock',
+  idleTimeoutHint: 'How long the device may sit idle before it asks for the PIN again.',
+  adminOnly: 'Administrators only.',
+  you: 'you',
+  lastAdmin: 'Last administrator: this account cannot be disabled.',
+  auditVerifiedFrom: 'verified from entry',
   enrolHint: 'Ask the server administrator for an enrolment code, then enter it here. Once per device.',
   enrolCode: 'Enrolment code',
   enrolDevice: 'Enrol this device',

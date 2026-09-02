@@ -6,6 +6,7 @@ import { pendingSyncCount } from '../db/db'
 import { getSyncSettings, isEnrolled } from '../lib/sync'
 import { useI18n } from '../i18n'
 import { LanguageMenu } from './LanguageMenu'
+import { LockButton } from './LockButton'
 import { cx } from './ui'
 
 /** Track connectivity so the UI can be honest about what will and won't work. */
@@ -246,6 +247,10 @@ export function AppShell({
               {/* Top-level screens only. A sub-screen keeps its header for the
                   patient's name, and nobody switches language mid-consultation. */}
               {tabs && <LanguageMenu onDark={hero} />}
+              {/* Locking is reachable from every top-level screen on purpose:
+                  handing the phone to a colleague is a constant, and a lock
+                  buried in Settings is one nobody uses. */}
+              {tabs && <LockButton onDark={hero} />}
             </div>
           </div>
 

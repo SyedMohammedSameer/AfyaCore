@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Attachment, Encounter, Patient, Setting } from './schema'
+import type { Attachment, AuditEntry, Clinician, Encounter, Patient, Setting } from './schema'
 
 /**
  * The local database is the source of truth, not a cache.
@@ -15,6 +15,8 @@ class AfyaDB extends Dexie {
   encounters!: EntityTable<Encounter, 'id'>
   attachments!: EntityTable<Attachment, 'id'>
   settings!: EntityTable<Setting, 'key'>
+  clinicians!: EntityTable<Clinician, 'id'>
+  audit!: EntityTable<AuditEntry, 'id'>
 
   constructor() {
     super('afyacore')
@@ -32,6 +34,18 @@ class AfyaDB extends Dexie {
       encounters: 'id, patientId, occurredAt, status, updatedAt, syncedAt, deletedAt',
       attachments: 'id, encounterId, createdAt',
       settings: 'key',
+    })
+
+    // v3 adds staff accounts and the local audit trail. Neither syncs: an
+    // account is a property of the phone it was created on, and the audit log
+    // records local reads the server never sees.
+    this.version(3).stores({
+      patients: 'id, familyName, givenName, registerNo, updatedAt, syncedAt, searchKey, deletedAt',
+      encounters: 'id, patientId, occurredAt, status, updatedAt, syncedAt, deletedAt',
+      attachments: 'id, encounterId, createdAt',
+      settings: 'key',
+      clinicians: 'id, name, role, disabledAt',
+      audit: 'id, seq, actorId, action, at',
     })
   }
 }

@@ -1,8 +1,10 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { I18nProvider } from './i18n'
 import { SkeletonRows } from './components/ui'
+import { LockScreen } from './components/LockScreen'
 import { HomeScreen } from './routes/Home'
+import { SessionProvider, useSession } from './lib/session'
 
 /**
  * Every route except the home screen is split out.
@@ -37,33 +39,58 @@ function RouteFallback() {
   )
 }
 
+/**
+ * Nothing renders until somebody is signed in.
+ *
+ * Deliberately a gate around the whole router rather than a guard on each
+ * route. A guard per route is one somebody forgets to add to the next route,
+ * and the failure is silent: the screen works, and only the audit trail is
+ * wrong.
+ */
+function RequireSession({ children }: { children: ReactNode }) {
+  const { clinician, ready } = useSession()
+  if (!ready) return null
+  if (!clinician) return <LockScreen />
+  return <>{children}</>
+}
+
 export function App() {
   return (
     <I18nProvider>
-      <BrowserRouter>
-        <Suspense fallback={<RouteFallback />}>
-          <Routes>
-            <Route path="/" element={<HomeScreen />} />
-            <Route path="/patients" element={<Roster />} />
-            <Route path="/reports" element={<Settings />} />
-            <Route path="/patient/new" element={<NewPatient />} />
-            <Route path="/patient/:patientId" element={<PatientProfile />} />
-            {/* Same component as /patient/new: it switches to edit mode on the
-                presence of :patientId. See routes/NewPatient.tsx. */}
-            <Route path="/patient/:patientId/edit" element={<NewPatient />} />
-            <Route path="/patient/:patientId/merge" element={<MergePatient />} />
-            <Route path="/patient/:patientId/encounter/:encounterId" element={<EncounterCapture />} />
-            <Route path="/patient/:patientId/encounter/:encounterId/review" element={<Review />} />
-            <Route
-              path="/patient/:patientId/encounter/:encounterId/instructions"
-              element={<Instructions />}
-            />
-            {/* Old path kept so an installed home-screen shortcut still resolves. */}
-            <Route path="/settings" element={<Navigate to="/reports" replace />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
+      <SessionProvider>
+        <RequireSession>
+          <AppRoutes />
+        </RequireSession>
+      </SessionProvider>
     </I18nProvider>
+  )
+}
+
+function AppRoutes() {
+  return (
+    <BrowserRouter>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<HomeScreen />} />
+          <Route path="/patients" element={<Roster />} />
+          <Route path="/reports" element={<Settings />} />
+          <Route path="/patient/new" element={<NewPatient />} />
+          <Route path="/patient/:patientId" element={<PatientProfile />} />
+          {/* Same component as /patient/new: it switches to edit mode on the
+              presence of :patientId. See routes/NewPatient.tsx. */}
+          <Route path="/patient/:patientId/edit" element={<NewPatient />} />
+          <Route path="/patient/:patientId/merge" element={<MergePatient />} />
+          <Route path="/patient/:patientId/encounter/:encounterId" element={<EncounterCapture />} />
+          <Route path="/patient/:patientId/encounter/:encounterId/review" element={<Review />} />
+          <Route
+            path="/patient/:patientId/encounter/:encounterId/instructions"
+            element={<Instructions />}
+          />
+          {/* Old path kept so an installed home-screen shortcut still resolves. */}
+          <Route path="/settings" element={<Navigate to="/reports" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
   )
 }
