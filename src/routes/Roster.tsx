@@ -15,16 +15,16 @@ function PatientRow({ patient, meta, badge }: { patient: Patient; meta: string; 
   return (
     <Link
       to={`/patient/${patient.id}`}
-      className="press press-active glass-panel group flex items-center gap-3 rounded-card p-3.5 hover:-translate-y-0.5 hover:shadow-float"
+      className="press press-active surface-card group flex items-center gap-3 rounded-card p-3.5 hover:-translate-y-0.5 hover:shadow-float"
     >
       <Avatar familyName={patient.familyName} givenName={patient.givenName} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-bold text-slate-900">
-          {patient.familyName} <span className="font-medium text-slate-600">{patient.givenName}</span>
+        <span className="block truncate font-bold text-ink">
+          {patient.familyName} <span className="font-medium text-ink-2">{patient.givenName}</span>
         </span>
-        {meta && <span className="block truncate text-sm text-slate-500">{meta}</span>}
+        {meta && <span className="block truncate text-sm text-ink-3">{meta}</span>}
       </span>
-      {badge ? <Badge tone="watch">{badge}</Badge> : <ChevronRight size={18} className="shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600" />}
+      {badge ? <Badge tone="watch">{badge}</Badge> : <ChevronRight size={18} className="shrink-0 text-ink-4 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600" />}
     </Link>
   )
 }
@@ -77,7 +77,7 @@ export function Roster() {
 
   return (
     <AppShell title={t.patients} subtitle={`${total} ${t.patientCount}`} tabs>
-      <div className="glass-panel sticky top-[4.6rem] z-10 -mx-1 mb-4 rounded-2xl p-2 sm:top-[5.1rem]">
+      <div className="surface-card sticky top-[4.6rem] z-10 -mx-1 mb-4 rounded-2xl p-2 sm:top-[5.1rem]">
         <div className="relative">
           <Search size={20} className="absolute top-1/2 left-3.5 -translate-y-1/2 text-brand-600" />
           <Input
@@ -93,7 +93,7 @@ export function Roster() {
             <button
               onClick={() => setQuery('')}
               aria-label={t.cancel}
-              className="absolute top-1/2 right-2 grid size-9 -translate-y-1/2 place-items-center rounded-full text-slate-400 active:bg-slate-100"
+              className="absolute top-1/2 right-2 grid size-9 -translate-y-1/2 place-items-center rounded-full text-ink-4 active:bg-sunken"
             >
               <X size={18} />
             </button>
@@ -111,11 +111,11 @@ export function Roster() {
                 'press press-active rounded-xl px-3 py-2 text-sm font-bold ring-1',
                 filter === key
                   ? 'bg-brand-gradient text-white shadow-lift ring-white/20'
-                  : 'bg-white/55 text-slate-600 ring-white/75 hover:bg-white/80',
+                  : 'bg-white/55 text-ink-2 ring-white/75 hover:bg-white/80',
               )}
             >
               {label}
-              <span className={cx('numeric ml-1.5', filter === key ? 'text-white/70' : 'text-slate-400')}>
+              <span className={cx('numeric ml-1.5', filter === key ? 'text-white/70' : 'text-ink-4')}>
                 {counts[key]}
               </span>
             </button>

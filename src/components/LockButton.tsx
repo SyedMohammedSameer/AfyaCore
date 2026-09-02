@@ -28,7 +28,7 @@ export function LockButton({ onDark = false }: { onDark?: boolean }) {
         'text-sm font-semibold ring-1 transition-colors',
         onDark
           ? 'bg-white/13 text-white ring-white/25 hover:bg-white/20'
-          : 'bg-slate-100/85 text-slate-700 ring-slate-200/80 hover:bg-slate-200/80',
+          : 'bg-sunken/85 text-ink-2 ring-line/80 hover:bg-line/80',
       )}
     >
       <span

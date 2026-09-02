@@ -51,9 +51,9 @@ export function SyncStatus({ onDark = false }: { onDark?: boolean }) {
   const tone = onDark
     ? 'bg-white/13 text-white/90 ring-white/20'
     : !configured
-      ? 'bg-slate-100/85 text-slate-600 ring-slate-200/80'
+      ? 'bg-sunken/85 text-ink-2 ring-line/80'
       : !online
-        ? 'bg-slate-100/85 text-slate-600 ring-slate-200/80'
+        ? 'bg-sunken/85 text-ink-2 ring-line/80'
         : waiting
           ? 'bg-warn-50/90 text-warn-700 ring-warn-200/80'
           : 'bg-ok-50/90 text-ok-700 ring-ok-200/80'
@@ -113,7 +113,7 @@ function Navigation({ desktop = false }: { desktop?: boolean }) {
                   ? desktop
                     ? 'bg-brand-gradient text-white shadow-lift ring-1 ring-white/20'
                     : 'text-brand-800'
-                  : 'text-slate-500 hover:bg-white/50 hover:text-slate-800',
+                  : 'text-ink-3 hover:bg-white/50 hover:text-ink',
               )}
             >
               <span className={cx('grid place-items-center', desktop ? 'size-6' : 'h-7 w-12 rounded-full', active && !desktop && 'bg-brand-100')}>
@@ -132,11 +132,11 @@ function DesktopRail() {
   const { t } = useI18n()
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[17rem] p-4 lg:block">
-      <div className="glass-panel flex h-full flex-col rounded-[2rem] p-3">
+      <div className="surface-card flex h-full flex-col rounded-[2rem] p-3">
         <Link to="/" className="press flex items-center gap-3 rounded-2xl px-2.5 py-3 hover:bg-white/45">
           <BrandMark />
           <span>
-            <span className="block text-lg font-extrabold tracking-[-0.05em] text-slate-900">AfyaCore</span>
+            <span className="block text-lg font-extrabold tracking-[-0.05em] text-ink">AfyaCore</span>
             <span className="block text-[0.64rem] font-bold tracking-[0.13em] text-brand-700 uppercase">Clinical workspace</span>
           </span>
         </Link>
@@ -147,10 +147,16 @@ function DesktopRail() {
 
         <div className="mt-auto flex flex-col gap-3">
           <LanguageMenu expand />
-          <div className="rounded-2xl bg-brand-950 p-4 text-white shadow-lift">
-            <span className="mb-3 inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[0.65rem] font-bold tracking-[0.12em] text-white/75 uppercase">Local-first</span>
-            <p className="text-sm leading-relaxed text-white/85">{t.dataNotice}</p>
-            <div className="mt-4"><SyncStatus onDark /></div>
+          {/* A quiet note, not a black slab. It reassures; it is not the most
+              important thing on the screen and should not look like it. */}
+          <div className="surface-card rounded-card p-3.5">
+            <span className="text-[0.625rem] font-semibold tracking-[0.09em] text-brand-700 uppercase">
+              Local-first
+            </span>
+            <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-ink-3">{t.dataNotice}</p>
+            <div className="mt-3">
+              <SyncStatus />
+            </div>
           </div>
         </div>
       </div>
@@ -168,7 +174,7 @@ function DesktopRail() {
  */
 function TabBar() {
   return (
-    <nav className="glass-panel fixed inset-x-2 bottom-2 z-30 rounded-[1.45rem] px-1.5 pb-safe lg:hidden">
+    <nav className="surface-card fixed inset-x-2 bottom-2 z-30 rounded-[1.45rem] px-1.5 pb-safe lg:hidden">
       <Navigation />
     </nav>
   )
@@ -201,28 +207,24 @@ export function AppShell({
 
   return (
     <div className="relative min-h-dvh overflow-x-hidden">
-      <div className="pointer-events-none fixed -top-24 left-[20%] -z-10 size-[26rem] rounded-full bg-brand-300/20 blur-3xl" />
-      <div className="pointer-events-none fixed top-[32%] -right-36 -z-10 size-[24rem] rounded-full bg-sky-300/20 blur-3xl" />
       <DesktopRail />
 
       <div className="relative flex min-h-dvh flex-col lg:pl-[18rem]">
-        <header
-          className={cx(
-            'pt-safe relative z-20',
-            hero
-              ? 'mx-2 overflow-hidden rounded-b-[2rem] bg-brand-gradient text-white shadow-float sm:mx-4 lg:mx-6 lg:rounded-b-[2.25rem]'
-              : 'glass-panel sticky top-0 mx-2 rounded-b-[1.5rem] border-x-0 border-t-0 sm:mx-4 lg:mx-6',
-          )}
-        >
-          {hero && <div className="grid-dots pointer-events-none absolute inset-0 opacity-35" />}
+        {/*
+          One header treatment, not two.
+
+          The hero variant was a full-bleed brand gradient with white text. It
+          looked like a landing page and, worse, it meant the top third of the
+          launch screen carried no information at all. Now both variants are the
+          same white surface on a hairline, and the hierarchy comes from type
+          size rather than from a coloured slab.
+        */}
+        <header className="pt-safe sticky top-0 z-20 border-b border-line bg-surface">
           <div className="relative mx-auto flex w-full max-w-5xl items-center gap-2 px-3 py-3 sm:px-5">
             {showBack ? (
               <button
                 onClick={() => navigate(-1)}
-                className={cx(
-                  'tap-safe press press-active -ml-1 grid place-items-center rounded-2xl',
-                  hero ? 'bg-white/10 text-white hover:bg-white/18' : 'bg-white/55 text-slate-700 hover:bg-white',
-                )}
+                className="tap-safe press press-active -ml-1 grid place-items-center rounded-field text-ink-2 hover:bg-sunken"
                 aria-label={t.back}
               >
                 <ArrowLeft size={22} />
@@ -236,21 +238,21 @@ export function AppShell({
             )}
 
             <div className="min-w-0 flex-1">
-              <h1 className={cx('truncate text-xl leading-tight font-extrabold sm:text-2xl', hero ? 'text-white' : 'text-slate-900')}>
+              <h1 className="truncate text-[1.375rem] leading-tight font-semibold tracking-[-0.022em] text-ink sm:text-2xl">
                 {title}
               </h1>
-              {subtitle && <p className={cx('mt-0.5 truncate text-sm font-medium', hero ? 'text-white/70' : 'text-slate-500')}>{subtitle}</p>}
+              {subtitle && <p className="mt-0.5 truncate text-[0.8125rem] text-ink-3">{subtitle}</p>}
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              {actions ?? <SyncStatus onDark={hero} />}
+              {actions ?? <SyncStatus />}
               {/* Top-level screens only. A sub-screen keeps its header for the
                   patient's name, and nobody switches language mid-consultation. */}
-              {tabs && <LanguageMenu onDark={hero} />}
+              {tabs && <LanguageMenu />}
               {/* Locking is reachable from every top-level screen on purpose:
                   handing the phone to a colleague is a constant, and a lock
                   buried in Settings is one nobody uses. */}
-              {tabs && <LockButton onDark={hero} />}
+              {tabs && <LockButton />}
             </div>
           </div>
 

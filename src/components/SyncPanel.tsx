@@ -98,7 +98,7 @@ export function SyncPanel() {
     <section>
       <SectionTitle>{t.sync}</SectionTitle>
       <Card className="flex flex-col gap-3">
-        <p className="text-sm text-slate-600">{t.syncHint}</p>
+        <p className="text-sm text-ink-2">{t.syncHint}</p>
 
         <Field label={t.serverUrl}>
           <Input
@@ -140,7 +140,7 @@ export function SyncPanel() {
           </>
         ) : (
           <>
-            <p className="text-sm text-slate-600">{t.enrolHint}</p>
+            <p className="text-sm text-ink-2">{t.enrolHint}</p>
 
             <Field label={t.enrolCode}>
               <Input
@@ -180,7 +180,7 @@ export function SyncPanel() {
               </p>
             )}
 
-            {!serverUrl.trim() && <p className="text-sm text-slate-500">{t.syncNotConfigured}</p>}
+            {!serverUrl.trim() && <p className="text-sm text-ink-3">{t.syncNotConfigured}</p>}
           </>
         )}
 
@@ -219,7 +219,7 @@ export function SyncPanel() {
           </div>
         )}
 
-        {!result && enrolled && <p className="text-sm text-slate-400">{t.syncNever}</p>}
+        {!result && enrolled && <p className="text-sm text-ink-4">{t.syncNever}</p>}
 
         {enrolled && (
           <Button variant="ghost" icon={<Unlink size={18} />} onClick={unenrol}>

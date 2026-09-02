@@ -221,7 +221,7 @@ export function Settings() {
 
         <section>
           <SectionTitle>{t.storage}</SectionTitle>
-          <Card className="flex flex-col gap-2 text-sm text-slate-700">
+          <Card className="flex flex-col gap-2 text-sm text-ink-2">
             <div className="flex justify-between">
               <span>{t.patients}</span>
               <span className="font-semibold">{patientCount}</span>
@@ -236,13 +236,13 @@ export function Settings() {
             </div>
             {quota && (
               <>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-200">
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-line">
                   <div
                     className="h-full rounded-full bg-brand-600"
                     style={{ width: `${Math.min(100, (quota.usage / quota.quota) * 100)}%` }}
                   />
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-ink-3">
                   {formatBytes(quota.usage)} / {formatBytes(quota.quota)}
                 </p>
               </>
@@ -253,7 +253,7 @@ export function Settings() {
         <section>
           <SectionTitle>{t.ocrPack}</SectionTitle>
           <Card className="flex flex-col gap-3">
-            <p className="text-sm text-slate-600">{t.ocrPackHint}</p>
+            <p className="text-sm text-ink-2">{t.ocrPackHint}</p>
             {ocrState === 'ready' ? (
               <p className="flex items-center gap-2 font-semibold text-ok-700">
                 <CheckCircle2 size={20} />
@@ -261,13 +261,13 @@ export function Settings() {
               </p>
             ) : ocrState === 'loading' ? (
               <div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                <div className="h-2 overflow-hidden rounded-full bg-line">
                   <div
                     className="h-full rounded-full bg-brand-600 transition-[width]"
                     style={{ width: `${Math.round(ocrProgress * 100)}%` }}
                   />
                 </div>
-                <p className="mt-1 text-xs text-slate-500">{Math.round(ocrProgress * 100)}%</p>
+                <p className="mt-1 text-xs text-ink-3">{Math.round(ocrProgress * 100)}%</p>
               </div>
             ) : (
               <Button variant="secondary" full icon={<ScanText size={20} />} onClick={downloadOcr}>
@@ -281,20 +281,20 @@ export function Settings() {
         <section>
           <SectionTitle>{t.piiPack}</SectionTitle>
           <Card className="flex flex-col gap-3">
-            <p className="text-sm text-slate-600">{t.piiPackHint}</p>
+            <p className="text-sm text-ink-2">{t.piiPackHint}</p>
             {piiState === 'ready' ? (
               <p className="flex items-center gap-2 font-semibold text-ok-700">
                 <CheckCircle2 size={20} />
                 {t.piiPackReady}
               </p>
             ) : piiState === 'checking' ? (
-              <p className="text-sm text-slate-400">…</p>
+              <p className="text-sm text-ink-4">…</p>
             ) : (
               // No download button: the model is placed on the server by the
               // deployer (`npm run vendor:openmed`), not fetched by a phone
               // from the Hub. A facility on a filtered connection cannot reach
               // huggingface.co, which is the whole reason it is self-hosted.
-              <p className="text-sm text-slate-500">{t.piiPackAbsent}</p>
+              <p className="text-sm text-ink-3">{t.piiPackAbsent}</p>
             )}
           </Card>
         </section>
@@ -302,20 +302,20 @@ export function Settings() {
         <section>
           <SectionTitle>{t.reporting}</SectionTitle>
           <Card className="flex flex-col gap-3">
-            <p className="text-sm text-slate-600">{t.reportingHint}</p>
+            <p className="text-sm text-ink-2">{t.reportingHint}</p>
             {monthlySummary && monthlySummary.length > 0 ? (
               <ul className="flex flex-col gap-1 text-sm">
                 {monthlySummary.slice(0, 8).map((c, i) => (
                   <li key={i} className="flex justify-between gap-2">
-                    <span className="truncate text-slate-600">
+                    <span className="truncate text-ink-2">
                       {indicatorLabel(c.indicator, lang)} · {c.ageBand}
                     </span>
-                    <span className="font-semibold text-slate-900">{c.count}</span>
+                    <span className="font-semibold text-ink">{c.count}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-slate-400">{t.noReportData}</p>
+              <p className="text-sm text-ink-4">{t.noReportData}</p>
             )}
             <Button variant="secondary" full icon={<Table size={20} />} onClick={exportCsv}>
               {t.exportCsv}
@@ -371,7 +371,7 @@ export function Settings() {
           <p>{t.dataNotice}</p>
         </Card>
 
-        <Card className="flex gap-3 text-xs text-slate-500">
+        <Card className="flex gap-3 text-xs text-ink-3">
           <Info size={16} className="mt-0.5 shrink-0" />
           <p>{t.prototypeNotice}</p>
         </Card>

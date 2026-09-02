@@ -51,7 +51,7 @@ export function PrivacySelector({ value, onChange }: PrivacySelectorProps) {
     <section>
       <SectionTitle>{t.privacy}</SectionTitle>
       <Card className="flex flex-col gap-2">
-        <p className="text-sm text-slate-600">{t.privacyHint}</p>
+        <p className="text-sm text-ink-2">{t.privacyHint}</p>
 
         <fieldset className="flex flex-col gap-2">
           <legend className="sr-only">{t.privacy}</legend>
@@ -62,7 +62,7 @@ export function PrivacySelector({ value, onChange }: PrivacySelectorProps) {
                 key={key}
                 className={cx(
                   'press flex cursor-pointer gap-3 rounded-field p-3 ring-1 transition-colors',
-                  selected ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-white ring-slate-200',
+                  selected ? 'bg-brand-50 ring-2 ring-brand-500' : 'bg-white ring-line',
                 )}
               >
                 <input
@@ -73,10 +73,10 @@ export function PrivacySelector({ value, onChange }: PrivacySelectorProps) {
                   onChange={() => onChange(key)}
                   className="sr-only"
                 />
-                <Icon size={20} className={cx('mt-0.5 shrink-0', selected ? tone : 'text-slate-400')} />
+                <Icon size={20} className={cx('mt-0.5 shrink-0', selected ? tone : 'text-ink-4')} />
                 <span className="min-w-0">
-                  <span className="block font-bold text-slate-900">{label}</span>
-                  <span className="mt-0.5 block text-sm leading-snug text-slate-600">{hint}</span>
+                  <span className="block font-bold text-ink">{label}</span>
+                  <span className="mt-0.5 block text-sm leading-snug text-ink-2">{hint}</span>
                 </span>
               </label>
             )
@@ -84,7 +84,7 @@ export function PrivacySelector({ value, onChange }: PrivacySelectorProps) {
         </fieldset>
 
         {value !== 'identified' && (
-          <p className="rounded-field bg-slate-50 p-2.5 text-xs leading-relaxed text-slate-500">
+          <p className="rounded-field bg-sunken p-2.5 text-xs leading-relaxed text-ink-3">
             {t.attachmentsExcluded}
           </p>
         )}

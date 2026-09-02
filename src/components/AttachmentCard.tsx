@@ -63,12 +63,12 @@ export function AttachmentCard({ attachment, onRemove, onApplyText }: Attachment
           <img
             src={url}
             alt=""
-            className="size-24 shrink-0 rounded-field object-cover ring-1 ring-slate-300"
+            className="size-24 shrink-0 rounded-field object-cover ring-1 ring-line-strong"
             loading="lazy"
           />
         )}
         <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-ink-3">
             {attachment.width}×{attachment.height} · {formatBytes(attachment.byteSize)}
           </span>
 
@@ -80,13 +80,13 @@ export function AttachmentCard({ attachment, onRemove, onApplyText }: Attachment
 
           {state === 'running' && (
             <div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+              <div className="h-2 overflow-hidden rounded-full bg-line">
                 <div
                   className="h-full rounded-full bg-brand-600 transition-[width]"
                   style={{ width: `${Math.round(progress * 100)}%` }}
                 />
               </div>
-              <p className="mt-1 text-xs text-slate-500">{t.readingText}</p>
+              <p className="mt-1 text-xs text-ink-3">{t.readingText}</p>
             </div>
           )}
         </div>
@@ -94,7 +94,7 @@ export function AttachmentCard({ attachment, onRemove, onApplyText }: Attachment
         <button
           onClick={onRemove}
           aria-label={t.delete}
-          className="tap-safe grid shrink-0 place-items-center self-start rounded-full text-slate-400 active:bg-danger-50 active:text-danger-600"
+          className="tap-safe grid shrink-0 place-items-center self-start rounded-full text-ink-4 active:bg-danger-50 active:text-danger-600"
         >
           <Trash2 size={20} />
         </button>
@@ -108,16 +108,16 @@ export function AttachmentCard({ attachment, onRemove, onApplyText }: Attachment
 
       {state === 'done' && result && (
         <div className="flex flex-col gap-2">
-          <div className="rounded-field bg-slate-50 p-3 ring-1 ring-slate-200">
-            <p className="mb-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
+          <div className="rounded-field bg-sunken p-3 ring-1 ring-line">
+            <p className="mb-1 text-xs font-bold tracking-wide text-ink-3 uppercase">
               {t.transcript}
               {result.confidence > 0 && (
-                <span className="ml-2 font-medium text-slate-400 normal-case">
+                <span className="ml-2 font-medium text-ink-4 normal-case">
                   {Math.round(result.confidence * 100)}%
                 </span>
               )}
             </p>
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-800">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink">
               {result.text || t.nothingExtracted}
             </p>
           </div>

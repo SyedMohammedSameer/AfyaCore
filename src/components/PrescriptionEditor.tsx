@@ -41,7 +41,7 @@ export function PrescriptionEditor({ prescriptions, provenance, onChange }: Pres
               <div className="flex items-start gap-2">
                 <Pill size={20} className="mt-3 shrink-0 text-brand-600" />
                 <div className="min-w-0 flex-1">
-                  <span className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                  <span className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-ink-2">
                     {t.drug}
                     <ProvenanceChip provenance={provenance[`prescription.${p.id}`]} />
                   </span>
@@ -56,7 +56,7 @@ export function PrescriptionEditor({ prescriptions, provenance, onChange }: Pres
                 <button
                   onClick={() => remove(p.id)}
                   aria-label={t.delete}
-                  className="tap-safe mt-1 grid shrink-0 place-items-center rounded-full text-slate-400 active:bg-danger-50 active:text-danger-600"
+                  className="tap-safe mt-1 grid shrink-0 place-items-center rounded-full text-ink-4 active:bg-danger-50 active:text-danger-600"
                 >
                   <Trash2 size={20} />
                 </button>
@@ -64,7 +64,7 @@ export function PrescriptionEditor({ prescriptions, provenance, onChange }: Pres
 
               <div className="grid grid-cols-3 gap-2">
                 <label className="block">
-                  <span className="mb-1 block text-xs font-semibold text-slate-600">{t.dose}</span>
+                  <span className="mb-1 block text-xs font-semibold text-ink-2">{t.dose}</span>
                   <Input
                     value={p.dose ?? ''}
                     onChange={(e) => update(p.id, { dose: e.target.value || undefined })}
@@ -73,7 +73,7 @@ export function PrescriptionEditor({ prescriptions, provenance, onChange }: Pres
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1 block text-xs font-semibold text-slate-600">{t.timesPerDay}</span>
+                  <span className="mb-1 block text-xs font-semibold text-ink-2">{t.timesPerDay}</span>
                   <Input
                     type="number"
                     inputMode="numeric"
@@ -87,7 +87,7 @@ export function PrescriptionEditor({ prescriptions, provenance, onChange }: Pres
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1 block text-xs font-semibold text-slate-600">{t.days}</span>
+                  <span className="mb-1 block text-xs font-semibold text-ink-2">{t.days}</span>
                   <Input
                     type="number"
                     inputMode="numeric"

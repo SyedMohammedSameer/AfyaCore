@@ -77,7 +77,7 @@ export function VitalsGrid({ vitals, provenance, onChange }: VitalsGridProps) {
   const { t } = useI18n()
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {VITAL_ORDER.map((key) => {
         const range = VITAL_RANGES[key]
         const value = vitals[key]
@@ -88,31 +88,29 @@ export function VitalsGrid({ vitals, provenance, onChange }: VitalsGridProps) {
         const outOfRange = filled && (value < range.min || value > range.max)
 
         const tile = outOfRange
-          ? 'bg-danger-50/95 ring-danger-400 ring-2'
+          ? 'bg-danger-50 ring-2 ring-danger-500'
           : severity === 'urgent'
-            ? 'bg-danger-50/95 ring-danger-400 ring-2'
+            ? 'bg-danger-50 ring-2 ring-danger-500'
             : severity === 'watch'
-              ? 'bg-warn-50/95 ring-warn-300 ring-2'
+              ? 'bg-warn-50 ring-2 ring-warn-500'
               : filled
-                ? 'bg-brand-50/70 ring-brand-200 ring-1'
-                : 'glass-subtle ring-white/80'
+                ? 'bg-brand-50 ring-1 ring-brand-200'
+                : 'surface-card'
 
         const valueColour = outOfRange || severity === 'urgent'
           ? 'text-danger-700'
           : severity === 'watch'
             ? 'text-warn-700'
-            : 'text-slate-900'
+            : 'text-ink'
 
         return (
           <label
             key={key}
-            className={cx('press flex flex-col rounded-card px-3.5 py-3 shadow-card transition-colors', tile)}
+            className={cx('press flex flex-col gap-0.5 rounded-card px-3 py-2.5 transition-colors', tile)}
           >
-            <span className="mb-1 flex items-center gap-1.5 overflow-hidden">
-              <span className={cx('grid size-6 shrink-0 place-items-center rounded-lg', filled ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-400')}>
-                <Icon size={13} />
-              </span>
-              <span className="truncate text-xs font-bold text-slate-600">{vitalLabel(key, t)}</span>
+            <span className="flex items-center gap-1.5 overflow-hidden">
+              <Icon size={13} className={cx('shrink-0', filled ? 'text-brand-600' : 'text-ink-4')} />
+              <span className="truncate text-[0.75rem] font-semibold text-ink-2">{vitalLabel(key, t)}</span>
             </span>
 
             <span className="flex items-baseline gap-1">
@@ -134,15 +132,23 @@ export function VitalsGrid({ vitals, provenance, onChange }: VitalsGridProps) {
                   onChange(key, Number.isFinite(parsed) ? parsed : undefined)
                 }}
                 className={cx(
-                  'numeric w-full min-w-0 border-0 bg-transparent p-0 text-2xl font-extrabold tracking-tight',
-                  'focus:ring-0 focus:outline-none placeholder:font-normal placeholder:text-slate-300',
+                  'numeric w-full min-w-0 border-0 bg-transparent p-0 text-[1.375rem] leading-tight font-semibold tracking-[-0.02em]',
+                  'focus:ring-0 focus:outline-none placeholder:font-normal placeholder:text-ink-4',
                   valueColour,
                 )}
               />
-              <span className="shrink-0 text-xs font-semibold text-slate-400">{range.unit}</span>
+              <span className="shrink-0 text-[0.6875rem] font-semibold text-ink-4">{range.unit}</span>
             </span>
 
-            <span className="mt-1 flex min-h-4 flex-wrap items-center gap-1">
+            {/* Rendered only when it has something to say. An always-present
+                empty row added 16px of dead space to all eight tiles, which is
+                most of a phone screen spent on nothing. */}
+            <span
+              className={cx(
+                'flex flex-wrap items-center gap-1',
+                !prov && severity === 'normal' && !outOfRange && 'hidden',
+              )}
+            >
               <ProvenanceChip provenance={prov} />
               {outOfRange ? (
                 <span className="numeric text-[0.6875rem] font-bold text-danger-700">

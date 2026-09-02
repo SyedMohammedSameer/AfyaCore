@@ -1,58 +1,128 @@
 @import 'tailwindcss';
 
 /*
+  Load the interface face ourselves.
+
+  The stack previously named `Inter` and nothing ever loaded it, so on an
+  Android phone the app silently rendered in whatever the system happened to
+  have. Naming a font you do not ship is the same as having no opinion about
+  typography at all.
+
+  IBM Plex Sans is the face of IBM Carbon, which OpenMRS 3 is built on, so it is
+  the type a clinician who has used an EMR in this region has most likely already
+  read. One variable file covers every weight: 46 kB for the latin subset, paid
+  once and then cached by the service worker forever.
+*/
+/*
+  The latin subset only, declared by hand.
+
+  The package's own `index.css` declares every subset it ships — Cyrillic,
+  Greek, Vietnamese, Latin Extended. A browser is smart enough to fetch only the
+  range it needs, but the *bundler* is not: vite emits all six files and the
+  service worker then precaches 162 kB of fonts on every install, for scripts
+  this app has no strings in. French, Malagasy and English all fit inside the
+  latin range, so this is the only file worth shipping.
+*/
+@font-face {
+  font-family: 'IBM Plex Sans Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  src: url('../node_modules/@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/*
   AfyaCore visual language
 
-  The interface has to feel reassuring in a consultation room, but also make a
-  convincing standalone demo. The glass treatment is therefore restrained:
-  strong type, high-contrast text and opaque-enough controls sit above the
-  decorative atmosphere. Nothing clinical depends on translucency alone.
+  Cool, flat and high-contrast. The previous treatment was glass and gradient,
+  which reads as a consumer app and, more practically, spends contrast on
+  decoration: translucency over a coloured ground is exactly what fails on a
+  cheap LCD held under a metal roof in daylight.
+
+  So: an opaque cool ground, white surfaces, a hairline instead of a shadow, and
+  colour reserved for meaning. Depth comes from a 1px border and a shadow you
+  have to look for, not from blur.
+
+  The palette is cool because the systems this app has to sit beside are cool.
+  DHIS2, IBM Carbon and the NHS design system are all blue-grey or neutral, and
+  those are the tools the people deploying this already use every day.
 */
 @theme {
-  --color-brand-50: #ecfdf8;
-  --color-brand-100: #cdfaf0;
-  --color-brand-200: #9af2df;
-  --color-brand-300: #5de5ca;
-  --color-brand-400: #29c9ae;
-  --color-brand-500: #14ae98;
-  --color-brand-600: #0d8b7d;
-  --color-brand-700: #0b6e66;
-  --color-brand-800: #095953;
-  --color-brand-900: #064842;
-  --color-brand-950: #022c2a;
+  /* --- Ground and surfaces ------------------------------------------- */
+  --color-ground: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-sunken: #f8fafc;
+  --color-line: #e3e8ee;
+  --color-line-strong: #cbd5e1;
 
-  --color-accent-50: #fff5ec;
-  --color-accent-100: #ffe7d2;
-  --color-accent-500: #f17838;
-  --color-accent-600: #dc5c1a;
-  --color-accent-700: #af4210;
+  /* --- Ink. Cool near-black, never pure black: #000 on white vibrates - */
+  --color-ink: #101828;
+  --color-ink-2: #475467;
+  --color-ink-3: #667085;
+  --color-ink-4: #98a2b3;
 
-  --color-danger-50: #fff2f4;
-  --color-danger-100: #ffe1e6;
-  --color-danger-200: #ffc8d0;
-  --color-danger-500: #ee526c;
-  --color-danger-600: #d93658;
-  --color-danger-700: #b52345;
+  /* --- Brand. A deep teal: AfyaCore's own, cooled to sit on the ground - */
+  --color-brand-50: #edf9f7;
+  --color-brand-100: #d3f0ea;
+  --color-brand-200: #a8e1d6;
+  --color-brand-300: #6fcbba;
+  --color-brand-400: #35ae99;
+  --color-brand-500: #12907c;
+  --color-brand-600: #0c7768;
+  --color-brand-700: #0a6055;
+  --color-brand-800: #084c44;
+  --color-brand-900: #063c36;
 
-  --color-warn-50: #fff9e9;
-  --color-warn-100: #fff1c4;
-  --color-warn-200: #ffe39a;
-  --color-warn-500: #e9a319;
-  --color-warn-700: #aa6808;
+  /*
+    Semantic colour is separate from the brand and never used decoratively.
+    On this screen a red pill means a vital is out of range, and nothing else.
+  */
+  --color-danger-50: #fef3f2;
+  --color-danger-100: #fee4e2;
+  --color-danger-200: #fecdca;
+  --color-danger-500: #f04438;
+  --color-danger-600: #d92d20;
+  --color-danger-700: #b42318;
 
-  --color-ok-50: #ebfbf2;
-  --color-ok-100: #d0f7e2;
-  --color-ok-200: #a6edc7;
-  --color-ok-500: #1aaf70;
-  --color-ok-700: #08784a;
+  --color-warn-50: #fffaeb;
+  --color-warn-100: #fef0c7;
+  --color-warn-200: #fedf89;
+  --color-warn-500: #f79009;
+  --color-warn-600: #dc6803;
+  --color-warn-700: #b54708;
 
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-ok-50: #ecfdf3;
+  --color-ok-100: #dcfae6;
+  --color-ok-200: #abefc6;
+  --color-ok-500: #17b26a;
+  --color-ok-600: #079455;
+  --color-ok-700: #067647;
 
-  --radius-field: 1rem;
-  --radius-card: 1.5rem;
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.03), 0 12px 30px rgb(15 23 42 / 0.05);
-  --shadow-lift: 0 10px 24px rgb(7 87 80 / 0.18), 0 3px 8px rgb(15 23 42 / 0.08);
-  --shadow-float: 0 20px 50px rgb(8 52 63 / 0.18), 0 5px 16px rgb(15 23 42 / 0.10);
+  --color-info-50: #eff8ff;
+  --color-info-100: #d1e9ff;
+  --color-info-200: #b2ddff;
+  --color-info-600: #1570ef;
+  --color-info-700: #175cd3;
+
+  --font-sans:
+    'IBM Plex Sans Variable', 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
+
+  /* Restrained radii. Bubbly reads as a toy; square reads as a spreadsheet. */
+  --radius-field: 0.625rem;
+  --radius-card: 0.875rem;
+
+  /*
+    Shadows do almost nothing on purpose. A 1px line separates a card from the
+    ground; the shadow only says which of two overlapping things is on top.
+  */
+  --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.05);
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04);
+  --shadow-lift: 0 4px 8px -2px rgb(16 24 40 / 0.08), 0 2px 4px -2px rgb(16 24 40 / 0.04);
+  --shadow-float: 0 12px 16px -4px rgb(16 24 40 / 0.1), 0 4px 6px -2px rgb(16 24 40 / 0.04);
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -61,24 +131,22 @@
     min-height: 100%;
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
-    background: #eaf4f4;
+    background: #f4f6f8;
   }
 
   body {
     min-height: 100%;
-    color: #102a31;
-    background:
-      radial-gradient(circle at 10% 0%, rgb(101 224 199 / 0.32), transparent 26rem),
-      radial-gradient(circle at 94% 12%, rgb(155 196 255 / 0.34), transparent 25rem),
-      radial-gradient(circle at 52% 100%, rgb(255 202 164 / 0.23), transparent 31rem),
-      linear-gradient(145deg, #f4fbfa 0%, #edf5f8 48%, #f7f4ee 100%);
-    background-attachment: fixed;
+    color: #101828;
+    /* Flat. Nothing behind the content competing with it for attention. */
+    background: #f4f6f8;
+    font-synthesis-weight: none;
   }
 
   input,
   select,
   textarea,
   button {
+    /* Below 16px, iOS Safari zooms the viewport on focus and never zooms back. */
     font-size: max(1rem, 16px);
   }
 
@@ -87,17 +155,28 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /*
+    A visible focus ring, offset so it clears the control's own border. Staff
+    use this on a cracked screen; a subtle focus state is no focus state.
+  */
   :focus-visible {
-    outline: 2px solid #0d8b7d;
-    outline-offset: 3px;
+    outline: 2px solid #0c7768;
+    outline-offset: 2px;
+    border-radius: 0.375rem;
   }
 
   h1,
   h2,
   h3 {
-    font-weight: 700;
-    letter-spacing: -0.035em;
+    font-weight: 600;
+    letter-spacing: -0.021em;
     text-wrap: balance;
+  }
+
+  /* Digits that line up in a column, everywhere digits line up in a column. */
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -107,8 +186,8 @@
 }
 
 @utility tap-safe {
-  min-height: 3rem;
-  min-width: 3rem;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
 }
 
 @utility pb-safe {
@@ -119,73 +198,88 @@
   padding-top: max(env(safe-area-inset-top), 0px);
 }
 
+/*
+  The card surface. Opaque white on the cool ground, separated by a hairline
+  rather than a drop shadow, which is what keeps a screen of eight cards from
+  looking like eight floating objects.
+*/
+@utility surface-card {
+  background: #ffffff;
+  border: 1px solid var(--color-line);
+  box-shadow: var(--shadow-card);
+}
+
+/* A recessed surface: inputs, list rows, anything the eye should read as a slot. */
+@utility surface-sunken {
+  background: var(--color-sunken);
+  border: 1px solid var(--color-line);
+}
+
+/*
+  The one place a gradient survives: the lock screen and the patient instruction
+  sheet, both of which are full-bleed single-purpose surfaces where atmosphere
+  costs nothing. Deep enough that white text clears AA comfortably.
+*/
 @utility bg-brand-gradient {
-  background-image: linear-gradient(135deg, #063f3d 0%, #087c70 51%, #15a990 100%);
-}
-
-@utility glass-panel {
-  background: linear-gradient(135deg, rgb(255 255 255 / 0.84), rgb(255 255 255 / 0.55));
-  border: 1px solid rgb(255 255 255 / 0.72);
-  box-shadow: 0 12px 36px rgb(23 63 75 / 0.08), inset 0 1px 0 rgb(255 255 255 / 0.78);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
-@utility glass-subtle {
-  background: rgb(255 255 255 / 0.55);
-  border: 1px solid rgb(255 255 255 / 0.70);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.72);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-@utility grid-dots {
-  background-image: radial-gradient(rgb(13 139 125 / 0.18) 0.75px, transparent 0.75px);
-  background-size: 17px 17px;
+  background-image: linear-gradient(160deg, #063c36 0%, #0a6055 55%, #0c7768 100%);
 }
 
 @utility press {
   transition:
-    transform 0.18s var(--ease-out-quint),
-    box-shadow 0.18s var(--ease-out-quint),
-    background-color 0.18s ease,
-    border-color 0.18s ease;
+    transform 0.15s var(--ease-out-quint),
+    box-shadow 0.15s var(--ease-out-quint),
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 @utility press-active {
   &:active {
-    transform: scale(0.975);
+    transform: scale(0.985);
   }
 }
 
 @keyframes pulse-ring {
-  0% { transform: scale(0.88); opacity: 0.68; }
-  70% { transform: scale(1.65); opacity: 0; }
-  100% { opacity: 0; }
+  0% {
+    transform: scale(0.9);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes rise {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @keyframes shimmer {
-  100% { transform: translateX(100%); }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
-@keyframes drift {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(0, -12px, 0) scale(1.035); }
+.animate-pulse-ring {
+  animation: pulse-ring 1.6s var(--ease-out-quint) infinite;
 }
-
-.animate-pulse-ring { animation: pulse-ring 1.6s var(--ease-out-quint) infinite; }
-.animate-rise { animation: rise 0.42s var(--ease-out-quint) both; }
-.animate-drift { animation: drift 9s ease-in-out infinite; }
+.animate-rise {
+  animation: rise 0.32s var(--ease-out-quint) both;
+}
 
 .skeleton {
   position: relative;
   overflow: hidden;
-  background: rgb(148 163 184 / 0.16);
+  background: rgb(203 213 225 / 0.35);
 }
 
 .skeleton::after {
@@ -193,12 +287,14 @@
   inset: 0;
   content: '';
   transform: translateX(-100%);
-  background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.72), transparent);
+  background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.8), transparent);
   animation: shimmer 1.4s infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
@@ -207,6 +303,10 @@
 }
 
 @media print {
-  .print\:hidden { display: none !important; }
-  body { background: #fff; }
+  .print\:hidden {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
 }

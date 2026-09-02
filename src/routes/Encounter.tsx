@@ -207,7 +207,7 @@ export function EncounterCapture() {
             <button
               onClick={() => fileInput.current?.click()}
               disabled={busy}
-              className="tap-safe flex items-center justify-center gap-2 rounded-field border-2 border-dashed border-slate-300 py-4 text-slate-500 active:bg-slate-100 disabled:opacity-50"
+              className="tap-safe flex items-center justify-center gap-2 rounded-field border-2 border-dashed border-line-strong py-4 text-ink-3 active:bg-sunken disabled:opacity-50"
             >
               <Camera size={22} />
               <span className="font-semibold">{t.addPhoto}</span>

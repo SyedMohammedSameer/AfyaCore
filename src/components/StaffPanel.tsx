@@ -32,7 +32,7 @@ export function StaffPanel() {
       <section>
         <SectionTitle>{t.staff}</SectionTitle>
         <Card>
-          <p className="flex items-center gap-2 text-sm text-slate-500">
+          <p className="flex items-center gap-2 text-sm text-ink-3">
             <ShieldAlert size={18} />
             {t.adminOnly}
           </p>
@@ -117,11 +117,11 @@ function StaffList() {
               className="flex items-center justify-between gap-2 rounded-field bg-white/50 p-2.5"
             >
               <div className="min-w-0">
-                <p className="truncate font-semibold text-slate-800">
+                <p className="truncate font-semibold text-ink">
                   {c.name}
-                  {c.id === me?.id && <span className="ml-1.5 text-xs text-slate-400">({t.you})</span>}
+                  {c.id === me?.id && <span className="ml-1.5 text-xs text-ink-4">({t.you})</span>}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-ink-3">
                   {c.role === 'admin' ? t.roleAdmin : t.roleClinician}
                   {c.lastSignInAt && ` · ${formatDateTime(c.lastSignInAt, lang)}`}
                 </p>
@@ -263,11 +263,11 @@ function AuditPanel() {
         <ul className="flex flex-col gap-1 text-xs">
           {entries.map((e) => (
             <li key={e.id} className="flex gap-2 rounded bg-white/50 px-2 py-1.5">
-              <span className="numeric shrink-0 tabular-nums text-slate-400">
+              <span className="numeric shrink-0 tabular-nums text-ink-4">
                 {formatDateTime(e.at, lang)}
               </span>
-              <span className="font-medium text-slate-700">{e.action}</span>
-              {e.detail && <span className="truncate text-slate-400">{e.detail}</span>}
+              <span className="font-medium text-ink-2">{e.action}</span>
+              {e.detail && <span className="truncate text-ink-4">{e.detail}</span>}
             </li>
           ))}
         </ul>

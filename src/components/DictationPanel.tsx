@@ -81,7 +81,7 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
   }
 
   if (!recogniser.available) {
-    return <Card className="bg-slate-100 text-sm text-slate-600">{t.micUnavailable}</Card>
+    return <Card className="bg-sunken text-sm text-ink-2">{t.micUnavailable}</Card>
   }
 
   const hasText = finalText.trim().length > 0
@@ -121,10 +121,10 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
         </button>
 
         <div className="min-w-0 flex-1">
-          <p className="text-lg leading-tight font-extrabold tracking-[-0.03em] text-slate-900">
+          <p className="text-lg leading-tight font-extrabold tracking-[-0.03em] text-ink">
             {listening ? t.listening : t.dictate}
           </p>
-          <p className="mt-0.5 text-sm leading-snug text-slate-500">{t.dictationHint}</p>
+          <p className="mt-0.5 text-sm leading-snug text-ink-3">{t.dictationHint}</p>
         </div>
       </div>
 
@@ -135,13 +135,13 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
       )}
 
       {(hasText || interim) && (
-        <div className="glass-subtle rounded-field p-3.5">
-          <p className="mb-1 text-[0.6875rem] font-bold tracking-wider text-slate-400 uppercase">
+        <div className="surface-card rounded-field p-3.5">
+          <p className="mb-1 text-[0.6875rem] font-bold tracking-wider text-ink-4 uppercase">
             {t.transcript}
           </p>
-          <p className="text-base leading-relaxed text-slate-800">
+          <p className="text-base leading-relaxed text-ink">
             {finalText}
-            {interim && <span className="text-slate-400"> {interim}</span>}
+            {interim && <span className="text-ink-4"> {interim}</span>}
           </p>
         </div>
       )}

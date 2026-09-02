@@ -68,7 +68,7 @@ function DosingClock({ frequencyPerDay }: { frequencyPerDay?: number }) {
           key={i}
           className={cx(
             'grid size-11 place-items-center rounded-xl ring-1',
-            on ? 'bg-brand-600 text-white ring-brand-700' : 'bg-slate-50 text-slate-300 ring-slate-200',
+            on ? 'bg-brand-600 text-white ring-brand-700' : 'bg-sunken text-ink-4 ring-line',
           )}
         >
           <Icon size={22} strokeWidth={2.2} />
@@ -91,7 +91,7 @@ function PrescriptionRow({ p, index, lang }: { p: Prescription; index: number; l
         </span>
         <div className="min-w-0 flex-1">
           {/* Large type: read at arm's length, often by someone with limited literacy. */}
-          <p className="text-xl leading-tight font-extrabold break-words text-slate-900">{p.drug}</p>
+          <p className="text-xl leading-tight font-extrabold break-words text-ink">{p.drug}</p>
           {p.dose && <p className="numeric text-lg font-semibold text-brand-800">{p.dose}</p>}
         </div>
       </div>
@@ -99,13 +99,13 @@ function PrescriptionRow({ p, index, lang }: { p: Prescription; index: number; l
       <div className="flex flex-wrap items-center justify-between gap-3">
         <DosingClock frequencyPerDay={p.frequencyPerDay} />
         {total !== undefined && (
-          <span className="numeric rounded-xl bg-slate-100 px-3 py-2 text-base font-bold text-slate-700">
+          <span className="numeric rounded-xl bg-sunken px-3 py-2 text-base font-bold text-ink-2">
             {total} ×
           </span>
         )}
       </div>
 
-      {detail && <p className="text-base leading-snug text-slate-600">{detail}</p>}
+      {detail && <p className="text-base leading-snug text-ink-2">{detail}</p>}
     </Card>
   )
 }
@@ -167,7 +167,7 @@ export function Instructions() {
 
         {encounter.prescriptions.length === 0 ? (
           <Card>
-            <p className="text-slate-500">{strings.noEncounters}</p>
+            <p className="text-ink-3">{strings.noEncounters}</p>
           </Card>
         ) : (
           <ol className="flex flex-col gap-3">
@@ -183,7 +183,7 @@ export function Instructions() {
           <p className="rounded-field bg-warn-50 p-3 text-sm text-warn-700 print:hidden">{t.noVoiceAvailable}</p>
         )}
 
-        <p className="px-1 text-xs text-slate-400 print:hidden">{t.dataNotice}</p>
+        <p className="px-1 text-xs text-ink-4 print:hidden">{t.dataNotice}</p>
       </div>
 
       <ActionBar>
