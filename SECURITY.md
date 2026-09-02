@@ -49,6 +49,14 @@ These are implemented and tested, and are the parts you can rely on:
 
 See the [export privacy](README.md#export-privacy) section of the README for detail.
 
+## Compliance
+
+[`docs/COMPLIANCE.md`](docs/COMPLIANCE.md) is the companion to this file: who the
+controller is, what data lives where, the data-protection regime per country,
+the DPIA and its risk register, and the threat model this table of controls is
+answering. Where the two overlap, this file describes the controls and that one
+describes the obligations they are meant to meet — and the ones they do not.
+
 ## Reporting a vulnerability
 
 Please **do not open a public issue** for a security problem.

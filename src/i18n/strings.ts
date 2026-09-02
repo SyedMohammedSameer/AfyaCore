@@ -172,6 +172,7 @@ export interface Strings {
   dataProtectionLaw: string
   regulator: string
   breachWindow: string
+  withoutDelay: string
   retention: string
   unconfirmed: string
   notLegalAdvice: string
@@ -423,6 +424,7 @@ const fr: Strings = {
   dataProtectionLaw: 'Loi applicable',
   regulator: 'Autorité de contrôle',
   breachWindow: 'Délai de notification',
+  withoutDelay: 'Sans délai',
   retention: 'Durée de conservation',
   unconfirmed: 'À confirmer',
   notLegalAdvice: 'Ces informations sont fournies à titre indicatif et n’ont pas été validées par un juriste de ce pays. Elles ne constituent pas un avis juridique.',
@@ -667,6 +669,7 @@ const mg: Strings = {
   dataProtectionLaw: 'Lalàna mifehy',
   regulator: 'Manam-pahefana mpanara-maso',
   breachWindow: 'Fe-potoana fampandrenesana',
+  withoutDelay: 'Avy hatrany',
   retention: 'Faharetan’ny fitehirizana',
   unconfirmed: 'Mbola hamarinina',
   notLegalAdvice: 'Torohevitra fotsiny ireto vaovao ireto ary tsy nohamarinin’ny mpahay lalàna ao amin’ity firenena ity.',
@@ -910,6 +913,7 @@ const en: Strings = {
   dataProtectionLaw: 'Governing law',
   regulator: 'Supervisory authority',
   breachWindow: 'Breach notification',
+  withoutDelay: 'Without delay',
   retention: 'Retention period',
   unconfirmed: 'To confirm',
   notLegalAdvice: 'Recorded for guidance and not reviewed by a lawyer in this jurisdiction. This is not legal advice.',
