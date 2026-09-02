@@ -91,9 +91,14 @@ export function CountryPanel() {
 
           <dt className="text-ink-3">{t.breachWindow}</dt>
           <dd className="font-medium text-ink">
-            {/* "Unconfirmed" rather than a plausible-looking default. A wrong
-                number here gets followed; a missing one gets asked about. */}
-            {law.breachNotificationHours ? `${law.breachNotificationHours} h` : t.unconfirmed}
+            {/* Three states, never a plausible-looking default. A wrong number
+                here gets followed; a missing one gets asked about; and an
+                immediate duty shown as a window invents time nobody has. */}
+            {law.breachNotification.kind === 'hours'
+              ? `${law.breachNotification.hours} h`
+              : law.breachNotification.kind === 'immediate'
+                ? t.withoutDelay
+                : t.unconfirmed}
           </dd>
 
           <dt className="text-ink-3">{t.retention}</dt>

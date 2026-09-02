@@ -29,11 +29,12 @@
  * names are recorded to the best of our knowledge and are **not legal advice**;
  * every profile ships with `counselReviewed: false` and the app says so.
  *
- * Retention periods and breach-notification windows are deliberately left as
- * `null` wherever we could not establish them from a primary source. A
- * confidently wrong retention period in a health system is worse than an
- * obviously absent one: the first gets followed, the second gets asked about.
- * `docs/COMPLIANCE.md` records what is confirmed and what is not.
+ * Retention periods are deliberately left as `null` wherever we could not
+ * establish them from a primary source, and a breach deadline can say outright
+ * that it is unestablished. A confidently wrong retention period in a health
+ * system is worse than an obviously absent one: the first gets followed, the
+ * second gets asked about. `docs/COMPLIANCE.md` §5 records what is confirmed,
+ * what is not, and how confident each row is.
  */
 import type { ClinicalLang } from './clinicalLocales'
 import type { LangCode } from '../db/schema'
@@ -56,16 +57,36 @@ export interface PhoneFormat {
   example: string
 }
 
+/**
+ * How quickly a personal-data breach must be reported.
+ *
+ * This started life as `number | null`, which turned out to be a modelling bug
+ * with a real consequence. Uganda's DPPA s.23 requires notification
+ * *immediately*, with no grace period at all, and the only way to say that in
+ * a nullable number was `72` — a figure taken from the GDPR-shaped regimes and
+ * wrong in the dangerous direction, since it invents three days a facility
+ * does not have. `null` would have been no better: the app renders that as
+ * "to confirm", so a strict obligation would have displayed as an unknown one.
+ *
+ * Three states, because there are three real answers: a fixed window, an
+ * immediate duty, and not established. `docs/COMPLIANCE.md` §5 carries the
+ * statutory wording behind each and what was checked to get it.
+ */
+export type BreachDeadline =
+  /** A fixed window in hours, e.g. Kenya's 72. */
+  | { kind: 'hours'; hours: number }
+  /** No grace period: "immediately", "as soon as reasonably possible". */
+  | { kind: 'immediate' }
+  /** Not established from a source we trust. Means "find out", not "none". */
+  | { kind: 'unestablished' }
+
 export interface DataProtectionRegime {
   /** Short name of the governing statute. */
   law: string
   /** Supervisory authority. */
   regulator: string
-  /**
-   * Hours within which a personal-data breach must be reported, or null where
-   * we could not establish it. Null means "find out", not "no obligation".
-   */
-  breachNotificationHours: number | null
+  /** When a breach must be reported. See BreachDeadline. */
+  breachNotification: BreachDeadline
   /**
    * Years a clinical record must be retained, or null where unestablished.
    * Retention is usually set by health-sector rules rather than the data
@@ -167,7 +188,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     law: {
       law: 'Loi n°2014-038 sur la protection des données à caractère personnel',
       regulator: 'Commission Malgache de l’Informatique et des Libertés (CMIL)',
-      breachNotificationHours: null,
+      breachNotification: { kind: 'unestablished' },
       retentionYears: null,
       crossBorderRestricted: true,
       counselReviewed: false,
@@ -193,7 +214,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     law: {
       law: 'Loi n°2008-12 sur la protection des données à caractère personnel',
       regulator: 'Commission de Protection des Données Personnelles (CDP)',
-      breachNotificationHours: null,
+      breachNotification: { kind: 'unestablished' },
       retentionYears: null,
       crossBorderRestricted: true,
       counselReviewed: false,
@@ -219,7 +240,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     law: {
       law: 'Loi n°2013-450 relative à la protection des données à caractère personnel',
       regulator: 'Autorité de Régulation des Télécommunications (ARTCI)',
-      breachNotificationHours: null,
+      breachNotification: { kind: 'unestablished' },
       retentionYears: null,
       crossBorderRestricted: true,
       counselReviewed: false,
@@ -238,7 +259,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     law: {
       law: 'Ordonnance-loi n°23/010 du 13 mars 2023 portant Code du numérique',
       regulator: 'Autorité de régulation du numérique',
-      breachNotificationHours: null,
+      breachNotification: { kind: 'unestablished' },
       retentionYears: null,
       crossBorderRestricted: true,
       counselReviewed: false,
@@ -258,7 +279,8 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     law: {
       law: 'Data Protection Act, 2019',
       regulator: 'Office of the Data Protection Commissioner (ODPC)',
-      breachNotificationHours: 72,
+      // DPA 2019 s.43(1): notify the Data Commissioner within 72 hours.
+      breachNotification: { kind: 'hours', hours: 72 },
       retentionYears: null,
       crossBorderRestricted: true,
       counselReviewed: false,
@@ -278,7 +300,8 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     law: {
       law: 'Nigeria Data Protection Act, 2023',
       regulator: 'Nigeria Data Protection Commission (NDPC)',
-      breachNotificationHours: 72,
+      // NDPA 2023 s.40(2), restated in GAID 2025 art. 33(2).
+      breachNotification: { kind: 'hours', hours: 72 },
       retentionYears: null,
       crossBorderRestricted: true,
       counselReviewed: false,
@@ -297,7 +320,8 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     law: {
       law: 'Data Protection Act, 2012 (Act 843)',
       regulator: 'Data Protection Commission',
-      breachNotificationHours: null,
+      // Act 843 s.31: "as soon as reasonably practicable". No fixed window.
+      breachNotification: { kind: 'immediate' },
       retentionYears: null,
       crossBorderRestricted: true,
       counselReviewed: false,
@@ -316,7 +340,9 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     law: {
       law: 'Personal Data Protection Act, 2022',
       regulator: 'Personal Data Protection Commission (PDPC)',
-      breachNotificationHours: null,
+      // Sources conflict: PDPA s.27(5) says "without undue delay", secondary
+      // commentary reports 72 h under the regulations. Unestablished until read.
+      breachNotification: { kind: 'unestablished' },
       retentionYears: null,
       crossBorderRestricted: true,
       counselReviewed: false,
@@ -335,7 +361,9 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     law: {
       law: 'Data Protection and Privacy Act, 2019',
       regulator: 'Personal Data Protection Office (PDPO)',
-      breachNotificationHours: 72,
+      // DPPA 2019 s.23 and reg. 33: "immediately". Recorded as 72 h until
+      // September 2026, which was simply wrong and three days too generous.
+      breachNotification: { kind: 'immediate' },
       retentionYears: null,
       crossBorderRestricted: true,
       counselReviewed: false,

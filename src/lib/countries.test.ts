@@ -64,6 +64,34 @@ describe('profile lookup', () => {
       expect(profile.law.regulator).not.toBe('')
     }
   })
+
+  it('never invents a breach-notification window', () => {
+    // Uganda shipped as 72 hours for a while. Its DPPA s.23 says
+    // "immediately", so the app was telling a facility administrator they had
+    // three days they did not have — and 72 was not a typo, it was the only
+    // thing a `number | null` field could say about a duty with no window.
+    //
+    // This test pins the shape that fixed it: a deadline is a fixed number of
+    // hours, an immediate duty, or honestly unestablished, and nothing else.
+    // A plausible-looking default is the failure mode, not the missing value.
+    for (const profile of Object.values(COUNTRY_PROFILES)) {
+      const deadline = profile.law.breachNotification
+      expect(['hours', 'immediate', 'unestablished']).toContain(deadline.kind)
+      if (deadline.kind === 'hours') {
+        expect(deadline.hours).toBeGreaterThan(0)
+        expect(Number.isInteger(deadline.hours)).toBe(true)
+      }
+    }
+  })
+
+  it('records Uganda and Ghana as immediate, not as a window', () => {
+    // Named rather than covered by the loop above, because these two are the
+    // regressions worth catching by name: both statutes give no grace period,
+    // and both are the shape a GDPR-trained reader would fill in with 72.
+    expect(COUNTRY_PROFILES.UG!.law.breachNotification.kind).toBe('immediate')
+    expect(COUNTRY_PROFILES.GH!.law.breachNotification.kind).toBe('immediate')
+    expect(COUNTRY_PROFILES.KE!.law.breachNotification).toEqual({ kind: 'hours', hours: 72 })
+  })
 })
 
 describe('phone patterns match real national formats', () => {

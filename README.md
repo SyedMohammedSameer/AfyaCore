@@ -332,10 +332,16 @@ Every phone pattern runs on every export, not just the configured country's. Bei
 country a device is set to is itself the failure being guarded against, and the cost is microseconds.
 
 ⚠️ **The legal metadata is not legal advice.** Each profile names its statute and regulator, and
-every one ships `counselReviewed: false`, which the app displays. Retention periods and breach
-windows are left blank wherever we could not establish them from a primary source: a confidently
-wrong retention period in a health system gets followed, whereas an obviously absent one gets asked
-about.
+every one ships `counselReviewed: false`, which the app displays. Retention periods are left blank
+wherever we could not establish them from a primary source: a confidently wrong retention period in
+a health system gets followed, whereas an obviously absent one gets asked about.
+
+A breach deadline is one of three things — a fixed number of hours, an immediate duty, or not
+established. It used to be `number | null`, and that shape was itself a bug: Uganda's DPPA s.23
+requires notification *immediately*, which is inexpressible as a nullable number, so it shipped as
+`72` — the GDPR-shaped figure a reader reaches for — and the app told administrators they had three
+days they did not have. [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md) §5 carries the full matrix, what
+was checked to build it, and how confident each row is.
 
 ## The design bet
 
@@ -538,6 +544,12 @@ much quieter bug than a wrong one.
 - ⚠️ **Records are not encrypted at rest.** IndexedDB on the device and SQLite on the server are both
   plain text, so an unlocked phone or the server's filesystem gives up the roster. Device encryption
   is the only thing protecting them today.
+- ⚠️ **No consent capture, no retention schedule, and deletion is a tombstone.** Nothing records a
+  lawful basis, nothing expires, and `deletePatient` destroys the attachment photographs but leaves
+  the patient and encounter rows as tombstones on both the device and the server — correct for sync
+  convergence, wrong for a data-subject erasure request. These are the three gaps between a demo and
+  a lawful deployment; they are enumerated as R10–R12 in
+  [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
 - **Malagasy dictation is not supported** and falls back to French. See `docs/MODEL-RESEARCH.md` §2.2.
 - ⚠️ **The DHIS2 export contains placeholder UIDs.** DHIS2 identifies data elements by
   instance-specific IDs we do not have. The JSON is structurally valid and will import once
