@@ -24,10 +24,11 @@
  *   npm run build && npm run preview     # in the repo root
  *   npm --prefix video run capture
  */
-import { access, copyFile, mkdir, readdir, rm } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import puppeteer from '../node_modules/puppeteer-core/lib/puppeteer/puppeteer-core.js'
+import { findChrome } from '../scripts/find-chrome.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repo = join(here, '..')
@@ -35,25 +36,6 @@ const SHOTS = join(repo, 'docs', 'screenshots')
 const PUBLIC = join(here, 'public')
 const BASE = process.env.AFYACORE_URL ?? 'http://localhost:4173'
 
-const CHROME_CANDIDATES = [
-  process.env.CHROME_PATH,
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/Applications/Chromium.app/Contents/MacOS/Chromium',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-].filter(Boolean)
-
-async function findChrome() {
-  for (const p of CHROME_CANDIDATES) {
-    try {
-      await access(p)
-      return p
-    } catch {
-      /* next */
-    }
-  }
-  throw new Error('No Chromium. Set CHROME_PATH.')
-}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 

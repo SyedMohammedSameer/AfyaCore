@@ -20,33 +20,11 @@
 import { mkdir, access, stat, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import puppeteer from 'puppeteer-core'
+import { findChrome } from './find-chrome.mjs'
 
 const BASE = process.env.AFYACORE_URL ?? 'http://localhost:4173'
 const OUT = 'docs/screenshots'
 
-const CHROME_CANDIDATES = [
-  process.env.CHROME_PATH,
-  '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/Applications/Chromium.app/Contents/MacOS/Chromium',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-  '/usr/bin/chromium-browser',
-].filter(Boolean)
-
-async function findChrome() {
-  for (const path of CHROME_CANDIDATES) {
-    try {
-      await access(path)
-      return path
-    } catch {
-      // try the next candidate
-    }
-  }
-  throw new Error(
-    `No Chromium found. Set CHROME_PATH to a Chrome/Brave/Chromium binary.\nTried:\n  ${CHROME_CANDIDATES.join('\n  ')}`,
-  )
-}
 
 /**
  * Capture sizes and format.

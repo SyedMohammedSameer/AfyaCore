@@ -28,32 +28,11 @@
  *
  * Exits non-zero on the first failed step, so CI can gate on it.
  */
-import { access } from 'node:fs/promises'
 import puppeteer from 'puppeteer-core'
+import { findChrome } from './find-chrome.mjs'
 
 const BASE = process.env.AFYACORE_URL ?? 'http://localhost:4173'
 
-const CHROME_CANDIDATES = [
-  process.env.CHROME_PATH,
-  '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/Applications/Chromium.app/Contents/MacOS/Chromium',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-  '/usr/bin/chromium-browser',
-].filter(Boolean)
-
-async function findChrome() {
-  for (const path of CHROME_CANDIDATES) {
-    try {
-      await access(path)
-      return path
-    } catch {
-      /* next */
-    }
-  }
-  throw new Error(`No Chromium found. Set CHROME_PATH.\nTried:\n  ${CHROME_CANDIDATES.join('\n  ')}`)
-}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 

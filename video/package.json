@@ -5,8 +5,8 @@
   "description": "ML4H demo video for AfyaCore, rendered with Remotion from frames of the real app.",
   "scripts": {
     "capture": "node capture.mjs",
-    "studio": "remotion studio",
-    "render": "remotion render Demo out/afyacore-demo.mp4"
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Demo out/afyacore-demo.mp4 --muted"
   },
   "dependencies": {
     "@remotion/bundler": "^4.0.520",

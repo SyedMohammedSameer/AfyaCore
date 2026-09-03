@@ -37,11 +37,16 @@ npm run render                       # -> out/afyacore-demo.mp4
 npm run studio                       # interactive editor
 ```
 
-On Linux, Remotion needs an old-headless-capable binary:
+`capture` finds a browser through `scripts/find-chrome.mjs`, the same list the
+screenshot and smoke scripts use — Chrome, Chromium, Brave or Edge. Override it
+with `CHROME_PATH` if yours lives somewhere unusual.
+
+`render` is different: Remotion downloads and manages its own Chrome Headless
+Shell, so it needs nothing installed. On Linux, where a system Chromium may
+refuse the old headless mode Remotion asks for, point it at a headless shell:
 
 ```bash
-npx remotion render src/index.ts Demo out/afyacore-demo.mp4 \
-  --browser-executable=/path/to/chrome-headless-shell
+npm run render -- --browser-executable=/path/to/chrome-headless-shell
 ```
 
 ## Licence
