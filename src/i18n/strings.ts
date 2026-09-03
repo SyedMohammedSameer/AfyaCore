@@ -191,6 +191,9 @@ export interface Strings {
   retentionConfirm: string
   retentionDone: string
   retentionServerNote: string
+  dictationRemoteDisclosure: string
+  dictationAcknowledge: string
+  dictationRemoteActive: string
   notLegalAdvice: string
   // Optional on-device PII model (OpenMed). An accuracy upgrade over the
   // deterministic scrub, never a replacement for it.
@@ -461,6 +464,10 @@ const fr: Strings = {
   retentionDone: '{n} consultations supprimées.',
   retentionServerNote:
     'Cet appareil ne supprime que sa propre copie. Purgez le serveur séparément avec « npm run admin retention:purge ».',
+  dictationRemoteDisclosure:
+    'La dictée de ce navigateur envoie l’audio à un service de reconnaissance externe : la voix du patient, son nom et son diagnostic quittent l’appareil. La saisie manuelle fonctionne hors ligne et ne quitte jamais l’appareil.',
+  dictationAcknowledge: 'J’ai compris, activer la dictée',
+  dictationRemoteActive: 'Dictée externe active : l’audio quitte cet appareil.',
   notLegalAdvice: 'Ces informations sont fournies à titre indicatif et n’ont pas été validées par un juriste de ce pays. Elles ne constituent pas un avis juridique.',
   piiPack: 'Modèle d’anonymisation',
   piiPackHint: 'Repère dans les notes les noms que le registre ne contient pas, par exemple un parent cité en passant. Le nettoyage de base fonctionne sans lui.',
@@ -724,6 +731,10 @@ const mg: Strings = {
   retentionDone: 'Voafafa ny fitsidihana {n}.',
   retentionServerNote:
     'Ity fitaovana ity ihany no voafafa. Fafao mitokana ny serivera amin’ny « npm run admin retention:purge ».',
+  dictationRemoteDisclosure:
+    'Mandefa ny feo any amin’ny serivisy ivelany ity fandikana feo ity: mivoaka ny fitaovana ny feon’ny marary, ny anarany sy ny aretiny. Mandeha tsy misy aterineto ny fanoratana an-tanana ary tsy mivoaka mihitsy.',
+  dictationAcknowledge: 'Azoko, alefaso ny fandikana feo',
+  dictationRemoteActive: 'Mandeha ny fandikana feo ivelany: mivoaka ity fitaovana ity ny feo.',
   notLegalAdvice: 'Torohevitra fotsiny ireto vaovao ireto ary tsy nohamarinin’ny mpahay lalàna ao amin’ity firenena ity.',
   piiPack: 'Modely fanafenana anarana',
   piiPackHint: 'Mahita anarana tsy ao amin’ny rejisitra ao anaty naotra, ohatra havana voatonona. Miasa ihany ny fanadiovana fototra na tsy misy izy.',
@@ -986,6 +997,10 @@ const en: Strings = {
   retentionDone: '{n} consultations deleted.',
   retentionServerNote:
     'This device deletes only its own copy. Purge the server separately with “npm run admin retention:purge”.',
+  dictationRemoteDisclosure:
+    'This browser’s dictation sends audio to an external recognition service: the patient’s voice, name and diagnosis leave the device. Typing works offline and never leaves the device.',
+  dictationAcknowledge: 'Understood, enable dictation',
+  dictationRemoteActive: 'External dictation active: audio leaves this device.',
   notLegalAdvice: 'Recorded for guidance and not reviewed by a lawyer in this jurisdiction. This is not legal advice.',
   piiPack: 'De-identification model',
   piiPackHint: 'Finds names in notes that the roster does not hold, such as a relative mentioned in passing. The deterministic scrub works without it.',

@@ -602,8 +602,13 @@ much quieter bug than a wrong one.
   them. They need a speaker who works in that health system before any real deployment; wrong dosage
   wording is a safety issue, not a polish issue. The app says so on the sheet, and the numerals and
   dosing icons carry the instruction regardless.
-- **Dictation needs network** (browser recogniser). Manual entry always works offline. Offline
-  ASR is the first planned upgrade.
+- ⚠️ **Dictation sends audio to the browser vendor**, not just "needs network". Chrome and Edge
+  stream captured audio to their own recognition service, so a dictated consultation discloses the
+  patient's voice, name and diagnosis to a third party. The app asks for on-device recognition where
+  the browser supports it (Chrome 138+), and where it does not, dictation is **off until an
+  administrator acknowledges the disclosure** — audited, withdrawable, and reminded on screen while
+  in force. Typing always works offline and never leaves the device. Offline ASR is the upgrade that
+  removes the disclosure rather than merely stating it.
 - ⚠️ **The audit chain detects tampering, it does not prevent it.** A hash chain makes an edited or
   deleted entry visible, but anyone who can rewrite the whole chain leaves no trace. Recording the
   head hash off the device is the mitigation, and it is manual.
