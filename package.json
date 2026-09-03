@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "eval": "vite-node eval/run.mjs",
+    "eval:stub": "vite-node eval/run.mjs -- --stub-neural",
     "vendor:ocr": "node scripts/vendor-ocr.mjs",
     "vendor:openmed": "node scripts/vendor-openmed.mjs",
     "screenshots": "node scripts/screenshots.mjs",

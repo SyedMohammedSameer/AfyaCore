@@ -35,6 +35,21 @@ const root = join(here, '..')
 
 const asJson = process.argv.includes('--json')
 
+/**
+ * `--stub-neural`: run the two-column comparison against a fake backend.
+ *
+ * Exists so the neural code path — BIO decoding, span merging, redaction,
+ * scoring and the comparison table — can be exercised without a 70 MB
+ * download, which is how it went unnoticed that `runDeident` accepted a
+ * backend and never called it. CI can run this; a laptop with no Hub access
+ * can run this.
+ *
+ * It is NOT a measurement and the report says so in capitals every time. The
+ * stub is a crude capitalised-word tagger, not a model, and any number it
+ * produces describes the plumbing rather than OpenMed.
+ */
+const stubNeural = process.argv.includes('--stub-neural')
+
 /* ------------------------------------------------------------------ *
  * Extraction
  * ------------------------------------------------------------------ */
@@ -185,61 +200,97 @@ function prf(tp, fp, fn) {
  * whether clinical content survived, so it is measured over `mustKeep` terms:
  * a scrubber that redacts everything scores perfect recall and is useless.
  */
-async function runDeident(scrubFreeText, deidentifyText) {
+async function runDeident(scrubFreeText, applyEntities, backend) {
   const corpus = JSON.parse(await readFile(join(here, 'corpus', 'deident.json'), 'utf8'))
 
   const terms = corpus.roster.flatMap((p) =>
     [p.familyName, p.givenName, p.address, p.registerNo].filter(Boolean),
   )
 
-  const buckets = {
-    onRoster: { removed: 0, total: 0 },
-    offRoster: { removed: 0, total: 0 },
-  }
-  let keptClinical = 0
-  let totalClinical = 0
-  const leaks = []
-  const overRedactions = []
-  const timings = []
+  /**
+   * Score one scrubbing strategy over the whole corpus.
+   *
+   * Factored out so the deterministic pass and the deterministic+neural pass
+   * are scored by identical code. Running them through two similar-looking
+   * loops is how a comparison table ends up measuring two different things.
+   */
+  const score = async (scrub) => {
+    const buckets = {
+      onRoster: { removed: 0, total: 0 },
+      offRoster: { removed: 0, total: 0 },
+    }
+    let keptClinical = 0
+    let totalClinical = 0
+    const leaks = []
+    const overRedactions = []
+    const timings = []
 
-  for (const testCase of corpus.cases) {
-    const started = performance.now()
-    const { text: out } = scrubFreeText(testCase.text, terms)
-    timings.push(performance.now() - started)
+    for (const testCase of corpus.cases) {
+      const started = performance.now()
+      const out = await scrub(testCase.text)
+      timings.push(performance.now() - started)
 
-    for (const identifier of testCase.identifiers) {
-      const bucket = identifier.onRoster ? buckets.onRoster : buckets.offRoster
-      bucket.total++
-      if (!out.includes(identifier.value)) {
-        bucket.removed++
-      } else {
-        leaks.push({ id: testCase.id, value: identifier.value, onRoster: identifier.onRoster })
+      for (const identifier of testCase.identifiers) {
+        const bucket = identifier.onRoster ? buckets.onRoster : buckets.offRoster
+        bucket.total++
+        if (!out.includes(identifier.value)) {
+          bucket.removed++
+        } else {
+          leaks.push({ id: testCase.id, value: identifier.value, onRoster: identifier.onRoster })
+        }
+      }
+
+      for (const keep of testCase.mustKeep) {
+        totalClinical++
+        if (out.includes(keep)) keptClinical++
+        else overRedactions.push({ id: testCase.id, destroyed: keep })
       }
     }
 
-    for (const keep of testCase.mustKeep) {
-      totalClinical++
-      if (out.includes(keep)) keptClinical++
-      else overRedactions.push({ id: testCase.id, destroyed: keep })
+    timings.sort((a, b) => a - b)
+    const rate = (b) => (b.total === 0 ? null : Number((b.removed / b.total).toFixed(4)))
+
+    return {
+      onRosterRecall: rate(buckets.onRoster),
+      onRoster: buckets.onRoster,
+      offRosterRecall: rate(buckets.offRoster),
+      offRoster: buckets.offRoster,
+      clinicalRetention:
+        totalClinical === 0 ? null : Number((keptClinical / totalClinical).toFixed(4)),
+      clinicalTerms: { kept: keptClinical, total: totalClinical },
+      medianMs: Number(timings[Math.floor(timings.length / 2)].toFixed(3)),
+      leaks,
+      overRedactions,
     }
   }
 
-  timings.sort((a, b) => a - b)
+  const deterministic = await score((text) => scrubFreeText(text, terms).text)
 
-  const rate = (b) => (b.total === 0 ? null : Number((b.removed / b.total).toFixed(4)))
+  /**
+   * The neural pass, applied exactly as `deidentify` applies it in production:
+   * after the deterministic scrub, over its output, adding redactions only.
+   *
+   * This is the number the whole optional 70 MB download exists to produce,
+   * and until now the harness took a `backend` argument and never called it —
+   * it reported "measured" while measuring nothing, which is the same class of
+   * bug as the availability check that claimed a model was installed when it
+   * was not.
+   */
+  const neural = backend
+    ? await score(async (text) => {
+        const scrubbed = scrubFreeText(text, terms).text
+        try {
+          return applyEntities(scrubbed, await backend(scrubbed)).text
+        } catch {
+          // A backend failure must not be scored as a redaction failure; it is
+          // reported as the deterministic result, which is what production
+          // would fall back to.
+          return scrubbed
+        }
+      })
+    : null
 
-  return {
-    onRosterRecall: rate(buckets.onRoster),
-    onRoster: buckets.onRoster,
-    offRosterRecall: rate(buckets.offRoster),
-    offRoster: buckets.offRoster,
-    clinicalRetention: totalClinical === 0 ? null : Number((keptClinical / totalClinical).toFixed(4)),
-    clinicalTerms: { kept: keptClinical, total: totalClinical },
-    medianMs: Number(timings[Math.floor(timings.length / 2)].toFixed(3)),
-    leaks,
-    overRedactions,
-    neural: deidentifyText ? 'measured' : 'not run (model absent)',
-  }
+  return { deterministic, neural, ...deterministic }
 }
 
 /* ------------------------------------------------------------------ *
@@ -344,34 +395,77 @@ function printReport(report) {
   line()
   line('De-identification of free text')
   line('-'.repeat(72))
-  const d = report.deident
-  line(
-    `  identifiers ON the roster     ${pct(d.onRosterRecall).padStart(7)}  ` +
-      `(${d.onRoster.removed}/${d.onRoster.total} removed)`,
-  )
-  line(
-    `  identifiers OFF the roster    ${pct(d.offRosterRecall).padStart(7)}  ` +
-      `(${d.offRoster.removed}/${d.offRoster.total} removed)`,
-  )
-  line(
-    `  clinical content retained     ${pct(d.clinicalRetention).padStart(7)}  ` +
-      `(${d.clinicalTerms.kept}/${d.clinicalTerms.total} terms)`,
-  )
-  line(`  median                        ${`${d.medianMs} ms`.padStart(7)}`)
-  line(`  neural pass                   ${d.neural}`)
+  const d = report.deident.deterministic
+  const n = report.deident.neural
 
-  if (d.leaks.length) {
+  // Two columns when the model is present, one when it is not. The delta on
+  // the off-roster row is the entire argument for the optional download, so it
+  // is shown side by side rather than as two separate runs a reader has to
+  // hold in their head.
+  const col = (v) => (n ? pct(v).padStart(11) : '')
+  if (n && report.stubNeural) {
+    line('  *** --stub-neural: the second column is a FAKE backend, not OpenMed. ***')
+    line('  *** It exercises the code path. The numbers mean nothing.            ***')
     line()
-    line('  not removed:')
-    for (const leak of d.leaks) {
+  }
+  line(
+    `  ${''.padEnd(30)}${'deterministic'.padStart(13)}` +
+      `${n ? (report.stubNeural ? '    STUB (fake)' : '   + OpenMed') : ''}`,
+  )
+  line(
+    `  identifiers ON the roster     ${pct(d.onRosterRecall).padStart(11)}` +
+      `${col(n?.onRosterRecall)}   (${d.onRoster.total} instances)`,
+  )
+  line(
+    `  identifiers OFF the roster    ${pct(d.offRosterRecall).padStart(11)}` +
+      `${col(n?.offRosterRecall)}   (${d.offRoster.total} instances)`,
+  )
+  line(
+    `  clinical content retained     ${pct(d.clinicalRetention).padStart(11)}` +
+      `${col(n?.clinicalRetention)}   (${d.clinicalTerms.total} terms)`,
+  )
+  line(
+    `  median latency                ${`${d.medianMs} ms`.padStart(11)}` +
+      `${n ? `${`${n.medianMs} ms`.padStart(11)}` : ''}`,
+  )
+  if (!n) line(`  neural pass                   not run (model absent)`)
+
+  if (n) {
+    line()
+    // The two rows that decide whether the download was worth it. Stated as a
+    // delta because "83%" means nothing without the 0% it replaced, and
+    // because a retention drop is the price being paid for it.
+    const delta = (a, b) => {
+      if (a === null || b === null) return 'n/a'
+      const diff = (b - a) * 100
+      return `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pp`
+    }
+    line(`  off-roster recall             ${delta(d.offRosterRecall, n.offRosterRecall)}`)
+    line(`  clinical retention            ${delta(d.clinicalRetention, n.clinicalRetention)}`)
+  }
+
+  const leakList = (label, leaks) => {
+    if (!leaks.length) return
+    line()
+    line(`  ${label}`)
+    for (const leak of leaks) {
       line(`    ${leak.id.padEnd(28)} ${leak.value}  ${leak.onRoster ? '(ON ROSTER)' : '(off roster)'}`)
     }
   }
-  if (d.overRedactions.length) {
+  leakList(n ? 'not removed by the deterministic pass:' : 'not removed:', d.leaks)
+  if (n) leakList('still not removed after OpenMed:', n.leaks)
+  const destroyedList = (label, overRedactions) => {
+    if (!overRedactions.length) return
     line()
-    line('  clinical content destroyed:')
-    for (const over of d.overRedactions) line(`    ${over.id.padEnd(28)} ${over.destroyed}`)
+    line(`  ${label}`)
+    for (const over of overRedactions) line(`    ${over.id.padEnd(28)} ${over.destroyed}`)
   }
+  destroyedList('clinical content destroyed:', d.overRedactions)
+  // The neural pass's over-redactions are the cost side of the trade, and the
+  // one a reviewer asks about first: drug names and place-of-treatment look
+  // like proper nouns to any NER model. Listed by name rather than left as a
+  // percentage, because "which words did it eat" is the actionable question.
+  if (n) destroyedList('clinical content destroyed by the neural pass:', n.overRedactions)
 
   line()
   line('Install cost')
@@ -414,22 +508,71 @@ async function main() {
   const { extractClinical } = await import('../src/lib/clinicalExtract.ts')
   const { CLINICAL_LOCALES } = await import('../src/lib/clinicalLocales.ts')
   const { scrubFreeText } = await import('../src/lib/deidentify.ts')
-  const { loadBackend } = await import('../src/lib/openmed.ts')
+  const { loadBackend, applyEntities } = await import('../src/lib/openmed.ts')
+
+  /*
+   * Load the model from the filesystem rather than over HTTP.
+   *
+   * The app checks for the model by fetching `/models/openmed-pii-fr/
+   * config.json`, which is right in a page and meaningless here: Node has no
+   * origin, so that path throws before it reaches the network. The same is
+   * true of `env.localModelPath`, a URL prefix in the browser and a directory
+   * on disk under Node. Both are injected rather than special-cased inside the
+   * app, so the shipped code path stays the browser one.
+   */
+  const modelRoot = join(root, 'public', 'models')
+  const available = async () => {
+    try {
+      await stat(join(modelRoot, 'openmed-pii-fr', 'config.json'))
+      return true
+    } catch {
+      return false
+    }
+  }
 
   // Present only where the model has been vendored; absent is the normal case
   // and the report says which happened rather than silently reporting zero.
   let backend = null
+  if (stubNeural) {
+    // Tags any capitalised word that is not sentence-initial and not already a
+    // redaction marker. Wrong in both directions on purpose: it is a plumbing
+    // exercise, not a baseline worth reporting.
+    backend = async (text) => {
+      const entities = []
+      for (const m of text.matchAll(/(?<![.!?]\s)(?<![\w'’-])\p{Lu}\p{L}{2,}/gu)) {
+        entities.push({
+          label: 'LASTNAME',
+          start: m.index,
+          end: m.index + m[0].length,
+          score: 0.9,
+        })
+      }
+      return entities
+    }
+  }
   try {
-    backend = await loadBackend()
-  } catch {
-    backend = null
+    if (stubNeural) throw { skip: true }
+    backend = await loadBackend({ modelRoot: `${modelRoot}/`, available })
+  } catch (err) {
+    if (err?.skip) {
+      // --stub-neural: the stub backend above stands in, deliberately.
+    } else {
+      // Loud rather than silent. A model that is on disk but will not load is
+      // a different problem from one that was never downloaded, and reporting
+      // both as "absent" is how the first goes unnoticed.
+      if (await available()) {
+        console.error(`\n  model present but failed to load: ${err.message}\n`)
+      }
+      backend = null
+    }
   }
 
   const report = {
     date: new Date().toISOString().slice(0, 10),
+    stubNeural,
     corpusNote: 'no real patient data (CONTRIBUTING.md)',
     extraction: await runExtraction(extractClinical, CLINICAL_LOCALES),
-    deident: await runDeident(scrubFreeText, backend),
+    deident: await runDeident(scrubFreeText, applyEntities, backend),
     bundle: await measureBundle(),
   }
 
@@ -443,8 +586,9 @@ async function main() {
   // was destroyed. Both are correctness failures rather than accuracy numbers,
   // so CI should fail on them; off-roster misses are expected without the model
   // and must not fail the build.
-  const rosterLeak = report.deident.leaks.some((l) => l.onRoster)
-  if (rosterLeak || report.deident.overRedactions.length) process.exit(1)
+  const det = report.deident.deterministic
+  const rosterLeak = det.leaks.some((l) => l.onRoster)
+  if (rosterLeak || det.overRedactions.length) process.exit(1)
 }
 
 main().catch((err) => {

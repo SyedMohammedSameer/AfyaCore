@@ -8,7 +8,7 @@
  * cannot reliably cache an opaque cross-origin response, so on-device
  * de-identification would pass testing and fail in a village.
  *
- * Unlike the OCR pack, this is **not** part of `npm run build`. It is ~67 MB and
+ * Unlike the OCR pack, this is **not** part of `npm run build`. It is ~70 MB and
  * the neural pass is an opt-in accuracy upgrade over a deterministic scrub that
  * already covers the common case, so a facility that never runs this loses
  * nothing except recall on identifiers the roster does not hold. Making it a
@@ -17,7 +17,7 @@
  *   npm run vendor:openmed
  *
  * Model: OpenMed/OpenMed-PII-French-ClinicalE5-Small-33M-v1-onnx-android
- * 33M parameters, DistilBERT-class, Apache-2.0, French clinical PII.
+ * 33M parameters, BERT (12 layers, hidden 384), Apache-2.0, French clinical PII.
  * See docs/MODEL-RESEARCH.md §4b for why this one and not the others.
  */
 import { mkdir, access, stat, copyFile, writeFile } from 'node:fs/promises'
@@ -54,17 +54,30 @@ const BASE = `https://huggingface.co/${REPO}/resolve/main`
  * transformers.js expects the graph under `onnx/`, whereas the OpenMed repo
  * publishes it at the root, so the download is rearranged rather than mirrored.
  *
- * fp16 is taken in preference to int8. Counter-intuitively the int8 export in
- * this family is the *larger* file (69.6 MB against 66.8 MB) because its
- * embedding table stays at higher precision, so int8 costs more bandwidth for
- * lower fidelity. Named `model_fp16.onnx` on the transformers.js side so the
- * `dtype: 'fp16'` selection in src/lib/openmed.ts resolves to it.
+ * **int8, not fp16.** This repo ships four graphs and the model card is
+ * explicit about which runtime each is for: `model_int8.onnx` is the "CPU,
+ * WebAssembly, and Android default", `model_fp16.onnx` is for "WebGPU and
+ * compatible accelerated runtimes". We serve the plain SIMD-threaded ONNX
+ * Runtime core and deliberately do *not* ship the 25 MB `jsep` build, so there
+ * is no WebGPU path here by construction — pairing the WebGPU graph with a
+ * WASM-only runtime was asking the one combination the publisher tells you not
+ * to use. transformers.js agrees independently: its own default dtype for the
+ * `wasm` device is a quantised graph (`utils/dtypes.js`).
+ *
+ * This reverses an earlier decision that took fp16 because int8 is, oddly, the
+ * *larger* download here — 69.6 MB against 66.8 MB, because the embedding table
+ * stays at higher precision. That was a real observation and the wrong call:
+ * 2.8 MB of bandwidth is not worth running off the supported path, and a
+ * download the runtime cannot use costs 66.8 MB rather than saving anything.
+ *
+ * Named `model_int8.onnx` on the transformers.js side so the `dtype: 'int8'`
+ * selection in src/lib/openmed.ts resolves to it.
  */
 const FILES = [
-  ['config.json', 'config.json'],
-  ['tokenizer.json', 'tokenizer.json'],
-  ['tokenizer_config.json', 'tokenizer_config.json'],
-  ['model_fp16.onnx', 'onnx/model_fp16.onnx'],
+  ['config.json', 'config.json', 4503],
+  ['tokenizer.json', 'tokenizer.json', 711661],
+  ['tokenizer_config.json', 'tokenizer_config.json', 499],
+  ['model_int8.onnx', 'onnx/model_int8.onnx', 69626378],
 ]
 
 const exists = (p) =>
@@ -75,9 +88,29 @@ const exists = (p) =>
 
 const mb = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`
 
-async function download(remote, cachePath) {
+/**
+ * Sizes are asserted, not trusted.
+ *
+ * These are LFS objects behind a redirect to a CDN. A captive portal, a
+ * filtering proxy or an expired signed URL can all answer 200 with a page of
+ * HTML, and `fetch` will follow the redirect and write it out perfectly
+ * happily. The failure then surfaces much later as an opaque ONNX parse error
+ * inside a browser, on someone else's machine. A byte count taken from the Hub
+ * listing turns that into a clear failure here, before anything is cached.
+ */
+async function download(remote, cachePath, expectedSize) {
+  const check = (size, where) => {
+    if (expectedSize && size !== expectedSize) {
+      throw new Error(
+        `${remote}: expected ${expectedSize} bytes, ${where} has ${size}. ` +
+          `Delete .cache/openmed and retry; if it persists, the Hub listing may have moved.`,
+      )
+    }
+  }
+
   if (await exists(cachePath)) {
     const { size } = await stat(cachePath)
+    check(size, 'the cached copy')
     console.log(`  cached  ${remote.padEnd(22)} ${mb(size)}`)
     return
   }
@@ -97,6 +130,15 @@ async function download(remote, cachePath) {
   await mkdir(dirname(cachePath), { recursive: true })
   await pipeline(Readable.fromWeb(response.body), createWriteStream(partial))
   const { size } = await stat(partial)
+  try {
+    check(size, 'the download')
+  } catch (err) {
+    // Never promote a bad download into the cache: the next run would report
+    // it as `cached` and the error would look like a different problem.
+    const { rm } = await import('node:fs/promises')
+    await rm(partial, { force: true })
+    throw err
+  }
   await copyFile(partial, cachePath)
   const { rm } = await import('node:fs/promises')
   await rm(partial, { force: true })
@@ -108,9 +150,9 @@ async function main() {
   await mkdir(outDir, { recursive: true })
 
   let total = 0
-  for (const [remote, local] of FILES) {
+  for (const [remote, local, expectedSize] of FILES) {
     const cachePath = join(cacheDir, remote)
-    await download(remote, cachePath)
+    await download(remote, cachePath, expectedSize)
     const target = join(outDir, local)
     await mkdir(dirname(target), { recursive: true })
     await copyFile(cachePath, target)
@@ -135,6 +177,7 @@ async function main() {
         paper: 'https://arxiv.org/abs/2508.01630',
         vendoredAt: new Date().toISOString(),
         files: FILES.map(([, local]) => local),
+        graph: 'int8 (CPU/WebAssembly path, per the model card)',
       },
       null,
       2,
