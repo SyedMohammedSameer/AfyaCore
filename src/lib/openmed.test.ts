@@ -9,7 +9,7 @@
  * "an I- tag with no B- before it was silently dropped and a surname survived".
  */
 import { describe, expect, it } from 'vitest'
-import { REDACTABLE_LABELS, alignTokenOffsets, applyEntities, decodeBio, isModelAvailable, mergeSpans, normaliseForAlignment, type NerEntity } from './openmed'
+import { REDACTABLE_LABELS, alignTokenOffsets, applyEntities, decodeBio, isModelAvailable, isProtectedSpan, mergeSpans, normaliseForAlignment, type NerEntity } from './openmed'
 import { deidentify, REDACTED } from './deidentify'
 import type { Encounter, Patient } from '../db/schema'
 
@@ -406,5 +406,90 @@ describe('alignTokenOffsets', () => {
     expect(out).not.toContain('Ramanantsoa')
     expect(out).not.toContain('Manjakandriana')
     expect(out).toContain('Adressé par le')
+  })
+})
+
+/* ------------------------------------------------------------------ *
+ * Protecting clinical content
+ * ------------------------------------------------------------------ */
+
+describe('isProtectedSpan', () => {
+  const span = (text: string, needle: string) => {
+    const start = text.indexOf(needle)
+    return isProtectedSpan(text, start, start + needle.length)
+  }
+
+  it('protects a drug name the model reads as a surname', () => {
+    // Destroyed on the first real run: to a NER model `Paracétamol` is a
+    // capitalised token of no obvious class, which is what a surname is.
+    expect(span('prescrire Paracétamol 500 mg', 'Paracétamol')).toBe(true)
+    expect(span('take Artéméther luméfantrine', 'Artéméther')).toBe(true)
+  })
+
+  it('protects eponyms observed destroying real clinical entities', () => {
+    expect(span('lymphome malin non hodgkinien', 'hodgkinien')).toBe(true)
+    expect(span('hernie de Spiegel opérée', 'Spiegel')).toBe(true)
+    expect(span("Castleman's disease confirmed", 'Castleman')).toBe(true)
+    expect(span('Henoch-Schönlein purpura', 'Schönlein')).toBe(true)
+  })
+
+  it('matches an eponym stem through its French adjectival form', () => {
+    expect(span('forme hodgkinienne', 'hodgkinienne')).toBe(true)
+  })
+
+  it('protects an eponym it has never seen, from the construction alone', () => {
+    // The half that generalises: no list covers every eponym in medicine, but
+    // `maladie de X` and `X's disease` are few and recognisable.
+    expect(span('maladie de Kawasaki typique', 'Kawasaki')).toBe(true)
+    expect(span("Ormond's disease suspected", 'Ormond')).toBe(true)
+    expect(span('syndrome de Lemierre', 'Lemierre')).toBe(true)
+  })
+
+  it('does not protect an ordinary name', () => {
+    expect(span('adressé par le Dr Ramanantsoa', 'Ramanantsoa')).toBe(false)
+    expect(span('sa fille Hanta est venue', 'Hanta')).toBe(false)
+    expect(span('vu à Manjakandriana', 'Manjakandriana')).toBe(false)
+  })
+
+  it('does not protect a name merely because a disease word is nearby', () => {
+    // The construction has to be adjacent. "Rakoto" three words before
+    // "syndrome" is a patient, not an eponym.
+    expect(span('Rakoto présente depuis peu un syndrome grippal', 'Rakoto')).toBe(false)
+  })
+})
+
+describe('applyEntities with the guard', () => {
+  const at = (text: string, needle: string, label: string): NerEntity => {
+    const start = text.indexOf(needle)
+    return { label, start, end: start + needle.length, score: 0.99 }
+  }
+
+  it('keeps the diagnosis and removes the clinician', () => {
+    const text = 'Lymphome hodgkinien, adressé par le Dr Ramanantsoa'
+    const { text: out, redactions, protectedSpans } = applyEntities(text, [
+      at(text, 'hodgkinien', 'LASTNAME'),
+      at(text, 'Ramanantsoa', 'LASTNAME'),
+    ])
+
+    expect(out).toContain('hodgkinien')
+    expect(out).not.toContain('Ramanantsoa')
+    expect(redactions).toBe(1)
+    expect(protectedSpans).toBe(1)
+  })
+
+  it('keeps a prescription intact', () => {
+    const text = 'Paracétamol 500 mg trois fois par jour'
+    const { text: out, redactions } = applyEntities(text, [at(text, 'Paracétamol', 'LASTNAME')])
+    expect(out).toBe(text)
+    expect(redactions).toBe(0)
+  })
+
+  it('can be measured unguarded, so the guard\'s effect is attributable', () => {
+    const text = 'Lymphome hodgkinien'
+    const unguarded = applyEntities(text, [at(text, 'hodgkinien', 'LASTNAME')], {
+      protect: () => false,
+    })
+    expect(unguarded.redactions).toBe(1)
+    expect(unguarded.text).not.toContain('hodgkinien')
   })
 })
