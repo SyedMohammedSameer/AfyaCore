@@ -194,6 +194,16 @@ export interface Strings {
   dictationRemoteDisclosure: string
   dictationAcknowledge: string
   dictationRemoteActive: string
+  // On-device speech (Whisper). When this pack is installed there is no
+  // disclosure to make, because nothing leaves.
+  dictationLocalActive: string
+  dictationLocalPreparing: string
+  dictationLocalWorking: string
+  dictationLocalHint: string
+  speechPack: string
+  speechPackHint: string
+  speechPackReady: string
+  speechPackAbsent: string
   notLegalAdvice: string
   // Optional on-device PII model (OpenMed). An accuracy upgrade over the
   // deterministic scrub, never a replacement for it.
@@ -468,6 +478,14 @@ const fr: Strings = {
     'La dictée de ce navigateur envoie l’audio à un service de reconnaissance externe : la voix du patient, son nom et son diagnostic quittent l’appareil. La saisie manuelle fonctionne hors ligne et ne quitte jamais l’appareil.',
   dictationAcknowledge: 'J’ai compris, activer la dictée',
   dictationRemoteActive: 'Dictée externe active : l’audio quitte cet appareil.',
+  dictationLocalActive: 'Reconnaissance sur l’appareil : l’audio ne quitte pas ce téléphone.',
+  dictationLocalPreparing: 'Préparation du modèle…',
+  dictationLocalWorking: 'Transcription…',
+  dictationLocalHint: 'Marquez une pause entre les éléments : chaque phrase est transcrite à la volée.',
+  speechPack: 'Modèle de dictée',
+  speechPackHint: 'Transcrit la dictée sur l’appareil. Sans lui, la dictée du navigateur envoie l’audio à un service externe.',
+  speechPackReady: 'Modèle installé, la dictée reste sur l’appareil',
+  speechPackAbsent: 'Non installé. La dictée du navigateur envoie l’audio hors de l’appareil et reste soumise à autorisation. L’administrateur peut installer le modèle sur le serveur.',
   notLegalAdvice: 'Ces informations sont fournies à titre indicatif et n’ont pas été validées par un juriste de ce pays. Elles ne constituent pas un avis juridique.',
   piiPack: 'Modèle d’anonymisation',
   piiPackHint: 'Repère dans les notes les noms que le registre ne contient pas, par exemple un parent cité en passant. Le nettoyage de base fonctionne sans lui.',
@@ -735,6 +753,14 @@ const mg: Strings = {
     'Mandefa ny feo any amin’ny serivisy ivelany ity fandikana feo ity: mivoaka ny fitaovana ny feon’ny marary, ny anarany sy ny aretiny. Mandeha tsy misy aterineto ny fanoratana an-tanana ary tsy mivoaka mihitsy.',
   dictationAcknowledge: 'Azoko, alefaso ny fandikana feo',
   dictationRemoteActive: 'Mandeha ny fandikana feo ivelany: mivoaka ity fitaovana ity ny feo.',
+  dictationLocalActive: 'Fandikana feo eto amin’ny fitaovana: tsy mivoaka ny feo.',
+  dictationLocalPreparing: 'Manomana ny modely…',
+  dictationLocalWorking: 'Mandika…',
+  dictationLocalHint: 'Mijanona kely eo anelanelan’ny zavatra tenenina: dikaina tsirairay ny fehezanteny.',
+  speechPack: 'Modely fandikana feo',
+  speechPackHint: 'Mandika ny feo eto amin’ny fitaovana. Raha tsy misy izy, mandefa ny feo any ivelany ny fandikana an’ny navigateur.',
+  speechPackReady: 'Voapetraka ny modely, tsy mivoaka ny feo',
+  speechPackAbsent: 'Tsy voapetraka. Mandefa ny feo any ivelany ny fandikana an’ny navigateur ary mila fanomezan-dalana. Azon’ny mpitantana apetraka ao amin’ny serivera ny modely.',
   notLegalAdvice: 'Torohevitra fotsiny ireto vaovao ireto ary tsy nohamarinin’ny mpahay lalàna ao amin’ity firenena ity.',
   piiPack: 'Modely fanafenana anarana',
   piiPackHint: 'Mahita anarana tsy ao amin’ny rejisitra ao anaty naotra, ohatra havana voatonona. Miasa ihany ny fanadiovana fototra na tsy misy izy.',
@@ -1001,6 +1027,14 @@ const en: Strings = {
     'This browser’s dictation sends audio to an external recognition service: the patient’s voice, name and diagnosis leave the device. Typing works offline and never leaves the device.',
   dictationAcknowledge: 'Understood, enable dictation',
   dictationRemoteActive: 'External dictation active: audio leaves this device.',
+  dictationLocalActive: 'Recognised on this device. Audio does not leave the phone.',
+  dictationLocalPreparing: 'Preparing the model…',
+  dictationLocalWorking: 'Transcribing…',
+  dictationLocalHint: 'Pause between items: each sentence is transcribed as you go.',
+  speechPack: 'Dictation model',
+  speechPackHint: 'Transcribes dictation on the device. Without it, the browser’s dictation sends audio to an external service.',
+  speechPackReady: 'Model installed, dictation stays on the device',
+  speechPackAbsent: 'Not installed. The browser’s dictation sends audio off the device and stays behind an acknowledgement. An administrator can install the model on the server.',
   notLegalAdvice: 'Recorded for guidance and not reviewed by a lawyer in this jurisdiction. This is not legal advice.',
   piiPack: 'De-identification model',
   piiPackHint: 'Finds names in notes that the roster does not hold, such as a relative mentioned in passing. The deterministic scrub works without it.',

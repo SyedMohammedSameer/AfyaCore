@@ -21,6 +21,7 @@
     "eval:explain": "vite-node eval/run.mjs -- --explain",
     "vendor:ocr": "node scripts/vendor-ocr.mjs",
     "vendor:openmed": "node scripts/vendor-openmed.mjs",
+    "vendor:whisper": "node scripts/vendor-whisper.mjs",
     "vendor:e3c": "node scripts/vendor-e3c.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "smoke": "node scripts/smoke.mjs",

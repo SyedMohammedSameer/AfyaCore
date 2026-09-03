@@ -14,12 +14,22 @@
  *
  * ## How it behaves
  *
- * - Where the browser can recognise **on-device** (Chrome 138+ with the
- *   language pack installed), nothing leaves and no acknowledgement is asked
- *   for. There is nothing to disclose.
+ * Three outcomes, tried in this order:
+ *
+ * - Where a **Whisper pack is installed** on this origin (`npm run
+ *   vendor:whisper`) and covers the clinical language, transcription runs in
+ *   a worker on the device. Nothing leaves, and there is nothing to disclose.
+ *   This is the path the app is meant to run on.
+ * - Where the **browser** can recognise on-device (Chrome 138+ with the
+ *   language pack installed), the same is true without any download.
  * - Otherwise dictation is **off** until an administrator acknowledges, once,
  *   that audio leaves the device. The acknowledgement is audited and can be
  *   withdrawn.
+ *
+ * The order is deliberate. The vendored pack is checked first because it is
+ * the only option the facility controls: browser on-device recognition can
+ * disappear with an update or a wiped language pack, and it does so silently,
+ * whereas a file on the facility's own server is either there or it is not.
  *
  * Not a per-consultation prompt: a dialog that appears fifty times a day is
  * clicked through without reading by lunchtime, which produces a record of
@@ -33,6 +43,7 @@
  * function — which is what makes it honest to ask rather than to assume.
  */
 import { db } from '../db/db'
+import { installedPack, packSupports, type Pack } from './asr'
 import { recordAudit } from './audit'
 import { recogniser, type RecogniserLang, type RecognitionMode } from './speech'
 
@@ -41,14 +52,35 @@ const KEY = 'dictation.remoteAcknowledged'
 export type DictationState =
   /** No recogniser in this browser at all. */
   | { status: 'unavailable' }
-  /** Recognition happens on the device. Nothing to disclose. */
+  /** A vendored model transcribes here, in a worker. Nothing to disclose. */
+  | { status: 'local-model'; pack: Pack }
+  /** The browser recognises on the device. Nothing to disclose. */
   | { status: 'on-device' }
   /** Audio would leave, and nobody has acknowledged that. Dictation is off. */
   | { status: 'needs-disclosure' }
   /** Audio leaves, and the facility has said so knowingly. */
   | { status: 'remote-acknowledged'; at: number }
 
-export async function dictationState(lang: RecogniserLang): Promise<DictationState> {
+export interface DictationStateOptions {
+  /** Injected for tests, and so a caller can probe without a live origin. */
+  findPack?: typeof installedPack
+}
+
+export async function dictationState(
+  lang: RecogniserLang,
+  options: DictationStateOptions = {},
+): Promise<DictationState> {
+  const findPack = options.findPack ?? installedPack
+
+  // Checked before `recogniser.available`: the local path needs a microphone
+  // and a worker, not the browser's Web Speech API, so a browser without one
+  // can still dictate. Restricted to languages the model actually handles —
+  // see `packSupports`, and the note there about Malagasy.
+  if (packSupports(lang)) {
+    const pack = await findPack()
+    if (pack) return { status: 'local-model', pack }
+  }
+
   if (!recogniser.available) return { status: 'unavailable' }
 
   const mode: RecognitionMode = await recogniser.modeFor(lang)
@@ -61,7 +93,24 @@ export async function dictationState(lang: RecogniserLang): Promise<DictationSta
 
 /** True when dictation may run at all. The one call a component needs. */
 export function dictationAllowed(state: DictationState): boolean {
-  return state.status === 'on-device' || state.status === 'remote-acknowledged'
+  return (
+    state.status === 'local-model' ||
+    state.status === 'on-device' ||
+    state.status === 'remote-acknowledged'
+  )
+}
+
+/**
+ * True when audio would leave the device in this state.
+ *
+ * The one question the UI, the audit log and the compliance document all ask,
+ * answered in one place. Written as an allowlist of the states that keep audio
+ * local rather than a denylist of the ones that do not: a state added later
+ * defaults to "this sends audio somewhere", which is the direction an
+ * incomplete answer should fail in.
+ */
+export function dictationLeavesDevice(state: DictationState): boolean {
+  return state.status !== 'local-model' && state.status !== 'on-device'
 }
 
 export async function acknowledgeRemoteDictation(accepted: boolean): Promise<void> {

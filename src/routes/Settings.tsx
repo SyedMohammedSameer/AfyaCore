@@ -11,6 +11,7 @@ import { toFhirBundle } from '../lib/fhir'
 import { aggregateMonth, toAggregateCsv, toDhis2DataValueSet, indicatorLabel } from '../lib/dhis2'
 import { isOcrReady, preloadOcr } from '../lib/ocr'
 import { isModelAvailable, loadBackend } from '../lib/openmed'
+import { installedPack, PACK_SIZES, type Pack } from '../lib/asr'
 import { recordAudit } from '../lib/audit'
 import { PrivacySelector } from '../components/PrivacySelector'
 import { SyncPanel } from '../components/SyncPanel'
@@ -109,9 +110,11 @@ export function Settings() {
   }
 
   const [piiState, setPiiState] = useState<'absent' | 'checking' | 'ready'>('checking')
+  const [speechPack, setSpeechPack] = useState<Pack | null | 'checking'>('checking')
 
   useEffect(() => {
     isModelAvailable().then((ready) => setPiiState(ready ? 'ready' : 'absent'))
+    installedPack().then(setSpeechPack)
   }, [])
 
   async function prepareRecords() {
@@ -287,6 +290,31 @@ export function Settings() {
               </Button>
             )}
             {ocrState === 'error' && <p className="text-sm text-danger-700">{t.ocrFailed}</p>}
+          </Card>
+        </section>
+
+        <section>
+          <SectionTitle>{t.speechPack}</SectionTitle>
+          <Card className="flex flex-col gap-3">
+            <p className="text-sm text-ink-2">{t.speechPackHint}</p>
+            {speechPack === 'checking' ? (
+              <p className="text-sm text-ink-4">…</p>
+            ) : speechPack ? (
+              <p className="flex items-center gap-2 font-semibold text-ok-700">
+                <CheckCircle2 size={20} />
+                {t.speechPackReady}
+                <span className="font-normal text-ink-3">
+                  ({speechPack}, {PACK_SIZES[speechPack]})
+                </span>
+              </p>
+            ) : (
+              // No download button here either, and for the same reason as the
+              // de-identification model: the deployer places it on the server
+              // with `npm run vendor:whisper`. A phone on the connections this
+              // project targets cannot reach the Hub, which is why it is
+              // self-hosted in the first place.
+              <p className="text-sm text-ink-3">{t.speechPackAbsent}</p>
+            )}
           </Card>
         </section>
 
