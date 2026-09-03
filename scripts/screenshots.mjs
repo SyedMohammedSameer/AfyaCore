@@ -57,6 +57,21 @@ async function settle(page) {
   await sleep(700)
 }
 
+/** Scroll the first element whose text matches into view, then let it settle. */
+async function scrollTo(page, pattern) {
+  const found = await page.evaluate((src) => {
+    const re = new RegExp(src, 'i')
+    const el = [...document.querySelectorAll('h2, h3, button, label, section')].find((node) =>
+      re.test((node.textContent ?? '').trim()),
+    )
+    if (!el) return false
+    el.scrollIntoView({ block: 'center' })
+    return true
+  }, pattern.source ?? pattern)
+  if (!found) throw new Error(`nothing on the page matching ${pattern}`)
+  await sleep(500)
+}
+
 async function shot(page, name) {
   const path = join(OUT, `${name}.${FORMAT}`)
   await page.screenshot({ path, type: FORMAT, quality: QUALITY })
@@ -207,6 +222,14 @@ async function main() {
 
     await visit(page, `${BASE}/reports`)
     await shot(page, 'desktop-settings')
+
+    // The reporting controls live below the fold on a 900px viewport, so the
+    // shot above shows storage and model settings and none of the thing the
+    // page is named for. Scroll to them and take a second frame: the monthly
+    // DHIS2 return and the de-identified research export are the two exports
+    // a ministry and an ethics committee respectively ask about.
+    await scrollTo(page, /monthly report/i)
+    await shot(page, 'desktop-reports')
 
     console.log('mobile:')
     await page.setViewport(MOBILE)
