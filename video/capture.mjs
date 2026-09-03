@@ -24,8 +24,10 @@
  *   npm run build && npm run preview     # in the repo root
  *   npm --prefix video run capture
  */
+import { execFile, spawn } from 'node:child_process'
 import { copyFile, mkdir, readdir, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import puppeteer from '../node_modules/puppeteer-core/lib/puppeteer/puppeteer-core.js'
 import { findChrome } from '../scripts/find-chrome.mjs'
@@ -35,6 +37,10 @@ const repo = join(here, '..')
 const SHOTS = join(repo, 'docs', 'screenshots')
 const PUBLIC = join(here, 'public')
 const BASE = process.env.AFYACORE_URL ?? 'http://localhost:4173'
+const SYNC_PORT = Number(process.env.AFYACORE_SYNC_PORT ?? 8788)
+const SYNC_URL = `http://localhost:${SYNC_PORT}`
+const FACILITY = 'CSB2-Ambohidratrimo'
+const run = promisify(execFile)
 
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -90,6 +96,103 @@ async function copyScreens() {
 }
 
 /**
+ * A throwaway sync server, so the status chip has something true to say.
+ *
+ * The first cut of the offline sequence never enrolled the device, and the
+ * consequence only showed up when the rendered frames were compared side by
+ * side: with no server configured the chip reads "Saved on device" whether the
+ * network is up or down, so the online and offline shots were pixel-identical
+ * in the one place a viewer would look to tell them apart. The captions
+ * asserted a state change the frames did not show.
+ *
+ * Enrolling against a real server fixes that at the source rather than with an
+ * overlay. The chip goes from a green "All synced" to a grey "Offline" because
+ * the app worked out it was offline, which is the whole point of the beat, and
+ * the walk now also proves enrolment and a push actually work end to end.
+ *
+ * The database is thrown away on every run, so this leaves nothing behind.
+ */
+async function startSyncServer() {
+  const dbDir = join(here, '.capture')
+  const dbPath = join(dbDir, 'sync.db')
+  await rm(dbDir, { recursive: true, force: true })
+  await mkdir(dbDir, { recursive: true })
+
+  const env = {
+    ...process.env,
+    AFYACORE_DB: dbPath,
+    PORT: String(SYNC_PORT),
+    // The app is served from a different port, so the browser treats sync as
+    // cross-origin. The server refuses every origin it was not told about.
+    AFYACORE_ALLOWED_ORIGINS: BASE,
+  }
+
+  const child = spawn('node', [join(repo, 'server', 'sync-server.mjs')], { env, stdio: 'ignore' })
+  const stop = () => {
+    child.kill('SIGTERM')
+  }
+
+  try {
+    for (let i = 0; i < 60; i++) {
+      try {
+        const res = await fetch(`${SYNC_URL}/health`)
+        if (res.ok) break
+      } catch {
+        // not listening yet
+      }
+      if (i === 59) throw new Error(`sync server did not start on ${SYNC_URL}`)
+      await sleep(250)
+    }
+
+    const cli = (...args) => run('node', [join(repo, 'server', 'cli.mjs'), ...args], { env })
+    await cli('facility:add', FACILITY, 'CSB2 Ambohidratrimo', 'MG')
+    const { stdout } = await cli('enrol:code', FACILITY)
+    const code = stdout.match(/enrolment code:\s+(\S+)/)?.[1]
+    if (!code) throw new Error(`could not read an enrolment code from:\n${stdout}`)
+
+    console.log(`  sync      server on ${SYNC_URL}, facility ${FACILITY}`)
+    return { code, stop }
+  } catch (err) {
+    stop()
+    throw err
+  }
+}
+
+/** Enrol through the real Settings form, the way a nurse would. */
+async function enrolDevice(page, code) {
+  await page.goto(`${BASE}/settings`, { waitUntil: 'networkidle2' })
+  await settle(page)
+  await unlockIfNeeded(page)
+
+  const url = await page.waitForSelector('input[placeholder="https://sync.example.org"]')
+  await url.click()
+  await url.type(SYNC_URL)
+  // The form persists the URL on blur, and the enrol button stays disabled
+  // until it is set.
+  await page.evaluate(() => document.activeElement?.blur())
+
+  const codeInput = await page.waitForSelector('input[placeholder="ABCD-2345"]')
+  await codeInput.click()
+  await codeInput.type(code)
+
+  await clickText(page, 'button', /enrol this device/)
+  await page.waitForFunction(
+    () => /device enrolled/i.test(document.body.textContent ?? ''),
+    { timeout: 20_000 },
+  )
+
+  // Push what is already on the device, so the chip can honestly say everything
+  // is synced rather than counting a backlog.
+  await clickText(page, 'button', /sync now/)
+  await page.waitForFunction(
+    () => !/syncing/i.test(document.body.textContent ?? ''),
+    { timeout: 30_000 },
+  )
+  await sleep(400)
+  console.log('  sync      device enrolled and pushed')
+}
+
+/**
  * The offline sequence, captured live.
  *
  * A still cannot show that the network is off and the app still works, so this
@@ -101,6 +204,7 @@ async function captureOffline() {
   await rm(dest, { recursive: true, force: true })
   await mkdir(dest, { recursive: true })
 
+  const sync = await startSyncServer()
   const browser = await puppeteer.launch({
     executablePath: await findChrome(),
     headless: 'new',
@@ -134,6 +238,8 @@ async function captureOffline() {
     await clickText(page, 'button', /load demo/)
     await sleep(600)
 
+    await enrolDevice(page, sync.code)
+
     await page.goto(`${BASE}/patients`, { waitUntil: 'networkidle2' })
     await settle(page)
     await unlockIfNeeded(page)
@@ -156,6 +262,7 @@ async function captureOffline() {
     await shot('offline-roster-again')
   } finally {
     await browser.close()
+    sync.stop()
   }
 }
 

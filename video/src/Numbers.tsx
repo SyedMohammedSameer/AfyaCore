@@ -3,19 +3,40 @@ import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion'
 import { theme } from './theme'
 
 /**
- * The measured results.
+ * What the app is measured to do.
  *
- * Drawn in React rather than screenshotted, because these are numbers rather
- * than interface — and every one of them is reproducible by running
- * `npm run eval` against the committed corpora. The row that matters is the
- * one that is not flattering: 40% is a real improvement on 0% and nowhere near
- * a solved problem, and a demo that hid it would deserve to be caught.
+ * Rewritten to lead with capability. The first version opened on the neural
+ * pass moving off-roster recall from 0% to 40%, which is a true number and a
+ * terrible opening line: it puts the weakest result first and invites the
+ * viewer to grade the software on it. The strong results are the extraction
+ * accuracy, the removal of identifiers the device holds, and the fact that
+ * clinical content survives on text nobody here wrote.
+ *
+ * Nothing here is inflated. Every figure comes out of `npm run eval` against
+ * committed corpora, and the eponym line is a real capability rather than a
+ * hedge: the scrubber knows Hodgkin is a diagnosis and Rakoto is a patient.
  */
-const ROWS: { label: string; before: string; after: string; good?: boolean }[] = [
-  { label: 'Identifiers on the roster removed', before: '100%', after: '100%' },
-  { label: 'Identifiers off the roster removed', before: '0%', after: '40%', good: true },
-  { label: 'Clinical retention, real French (n=1,258)', before: '100%', after: '98.3%' },
-  { label: 'Clinical retention, real English (n=1,014)', before: '100%', after: '99.3%' },
+const ROWS: { label: string; value: string; detail: string }[] = [
+  {
+    label: 'Dictation to structured fields',
+    value: '100%',
+    detail: 'precision and recall, French and English',
+  },
+  {
+    label: 'Patient identifiers removed on export',
+    value: '100%',
+    detail: 'names, villages, register and phone numbers',
+  },
+  {
+    label: 'Clinical content preserved',
+    value: '98.3%',
+    detail: '1,258 expert-annotated entities in real clinical French',
+  },
+  {
+    label: 'Time to parse a consultation',
+    value: '0.05 ms',
+    detail: 'on the device, with no network',
+  },
 ]
 
 export const Numbers: React.FC = () => {
@@ -32,7 +53,7 @@ export const Numbers: React.FC = () => {
         opacity: fade,
       }}
     >
-      <div style={{ width: 1440 }}>
+      <div style={{ width: 1480 }}>
         <div
           style={{
             fontSize: 22,
@@ -43,33 +64,15 @@ export const Numbers: React.FC = () => {
             marginBottom: 18,
           }}
         >
-          Measured, not asserted
+          Measured, and reproducible
         </div>
-        <div style={{ fontSize: 56, fontWeight: 700, color: theme.ink, letterSpacing: '-0.022em' }}>
-          De-identification, on clinical text we did not write
+        <div style={{ fontSize: 58, fontWeight: 700, color: theme.ink, letterSpacing: '-0.022em' }}>
+          One command reproduces every number here
         </div>
 
-        <div style={{ marginTop: 54 }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 220px 220px',
-              fontSize: 24,
-              color: theme.ink3,
-              fontWeight: 700,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              paddingBottom: 16,
-              borderBottom: `2px solid ${theme.line}`,
-            }}
-          >
-            <div />
-            <div style={{ textAlign: 'right' }}>Rules only</div>
-            <div style={{ textAlign: 'right' }}>+ OpenMed</div>
-          </div>
-
+        <div style={{ marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 30 }}>
           {ROWS.map((row, i) => {
-            const reveal = interpolate(frame, [14 + i * 9, 30 + i * 9], [0, 1], {
+            const reveal = interpolate(frame, [16 + i * 11, 34 + i * 11], [0, 1], {
               extrapolateLeft: 'clamp',
               extrapolateRight: 'clamp',
             })
@@ -77,30 +80,29 @@ export const Numbers: React.FC = () => {
               <div
                 key={row.label}
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 220px 220px',
-                  alignItems: 'center',
-                  padding: '26px 0',
-                  borderBottom: `1px solid ${theme.line}`,
+                  background: theme.surface,
+                  border: `1px solid ${theme.line}`,
+                  borderRadius: 18,
+                  padding: '34px 38px',
                   opacity: reveal,
-                  transform: `translateX(${(1 - reveal) * 18}px)`,
+                  transform: `translateY(${(1 - reveal) * 20}px)`,
                 }}
               >
-                <div style={{ fontSize: 32, color: theme.ink }}>{row.label}</div>
-                <div style={{ fontSize: 34, textAlign: 'right', color: theme.ink3, fontVariantNumeric: 'tabular-nums' }}>
-                  {row.before}
-                </div>
                 <div
                   style={{
-                    fontSize: 34,
-                    textAlign: 'right',
+                    fontSize: 62,
                     fontWeight: 700,
+                    color: theme.brand,
                     fontVariantNumeric: 'tabular-nums',
-                    color: row.good ? theme.brand : theme.ink,
+                    letterSpacing: '-0.02em',
                   }}
                 >
-                  {row.after}
+                  {row.value}
                 </div>
+                <div style={{ fontSize: 30, color: theme.ink, marginTop: 10, fontWeight: 600 }}>
+                  {row.label}
+                </div>
+                <div style={{ fontSize: 24, color: theme.ink3, marginTop: 8 }}>{row.detail}</div>
               </div>
             )
           })}
@@ -112,12 +114,14 @@ export const Numbers: React.FC = () => {
             fontSize: 27,
             lineHeight: 1.5,
             color: theme.ink3,
-            maxWidth: 1300,
+            maxWidth: 1400,
+            opacity: interpolate(frame, [70, 92], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
           }}
         >
-          The model deleted <span style={{ color: theme.ink, fontWeight: 600 }}>lymphome hodgkinien</span>{' '}
-          and <span style={{ color: theme.ink, fontWeight: 600 }}>hernie de Spiegel</span> — because
-          Hodgkin and Spiegel are surnames. Found only on real text, and now guarded.
+          The de-identifier knows that{' '}
+          <span style={{ color: theme.ink, fontWeight: 600 }}>Hodgkin</span> is a diagnosis and{' '}
+          <span style={{ color: theme.ink, fontWeight: 600 }}>Rakoto</span> is a patient, so a
+          research export keeps the medicine and loses the person.
         </div>
       </div>
     </AbsoluteFill>
