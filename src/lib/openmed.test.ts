@@ -493,3 +493,111 @@ describe('applyEntities with the guard', () => {
     expect(unguarded.text).not.toContain('hodgkinien')
   })
 })
+
+describe('the guard survives span merging', () => {
+  const at = (text: string, needle: string, label: string): NerEntity => {
+    const start = text.indexOf(needle)
+    return { label, start, end: start + needle.length, score: 0.99 }
+  }
+
+  it('protects a drug adjacent to another tagged token', () => {
+    // The bug this reproduces: mergeSpans joins anything separated only by
+    // whitespace, so guarding after the merge saw `paracétamol si fièvre`,
+    // which matches no formulary entry, and the drug was destroyed while the
+    // guard reported itself as working. Guarding before the merge is the fix.
+    const text = 'Artéméther luméfantrine matin et soir, paracétamol si fièvre'
+    const { text: out, protectedSpans } = applyEntities(text, [
+      at(text, 'paracétamol', 'LASTNAME'),
+      at(text, 'si', 'LASTNAME'),
+      at(text, 'fièvre', 'LASTNAME'),
+    ])
+
+    expect(out).toContain('paracétamol')
+    expect(protectedSpans).toBeGreaterThan(0)
+  })
+
+  it('protects an eponym carrying a preposition into the span', () => {
+    const text = 'hernie de Spiegel opérée en 2019'
+    const { text: out } = applyEntities(text, [
+      at(text, 'de', 'LASTNAME'),
+      at(text, 'Spiegel', 'LASTNAME'),
+    ])
+    expect(out).toContain('Spiegel')
+  })
+
+  it("protects an eponym carrying a possessive", () => {
+    const text = "Castleman's disease confirmed on biopsy"
+    const { text: out } = applyEntities(text, [at(text, "Castleman's", 'LASTNAME')])
+    expect(out).toContain('Castleman')
+  })
+
+  it('still merges and redacts a genuine multi-part name', () => {
+    // The guard must not become a general veto: two adjacent tagged tokens
+    // that are neither drug nor eponym still merge into one redaction.
+    const text = 'adressé par Jean Baptiste Ramanantsoa'
+    const { text: out, redactions } = applyEntities(text, [
+      at(text, 'Jean', 'FIRSTNAME'),
+      at(text, 'Baptiste', 'MIDDLENAME'),
+      at(text, 'Ramanantsoa', 'LASTNAME'),
+    ])
+    expect(out).toBe('adressé par […]')
+    expect(redactions).toBe(1)
+  })
+
+  it('redacts the name and keeps the drug when both are in one run', () => {
+    const text = 'Dr Rakoto a prescrit paracétamol'
+    const { text: out } = applyEntities(text, [
+      at(text, 'Rakoto', 'LASTNAME'),
+      at(text, 'paracétamol', 'LASTNAME'),
+    ])
+    expect(out).not.toContain('Rakoto')
+    expect(out).toContain('paracétamol')
+  })
+})
+
+describe('the guard must not rescue a real name', () => {
+  const at = (text: string, needle: string, label: string): NerEntity => {
+    const start = text.indexOf(needle)
+    return { label, start, end: start + needle.length, score: 0.99 }
+  }
+
+  it('redacts a surname that happens to sit beside an eponym', () => {
+    // `Gilbert` is a syndrome and a surname. Guarding after the merge, this
+    // span is one unit, the guard sees `gilbert`, and Ramanantsoa survives —
+    // a privacy failure created by a guard meant to protect clinical content.
+    const text = 'adressé par le Dr Gilbert Ramanantsoa'
+    const { text: out } = applyEntities(text, [
+      at(text, 'Gilbert', 'FIRSTNAME'),
+      at(text, 'Ramanantsoa', 'LASTNAME'),
+    ])
+    expect(out).not.toContain('Ramanantsoa')
+  })
+
+  it('does not protect an ambiguous eponym used as a plain name', () => {
+    const text = 'vu par Gilbert Rakoto ce matin'
+    const start = text.indexOf('Gilbert')
+    expect(isProtectedSpan(text, start, start + 'Gilbert'.length)).toBe(false)
+  })
+
+  it('does protect the same word inside its construction', () => {
+    const text = 'maladie de Gilbert connue'
+    const start = text.indexOf('Gilbert')
+    expect(isProtectedSpan(text, start, start + 'Gilbert'.length)).toBe(true)
+  })
+
+  it('redacts a name that dictation ran together with a drug', () => {
+    // The case that makes the guard's *position* matter rather than its
+    // contents. A speech recogniser drops the comma, so "paracétamol, Hanta
+    // revient demain" arrives with the drug and the relative's name adjacent.
+    // Guarding after the merge, they are one span; the span contains a
+    // formulary drug; the whole thing is protected; the name survives. The
+    // guard would be leaking a name in order to save a drug.
+    const text = 'paracétamol Hanta revient demain'
+    const { text: out } = applyEntities(text, [
+      at(text, 'paracétamol', 'LASTNAME'),
+      at(text, 'Hanta', 'FIRSTNAME'),
+    ])
+    expect(out).toContain('paracétamol')
+    expect(out).not.toContain('Hanta')
+  })
+})

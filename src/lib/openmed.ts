@@ -153,16 +153,33 @@ export const DEFAULT_MIN_SCORE = 0.35
 export const EPONYM_STEMS = [
   // Observed destroying real clinical content in the E3C run.
   'hodgkin', 'spiegel', 'castleman', 'henoch', 'schonlein',
-  // Common enough in primary care and secondary referral notes to be worth
-  // pre-empting rather than waiting to observe.
-  'crohn', 'parkinson', 'alzheimer', 'basedow', 'cushing', 'addison',
-  'kaposi', 'burkitt', 'wilms', 'ewing', 'paget', 'raynaud', 'reye',
-  'guillain', 'barre', 'wernicke', 'korsakoff', 'marfan', 'klinefelter',
-  'duchenne', 'charcot', 'fallot', 'quincke', 'osler', 'behcet', 'perthes',
-  'pott', 'chagas', 'hirschsprung', 'meckel', 'barrett', 'buerger',
-  'dupuytren', 'hashimoto', 'sjogren', 'wegener', 'goodpasture', 'alport',
-  'fanconi', 'whipple', 'mallory', 'boerhaave', 'zollinger', 'ellison',
-  'conn', 'sheehan', 'plummer', 'vinson', 'ludwig', 'koplik', 'gilbert',
+  // Common enough in primary care and referral notes to pre-empt rather than
+  // wait to observe. Every one of these is a word a clinician would not use
+  // for anything but the disease.
+  'crohn', 'alzheimer', 'basedow', 'cushing', 'addison', 'kaposi', 'burkitt',
+  'wilms', 'ewing', 'raynaud', 'wernicke', 'korsakoff', 'marfan',
+  'klinefelter', 'duchenne', 'charcot', 'fallot', 'quincke', 'behcet',
+  'perthes', 'hirschsprung', 'meckel', 'barrett', 'buerger', 'dupuytren',
+  'hashimoto', 'sjogren', 'wegener', 'goodpasture', 'fanconi', 'boerhaave',
+  'zollinger', 'ellison', 'guillain', 'chagas', 'hodgkinien', 'parkinson',
+]
+
+/**
+ * Eponyms that are also ordinary names, protected only in context.
+ *
+ * `Gilbert` is a syndrome and a surname. `Paget`, `Pott`, `Conn`, `Barré`,
+ * `Ludwig` and `Still` are the same. Matching these bare would protect a real
+ * person: with span merging, `Dr Gilbert Ramanantsoa` becomes one span, the
+ * guard sees `gilbert`, and the whole span survives — including the surname it
+ * was supposed to remove. That is a privacy failure introduced by a guard
+ * meant to protect clinical content, which is the worst way to lose a name.
+ *
+ * So these require the eponymous construction around them — `maladie de
+ * Gilbert`, `Paget's disease` — where the surrounding words settle it.
+ */
+const CONTEXTUAL_EPONYMS = [
+  'gilbert', 'paget', 'pott', 'conn', 'barre', 'ludwig', 'vinson', 'plummer',
+  'sheehan', 'whipple', 'mallory', 'alport', 'osler', 'reye', 'koplik', 'still',
 ]
 
 /**
@@ -216,16 +233,31 @@ export function isProtectedSpan(text: string, start: number, end: number): boole
   const slice = normalised.trim()
   if (!slice) return false
 
+  const before = normaliseForAlignment(text.slice(Math.max(0, start - 40), start)).normalised
+  const after = normaliseForAlignment(text.slice(end, end + 30)).normalised
+  const inConstruction = EPONYM_BEFORE.test(before) || EPONYM_AFTER.test(after)
+  if (inConstruction) return true
+
   if (getProtectedTerms().has(slice)) return true
-  for (const stem of EPONYM_STEMS) {
-    if (slice === stem || slice.startsWith(stem)) return true
+
+  // Word-aware as well as whole-slice, so `de Spiegel` and `Castleman's` are
+  // caught when a span carries a preposition or a possessive with the name.
+  // Only sound because the guard runs before the merge, where a span is one
+  // entity rather than a run of them — post-merge, one protected word would
+  // rescue every name merged alongside it.
+  const words = slice.split(/[\s'’-]+/).filter(Boolean)
+  for (const word of words) {
+    if (getProtectedTerms().has(word)) return true
+    for (const stem of EPONYM_STEMS) {
+      if (word === stem || word.startsWith(stem)) return true
+    }
+    for (const stem of CONTEXTUAL_EPONYMS) {
+      // Bare match is not enough for these: they are ordinary names too.
+      if ((word === stem || word.startsWith(stem)) && inConstruction) return true
+    }
   }
 
-  const before = normaliseForAlignment(text.slice(Math.max(0, start - 40), start)).normalised
-  if (EPONYM_BEFORE.test(before)) return true
-
-  const after = normaliseForAlignment(text.slice(end, end + 30)).normalised
-  return EPONYM_AFTER.test(after)
+  return false
 }
 
 export interface NeuralScrubOptions {
@@ -291,7 +323,7 @@ export function applyEntities(
     protect = isProtectedSpan,
   } = options
 
-  const keep = entities.filter(
+  const candidates = entities.filter(
     (e) =>
       e.score >= minScore &&
       labels.has(e.label.toUpperCase()) &&
@@ -300,22 +332,37 @@ export function applyEntities(
       e.end <= text.length,
   )
 
+  /*
+   * The guard runs BEFORE the merge, and the ordering is the whole point.
+   *
+   * `mergeSpans` joins anything separated only by whitespace or a hyphen, so a
+   * protected word next to a tagged one is swallowed into a longer span:
+   * `paracétamol` became `paracétamol si fièvre`, and `Spiegel` became
+   * `de Spiegel`. Neither of those matches a formulary entry or an eponym
+   * stem, so a guard applied after merging silently failed on exactly the
+   * terms it was written for — the drug and the eponym both stayed on the
+   * destroyed list while the guard reported itself as working.
+   *
+   * Vetoing candidates first means a protected term is never a candidate, so
+   * it cannot be absorbed, and the merge only ever joins spans that are all
+   * genuinely redactable.
+   */
+  let protectedSpans = 0
+  const keep = candidates.filter((e) => {
+    if (!protect(text, e.start, e.end)) return true
+    protectedSpans++
+    return false
+  })
+
   const spans = mergeSpans(keep, text)
   let out = text
   let redactions = 0
-  let protectedSpans = 0
 
   for (const [start, end] of [...spans].reverse()) {
     // Text already replaced by the deterministic pass is left alone: redacting
     // a redaction marker would double-count and produce "[…][…]".
     const slice = out.slice(start, end)
     if (slice === redacted || slice.trim() === '') continue
-    // A drug name or a disease named after its describer is clinical content,
-    // whatever label the model put on it. See isProtectedSpan.
-    if (protect(text, start, end)) {
-      protectedSpans++
-      continue
-    }
     out = out.slice(0, start) + redacted + out.slice(end)
     redactions++
   }
