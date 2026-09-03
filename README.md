@@ -10,7 +10,7 @@
   <a href="https://github.com/SyedMohammedSameer/AfyaCore/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/SyedMohammedSameer/AfyaCore/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="Licence: MIT" src="https://img.shields.io/badge/licence-MIT-0d8b7d.svg"></a>
   <img alt="PWA" src="https://img.shields.io/badge/PWA-installable-0d8b7d.svg">
-  <img alt="Bundle" src="https://img.shields.io/badge/initial%20load-~137%20kB%20gzip-0d8b7d.svg">
+  <img alt="Bundle" src="https://img.shields.io/badge/initial%20load-~139%20kB%20gzip-0d8b7d.svg">
   <img alt="Offline" src="https://img.shields.io/badge/offline-first-0d8b7d.svg">
 </p>
 
@@ -18,11 +18,35 @@
   <img src="docs/screenshots/desktop-today.webp" alt="AfyaCore dashboard on a laptop" width="820">
 </p>
 
-> **Status: pilot candidate.** Not yet validated with a facility or an NGO. The sync server now
-> authenticates devices and keeps a tamper-evident audit trail; records are still stored unencrypted
-> on the device. See [Known limits](#known-limits) and [SECURITY.md](SECURITY.md).
+> **Status: pilot candidate, `0.0.2`.** Not yet validated with a facility or an NGO, and no clinician
+> has used it. Records are stored unencrypted on the device. An external review in September 2026
+> found five release blockers — dictation sending audio off-device while the docs claimed otherwise,
+> rejected sync records silently marked as synced, "anonymous" exports that were still linkable,
+> role permissions declared but not enforced, and invalid FHIR identifiers — all now fixed, each
+> with a regression test named after the failure. See [Known limits](#known-limits),
+> [SECURITY.md](SECURITY.md) and [docs/COMPLIANCE.md](docs/COMPLIANCE.md).
 
 ---
+
+## What review found
+
+`0.0.2` exists because an external review read the whole repository and found
+five things the code did that the documentation denied. Every one is fixed and
+every one has a regression test named after the failure, because the pattern
+across all five was the same: a control that was **described more favourably
+than it behaved**, and nothing that failed when it did.
+
+| Found | Was | Now |
+|---|---|---|
+| Dictation | Audio streamed to the browser vendor while SECURITY.md claimed no third-party call at runtime | On-device where the browser supports it; otherwise off until acknowledged, audited, withdrawable |
+| Sync conflicts | A record the server rejected was marked as synced, and the pull could never correct it — permanent silent divergence | The canonical row travels with the rejection and converges; rejected rows are never acknowledged |
+| "Anonymous" exports | Stable encounter and prescription ids, exact row timestamps, and prescription notes never scrubbed at all | All ids pseudonymised per export, row timestamps dropped, notes scrubbed |
+| Role permissions | Declared in a matrix that only components consulted, and Settings did not | Enforced at the service boundary; a clinician cannot export identified, delete, repoint sync or erase |
+| FHIR ids | 73 characters against R4's 64-char limit, and `urn:uuid:` on things that were not UUIDs | Folded to a stable legal id; the compliance claim downgraded until a validator has actually run |
+
+Three of the five were invisible at the levels most often exercised — the FHIR
+overflow only bites identified exports, the export linkage only shows up when
+you diff two files — which is the argument for having somebody else read it.
 
 ## The app
 
@@ -38,6 +62,15 @@ Every screenshot below is the real build against the synthetic demo workspace, r
 |---|---|---|
 | <img src="docs/screenshots/mobile-lock.webp" alt="PIN entry lock screen" width="240"> | <img src="docs/screenshots/mobile-review.webp" alt="Review screen showing per-field provenance" width="240"> | <img src="docs/screenshots/mobile-instructions.webp" alt="Patient instruction sheet in Malagasy with dosing icons" width="240"> |
 | A shared phone needs to know who is holding it, or the audit trail says "someone at this facility". | Per-field provenance. Low-confidence values are flagged *Check this* before anything is saved. | Rendered in the **patient's** language, with dosing icons for anyone who cannot read. |
+
+The one screen worth dwelling on. The browser's dictation sends audio to the vendor's recognition
+service, so the microphone is **not offered** until somebody accountable for the facility's data
+says that is acceptable — and once it is, a reminder stays on screen for as long as it is in force:
+
+| Before acknowledgement | After |
+|---|---|
+| <img src="docs/screenshots/mobile-dictation-disclosure.webp" alt="Dictation disclosure: audio leaves the device" width="240"> | <img src="docs/screenshots/mobile-encounter.webp" alt="Consultation capture with the dictation panel active" width="240"> |
+| No microphone. Typing works offline and never leaves the device, so refusing costs typing speed rather than function. | Audited, withdrawable, and never silent about what it is doing. |
 
 The same build on a laptop, where the roster becomes a rail and the reporting screen has room to
 breathe:
@@ -397,9 +430,9 @@ dependency (~7 MB) and it is downloaded only when someone asks for it. Every mod
 [`docs/MODEL-RESEARCH.md`](docs/MODEL-RESEARCH.md) is an upgrade path behind an interface, not a
 launch blocker, which is what keeps the install small enough for a 2G connection.
 
-Initial download: **~137 kB gzipped** (the entry chunk and its stylesheet) plus a 45 kB font.
+Initial download: **~139 kB gzipped** (the entry chunk and its stylesheet) plus a 45 kB font.
 Routes beyond the home screen load on demand and are then cached permanently by the service worker;
-the full precached shell is 226 kB over the wire, 612 KiB on disk.
+the full precached shell is 232 kB over the wire, 629 KiB on disk.
 
 ## One app, every device
 
@@ -554,9 +587,9 @@ destroyed. Accuracy numbers never fail a build; correctness failures do.
 
 | Install | |
 |---|---|
-| Initial load, blocking | 137 kB gzip |
+| Initial load, blocking | 139 kB gzip |
 | Interface font, `font-display: swap` | 45 kB raw |
-| Precached shell, background | 226 kB |
+| Precached shell, background | 232 kB |
 | On demand, never precached | OCR ~7 MB · PII model ~67 MB |
 
 Three things this table is careful about:
