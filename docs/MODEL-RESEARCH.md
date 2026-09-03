@@ -164,7 +164,49 @@ health post downloads over 2G:
 | `PII-French-BiomedBERT-Large-340M` | ~680 MB | — | Out of the question on a phone. |
 
 Note that the `int8` export in this family is *larger* than `fp16` (69.6 MB against 66.8 MB),
-because the embedding table stays at higher precision. We take fp16.
+because the embedding table stays at higher precision. **We take int8 anyway.** The model card is
+explicit that `model_int8.onnx` is the "CPU, WebAssembly, and Android default" and `model_fp16.onnx`
+is for "WebGPU and compatible accelerated runtimes"; we ship the plain SIMD-threaded ONNX Runtime
+core and not the 25 MB `jsep` build, so there is no WebGPU path here at all. Optimising 2.8 MB of
+bandwidth onto an unsupported runtime is not a saving.
+
+### What it actually does, measured
+
+First run over the synthetic de-identification corpus and over 1,258 gold-annotated clinical
+entities in real French clinical text (E3C), `npm run eval`:
+
+| | deterministic | + OpenMed |
+|---|---|---|
+| Identifiers **on** the roster | 100% | 100% |
+| Identifiers **off** the roster | 0% | **40%** (2/5) |
+| Clinical retention, synthetic corpus | 100% | 94.4% |
+| Clinical retention, **real** French (E3C, n=1258) | 100% | **97.6%** |
+| Clinical retention, **real** English (E3C, n=1014) | 100% | **99.1%** |
+| Median latency per field | 0.055 ms | 2.4 ms |
+
+Three findings worth reporting, none of which the synthetic corpus could have produced:
+
+**1. The model destroys diagnoses named after people.** The worst losses on real French were
+`lymphome malin non hodgkinien`, `hernie de Spiegel`, `Castleman's disease` and `Henoch-Schönlein
+purpura`. Hodgkin, Spiegel, Castleman, Henoch and Schönlein are surnames; the model is correct and
+the result is a record missing its diagnosis. Mitigated by `isProtectedSpan` in
+`src/lib/openmed.ts`, which vetoes redaction of formulary drugs, a list of eponym stems, and
+anything in an eponymous construction (`maladie de X`, `X's disease`) so that eponyms not on the
+list are still caught.
+
+**2. It destroys drug names.** `paracétamol` went on the first run. To a NER model a drug name is a
+capitalised token of no obvious semantic class, which is what a surname is. The formulary is now a
+protected list.
+
+**3. Recall on Malagasy proper nouns is poor.** The two off-roster identifiers it caught were
+`Hanta` and `Ambodivona`; it missed `Ramanantsoa`, `Manjakandriana` and `Solofo`. This is a French
+clinical model with a 30,522-token **English** WordPiece vocabulary and accent stripping, so
+Malagasy names fragment heavily. 40% off-roster recall is a real improvement on 0% and is nowhere
+near enough to present as a solved problem.
+
+The honest summary: the pass earns its 70 MB where identifiers are European-shaped, costs measurable
+clinical content without the guard, and is weakest exactly where this app is deployed. It stays
+optional and off by default.
 
 ### Why it is a filter over output, not a step in capture
 

@@ -201,6 +201,15 @@ function prf(tp, fp, fn) {
  * whether clinical content survived, so it is measured over `mustKeep` terms:
  * a scrubber that redacts everything scores perfect recall and is useless.
  */
+/**
+ * Spans the guard kept, across the whole run.
+ *
+ * Counted because the guard is a deliberate weakening of a privacy control and
+ * therefore has to be visible: "kept 41 spans" is a number somebody can argue
+ * with, where a silent veto is not.
+ */
+const protectedTally = { count: 0 }
+
 async function runDeident(scrubFreeText, applyEntities, backend) {
   const corpus = JSON.parse(await readFile(join(here, 'corpus', 'deident.json'), 'utf8'))
 
@@ -281,7 +290,9 @@ async function runDeident(scrubFreeText, applyEntities, backend) {
     ? await score(async (text) => {
         const scrubbed = scrubFreeText(text, terms).text
         try {
-          return applyEntities(scrubbed, await backend(scrubbed)).text
+          const applied = applyEntities(scrubbed, await backend(scrubbed))
+          protectedTally.count += applied.protectedSpans
+          return applied.text
         } catch {
           // A backend failure must not be scored as a redaction failure; it is
           // reported as the deterministic result, which is what production
@@ -328,7 +339,9 @@ async function runRealText(scrubFreeText, applyEntities, backend) {
       ? await scoreE3C(corpus.rows, async (t) => {
           const scrubbed = scrubFreeText(t, []).text
           try {
-            return applyEntities(scrubbed, await backend(scrubbed)).text
+            const applied = applyEntities(scrubbed, await backend(scrubbed))
+            protectedTally.count += applied.protectedSpans
+            return applied.text
           } catch {
             return scrubbed
           }
@@ -483,7 +496,8 @@ function printReport(report) {
     line()
     line(
       `  model: ${diag.calls} calls, ${diag.tokensTagged} tokens tagged, ` +
-        `${diag.spansAligned} spans after alignment`,
+        `${diag.spansAligned} spans after alignment, ` +
+        `${report.protectedSpans} kept by the clinical guard`,
     )
     // The check that would have caught a pass which loaded 70 MB, ran the
     // model, and discarded every token it produced.
@@ -673,6 +687,7 @@ async function main() {
     realText: await runRealText(scrubFreeText, applyEntities, backend),
     // Read after every scoring pass, so it covers the whole run.
     backendDiagnostics: backend && !stubNeural ? getBackendDiagnostics() : null,
+    protectedSpans: protectedTally.count,
     bundle: await measureBundle(),
   }
 

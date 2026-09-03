@@ -44,6 +44,8 @@
  * model itself is somebody else's tested artefact.
  */
 
+import { CLINICAL_LOCALES } from './clinicalLocales'
+
 /** One entity as a NER backend reports it. Character offsets into the input. */
 export interface NerEntity {
   /** Entity type without its BIO prefix, e.g. `FIRSTNAME`. */
@@ -111,11 +113,131 @@ export const REDACTABLE_LABELS = new Set([
  */
 export const DEFAULT_MIN_SCORE = 0.35
 
+/* ------------------------------------------------------------------ *
+ * Protecting clinical content from the model
+ * ------------------------------------------------------------------ */
+
+/**
+ * Surname stems that are also diagnoses.
+ *
+ * Measured, not guessed. Running the model over 1,258 gold-annotated clinical
+ * entities in real French clinical text (E3C) destroyed 2.4% of them, and the
+ * worst offenders were all the same thing:
+ *
+ *   lymphome malin non hodgkinien · hernie de Spiegel
+ *   Castleman's disease · Henoch-Schönlein purpura
+ *
+ * Hodgkin, Spiegel, Castleman, Henoch and Schönlein are surnames. A PII model
+ * is doing its job when it flags them. It is also deleting the patient's
+ * diagnosis, which is the one thing in the record that must survive
+ * de-identification — a research export missing "lymphome hodgkinien" is not
+ * de-identified, it is wrong.
+ *
+ * Stems rather than whole words, because French forms adjectives from them:
+ * `hodgkin` has to cover `hodgkinien` and `hodgkinienne`. Compared after the
+ * same accent-stripping normalisation the tokeniser uses, so `schonlein`
+ * matches `Schönlein`.
+ *
+ * ## The risk this accepts, stated plainly
+ *
+ * A patient actually surnamed Hodgkin would not be redacted by this pass. That
+ * is survivable for one specific reason: **the deterministic roster scrub runs
+ * first and always**, and it removes every name on this device's roster by
+ * exact match. So the residual risk is narrowed to a person who is *not* on the
+ * roster and *is* named after a disease — a relative mentioned in passing, at
+ * most. Set against destroying diagnoses in every record that mentions one,
+ * this is the right side of the trade, and it is the reverse of the usual
+ * "when unsure, remove" rule only because these are enumerated rather than
+ * uncertain.
+ */
+export const EPONYM_STEMS = [
+  // Observed destroying real clinical content in the E3C run.
+  'hodgkin', 'spiegel', 'castleman', 'henoch', 'schonlein',
+  // Common enough in primary care and secondary referral notes to be worth
+  // pre-empting rather than waiting to observe.
+  'crohn', 'parkinson', 'alzheimer', 'basedow', 'cushing', 'addison',
+  'kaposi', 'burkitt', 'wilms', 'ewing', 'paget', 'raynaud', 'reye',
+  'guillain', 'barre', 'wernicke', 'korsakoff', 'marfan', 'klinefelter',
+  'duchenne', 'charcot', 'fallot', 'quincke', 'osler', 'behcet', 'perthes',
+  'pott', 'chagas', 'hirschsprung', 'meckel', 'barrett', 'buerger',
+  'dupuytren', 'hashimoto', 'sjogren', 'wegener', 'goodpasture', 'alport',
+  'fanconi', 'whipple', 'mallory', 'boerhaave', 'zollinger', 'ellison',
+  'conn', 'sheehan', 'plummer', 'vinson', 'ludwig', 'koplik', 'gilbert',
+]
+
+/**
+ * The shape an eponym appears in, for the ones no list will contain.
+ *
+ * A curated list cannot cover every eponym in medicine, but the constructions
+ * they appear in are few: `maladie de X`, `syndrome de X`, `X's disease`,
+ * `X purpura`. Matching the construction generalises to eponyms we have never
+ * seen, which is what makes this more than a lookup table.
+ */
+const EPONYM_BEFORE =
+  /(?:maladie|maladies|syndrome|syndromes|signe|manoeuvre|manœuvre|hernie|tumeur|lymphome|sarcome|purpura|fievre|bacille|test|epreuve|reflexe|classification|stade)\s+(?:de\s+|d'|du\s+)?$/
+
+const EPONYM_AFTER =
+  /^(?:'s|’s)?\s*(?:disease|syndrome|sign|lymphoma|purpura|sarcoma|tumou?r|hernia|fever|test|manoeuvre|reflex|bacillus|classification|stage)\b/
+
+/**
+ * Everything the neural pass must not remove, whatever it thinks a span is.
+ *
+ * Built once from the formularies of every clinical locale plus the eponym
+ * stems. Drug names are here because the model destroyed `paracétamol` on the
+ * very first real run: to a NER model a drug name is a capitalised token of no
+ * obvious semantic class, and `Paracétamol` reads exactly like a surname.
+ * Losing it turns a prescription into a blank.
+ */
+let protectedTerms: Set<string> | null = null
+
+function getProtectedTerms(): Set<string> {
+  if (protectedTerms) return protectedTerms
+  const terms = new Set<string>()
+  for (const locale of Object.values(CLINICAL_LOCALES)) {
+    for (const drug of locale.formulary) {
+      terms.add(drug)
+      // Formularies are stored unaccented; split compounds so a single
+      // redacted component is caught too.
+      for (const part of drug.split(/\s+/)) if (part.length > 3) terms.add(part)
+    }
+  }
+  protectedTerms = terms
+  return terms
+}
+
+/**
+ * True when a span must survive the neural pass regardless of its label.
+ *
+ * Exported for testing, because this is the guard that decides whether a
+ * de-identified record still contains the diagnosis it was written for.
+ */
+export function isProtectedSpan(text: string, start: number, end: number): boolean {
+  const { normalised } = normaliseForAlignment(text.slice(start, end))
+  const slice = normalised.trim()
+  if (!slice) return false
+
+  if (getProtectedTerms().has(slice)) return true
+  for (const stem of EPONYM_STEMS) {
+    if (slice === stem || slice.startsWith(stem)) return true
+  }
+
+  const before = normaliseForAlignment(text.slice(Math.max(0, start - 40), start)).normalised
+  if (EPONYM_BEFORE.test(before)) return true
+
+  const after = normaliseForAlignment(text.slice(end, end + 30)).normalised
+  return EPONYM_AFTER.test(after)
+}
+
 export interface NeuralScrubOptions {
   minScore?: number
   labels?: Set<string>
   /** Replacement token. Defaults to the same marker the deterministic pass uses. */
   redacted?: string
+  /**
+   * Veto on a span. Defaults to `isProtectedSpan`, which keeps drug names and
+   * medical eponyms. Pass `() => false` to measure the model unguarded.
+   */
+  protect?: (text: string, start: number, end: number) => boolean
 }
 
 /**
@@ -161,11 +283,12 @@ export function applyEntities(
   text: string,
   entities: NerEntity[],
   options: NeuralScrubOptions = {},
-): { text: string; redactions: number } {
+): { text: string; redactions: number; protectedSpans: number } {
   const {
     minScore = DEFAULT_MIN_SCORE,
     labels = REDACTABLE_LABELS,
     redacted = '[…]',
+    protect = isProtectedSpan,
   } = options
 
   const keep = entities.filter(
@@ -180,17 +303,24 @@ export function applyEntities(
   const spans = mergeSpans(keep, text)
   let out = text
   let redactions = 0
+  let protectedSpans = 0
 
   for (const [start, end] of [...spans].reverse()) {
     // Text already replaced by the deterministic pass is left alone: redacting
     // a redaction marker would double-count and produce "[…][…]".
     const slice = out.slice(start, end)
     if (slice === redacted || slice.trim() === '') continue
+    // A drug name or a disease named after its describer is clinical content,
+    // whatever label the model put on it. See isProtectedSpan.
+    if (protect(text, start, end)) {
+      protectedSpans++
+      continue
+    }
     out = out.slice(0, start) + redacted + out.slice(end)
     redactions++
   }
 
-  return { text: out, redactions }
+  return { text: out, redactions, protectedSpans }
 }
 
 /**
