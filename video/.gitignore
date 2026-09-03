@@ -1,0 +1,4 @@
+node_modules
+out
+# Captured from the running app by `npm run capture`; regenerated, never edited.
+public
