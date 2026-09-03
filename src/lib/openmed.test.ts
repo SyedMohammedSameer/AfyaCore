@@ -9,14 +9,7 @@
  * "an I- tag with no B- before it was silently dropped and a surname survived".
  */
 import { describe, expect, it } from 'vitest'
-import {
-  applyEntities,
-  decodeBio,
-  isModelAvailable,
-  mergeSpans,
-  REDACTABLE_LABELS,
-  type NerEntity,
-} from './openmed'
+import { REDACTABLE_LABELS, alignTokenOffsets, applyEntities, decodeBio, isModelAvailable, mergeSpans, normaliseForAlignment, type NerEntity } from './openmed'
 import { deidentify, REDACTED } from './deidentify'
 import type { Encounter, Patient } from '../db/schema'
 
@@ -319,5 +312,99 @@ describe('detecting whether the model is installed', () => {
       throw new Error('offline')
     }) as unknown as typeof fetch
     expect(await isModelAvailable(impl)).toBe(false)
+  })
+})
+
+/* ------------------------------------------------------------------ *
+ * Offset reconstruction
+ * ------------------------------------------------------------------ */
+
+describe('normaliseForAlignment', () => {
+  it('strips accents and lower-cases, as the tokeniser does', () => {
+    const { normalised } = normaliseForAlignment('Fièvre à 38°C')
+    expect(normalised).toBe('fievre a 38°c')
+  })
+
+  it('maps every normalised character back to its source character', () => {
+    const text = 'fébriles'
+    const { normalised, map } = normaliseForAlignment(text)
+    expect(normalised).toBe('febriles')
+    // `é` is one source character even though its NFD form is two.
+    expect(map).toHaveLength(normalised.length)
+    expect(text[map[normalised.indexOf('b')]!]).toBe('b')
+    expect(text.slice(map[0]!, map[map.length - 1]! + 1)).toBe('fébriles')
+  })
+})
+
+describe('alignTokenOffsets', () => {
+  const tok = (word: string, entity = 'O', score = 0.99) => ({ word, entity, score })
+
+  it('finds a plain word', () => {
+    const text = 'Patient Rakoto admis'
+    const [span] = alignTokenOffsets(text, [tok('rakoto', 'B-LASTNAME')])
+    expect(text.slice(span!.start, span!.end)).toBe('Rakoto')
+    expect(span!.label).toBe('B-LASTNAME')
+  })
+
+  it('recovers the accented source span from an unaccented token', () => {
+    // The whole reason the index map exists: the model sees `febriles`, the
+    // record says `fébriles`, and the redaction has to land on the record.
+    const text = 'sensations fébriles ce matin'
+    const [span] = alignTokenOffsets(text, [tok('febriles', 'B-LASTNAME')])
+    expect(text.slice(span!.start, span!.end)).toBe('fébriles')
+  })
+
+  it('keeps offsets correct after several accented characters', () => {
+    const text = 'À Ambohidratrimo, Éric Ramanantsoa'
+    const spans = alignTokenOffsets(text, [tok('eric', 'B-FIRSTNAME'), tok('ramanantsoa', 'I-FIRSTNAME')])
+    expect(text.slice(spans[0]!.start, spans[0]!.end)).toBe('Éric')
+    expect(text.slice(spans[1]!.start, spans[1]!.end)).toBe('Ramanantsoa')
+  })
+
+  it('handles WordPiece continuations with and without the ## marker', () => {
+    const text = 'hémoptysies signalées'
+    const withMarker = alignTokenOffsets(text, [tok('hemo', 'B-LASTNAME'), tok('##ptysies', 'I-LASTNAME')])
+    const without = alignTokenOffsets(text, [tok('hemo', 'B-LASTNAME'), tok('ptysies', 'I-LASTNAME')])
+    for (const spans of [withMarker, without]) {
+      expect(text.slice(spans[0]!.start, spans[1]!.end)).toBe('hémoptysies')
+    }
+  })
+
+  it('moves forward rather than rematching an earlier occurrence', () => {
+    // `a` occurs inside `Rakoto` long before the standalone token. A matcher
+    // that restarts from zero redacts the wrong character.
+    const text = 'Rakoto a vu Rakoto'
+    const spans = alignTokenOffsets(text, [tok('rakoto', 'B-LASTNAME'), tok('a'), tok('vu'), tok('rakoto', 'B-LASTNAME')])
+    expect(spans[3]!.start).toBeGreaterThan(spans[0]!.start)
+    expect(text.slice(spans[3]!.start, spans[3]!.end)).toBe('Rakoto')
+  })
+
+  it('drops a token it cannot locate instead of guessing a span', () => {
+    const text = 'toux sèche'
+    const spans = alignTokenOffsets(text, [tok('toux'), tok('[UNK]'), tok('seche')])
+    expect(spans).toHaveLength(2)
+    expect(text.slice(spans[1]!.start, spans[1]!.end)).toBe('sèche')
+  })
+
+  it('produces spans that decodeBio and applyEntities can actually redact', () => {
+    // The end-to-end shape of the bug: every stage individually looked fine
+    // and the composition redacted nothing. This asserts the composition.
+    const text = 'Adressé par le Dr Ramanantsoa de Manjakandriana'
+    const aligned = alignTokenOffsets(text, [
+      tok('adresse'),
+      tok('par'),
+      tok('le'),
+      tok('dr', 'B-PREFIX'),
+      tok('ramanantsoa', 'B-LASTNAME'),
+      tok('de'),
+      tok('manjakandriana', 'B-CITY'),
+    ])
+    const entities = decodeBio(aligned)
+    const { text: out, redactions } = applyEntities(text, entities)
+
+    expect(redactions).toBeGreaterThan(0)
+    expect(out).not.toContain('Ramanantsoa')
+    expect(out).not.toContain('Manjakandriana')
+    expect(out).toContain('Adressé par le')
   })
 })
