@@ -1,5 +1,6 @@
 import { db } from './db'
 import { newId } from '../lib/id'
+import { requirePermission } from '../lib/identity'
 import { recordAudit } from '../lib/audit'
 import type { ConsentState, Encounter, FieldProvenance, Patient, Prescription, Vitals } from './schema'
 
@@ -211,6 +212,7 @@ export async function recordResearchConsent(
 }
 
 export async function deletePatient(id: string): Promise<void> {
+  requirePermission('delete.patient')
   await db.transaction('rw', db.patients, db.encounters, db.attachments, db.audit, async () => {
     const now = Date.now()
     const encounters = await db.encounters.where('patientId').equals(id).toArray()

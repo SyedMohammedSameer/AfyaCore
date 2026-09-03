@@ -17,6 +17,9 @@
  *   { cursor, actorId, changes: { patients: [], encounters: [] } }
  *   -> { cursor, changes: { patients: [], encounters: [] }, pushed, conflicts }
  *
+ * A conflict carries the server's canonical record, so a client that pushed a
+ * stale row can converge without waiting for a pull that will never include it.
+ *
  * The client pushes what it has, then receives everything it has not seen.
  * `cursor` is a server-assigned monotonic sequence, not a timestamp, so device
  * clock skew (common on phones that lose power) cannot cause a record to be
@@ -129,11 +132,24 @@ export function createSyncApp({
         // copy, which makes a retried push idempotent rather than churning the
         // sequence.
         if (existing && existing.updated_at >= record.updatedAt) {
+          /*
+           * The canonical row travels with the rejection.
+           *
+           * Reporting only `{id, reason}` left the client with no way to
+           * converge: it had a stale row the server had refused, and the pull
+           * would not send the canonical version because that row's sequence
+           * is below the client's cursor. The device kept its stale copy,
+           * marked it synced, and the two silently diverged for good.
+           *
+           * Sending the body makes the rejection self-healing — the client
+           * applies it through the same path as a normal pull.
+           */
           conflicts.push({
             kind,
             id: record.id,
             reason: 'server_newer',
             serverUpdatedAt: existing.updated_at,
+            record: JSON.parse(existing.body),
           })
           continue
         }

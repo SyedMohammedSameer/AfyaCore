@@ -47,6 +47,7 @@
 import { db } from '../db/db'
 import { recordAudit } from './audit'
 import { getCountryProfile } from './facility'
+import { requirePermission } from './identity'
 
 const RETENTION_KEY = 'facility.retentionYears'
 
@@ -87,6 +88,7 @@ export async function getRetentionYears(): Promise<{
 }
 
 export async function setRetentionYears(years: number | null): Promise<void> {
+  requirePermission('manage.device')
   await db.settings.put({ key: RETENTION_KEY, value: years ?? 0 })
   await recordAudit({
     action: 'facility.configure',
@@ -140,6 +142,9 @@ export interface PurgeResult {
  * for.
  */
 export async function purgeExpired(now = Date.now()): Promise<PurgeResult> {
+  // Destructive and irreversible: the one place a UI-only check is least
+  // acceptable.
+  requirePermission('manage.device')
   const { years } = await getRetentionYears()
   if (years === null) return { encounters: 0, attachments: 0, patients: 0 }
 

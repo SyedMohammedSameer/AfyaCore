@@ -21,7 +21,7 @@
  */
 import Dexie from 'dexie'
 import { db } from '../db/db'
-import type { AuditEntry, AuditAction } from '../db/schema'
+import type { AuditAction, AuditEntry, Role } from '../db/schema'
 
 export const GENESIS_HASH = '0'.repeat(64)
 
@@ -72,12 +72,30 @@ export async function chainHash(
  */
 let currentActorId: string | undefined
 
-export function setCurrentActor(id: string | undefined): void {
+/**
+ * The role travels with the actor.
+ *
+ * Permission checks were previously only in components, which meant the
+ * declared matrix in identity.ts was a description of the UI rather than a
+ * property of the system: anything reachable from code — a service call, a
+ * background sync, a future screen that forgot the check — was ungated. A
+ * service boundary cannot ask React who is signed in, so the role lives here,
+ * beside the actor id it is already tracking, and `requirePermission` in
+ * identity.ts reads it.
+ */
+let currentRole: Role | undefined
+
+export function setCurrentActor(id: string | undefined, role?: Role): void {
   currentActorId = id
+  currentRole = id ? role : undefined
 }
 
 export function getCurrentActor(): string | undefined {
   return currentActorId
+}
+
+export function getCurrentRole(): Role | undefined {
+  return currentRole
 }
 
 export interface RecordAuditInput {

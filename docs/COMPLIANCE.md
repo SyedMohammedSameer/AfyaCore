@@ -240,7 +240,7 @@ these are ours for a rural outpatient facility with shared devices.
 | R5 | **Server disk is copied** | Med | High | Tokens and enrolment codes stored as hashes | **High.** Clinical records are plain text in SQLite. Relies on the deployer's disk encryption. |
 | R6 | **Traffic intercepted** | Med | High | TLS supported via `AFYACORE_TLS_CERT`/`KEY`; the server warns on boot when running plain HTTP | **Deployer's.** Plain HTTP is the default and that is a real hazard on a shared network. |
 | R7 | **Audit trail altered to hide access** | Low | Med | Hash chain on device and server; `cli.mjs audit:verify` reports the first break | **Medium.** A chain makes tampering detectable, not impossible: an administrator with filesystem access can rewrite the whole chain. Anchoring the head hash off-box is manual. |
-| R8 | **Staff member browses records with no clinical reason** | Med | Med | `patient.view` is audited; roles restrict export, deletion, staff management | Medium. Detection only, and only if someone reads the log. |
+| R8 | **Staff member browses records with no clinical reason** | Med | Med | `patient.view` is audited; roles restrict export, deletion, staff management, **enforced at service boundaries** (`requirePermission`) rather than in components alone | Medium. Detection only for reads, and only if someone reads the log. |
 | R9 | **Enrolment code intercepted (it travels by SMS or voice)** | Med | Med | Single-use, 24 h expiry, 10 attempts/min/address rate limit, ~38 bits of entropy | Low |
 | R10 | **Patient asks for erasure and it is not honoured** | Med | Med | Attachment blobs are destroyed outright | **High.** For everything else, deletion is a tombstone, not erasure (§6.3). |
 | R11 | **Data retained beyond its lawful period** | High | Med | Facility retention period, eligibility preview, audited purge on device and server | **Medium.** The mechanism exists on both sides; what remains unresolved is the *period*, which is `null` for most countries because we could not establish it from a primary source (§5.3). |
@@ -474,7 +474,22 @@ person, a route to the regulator, and a rehearsed procedure. Note the deadlines
 that are **immediate** (Ghana, Uganda) — those leave no time to work out who to
 call.
 
-### 6.6 Accountability
+### 6.6 Role enforcement
+
+The permission matrix (`PERMISSIONS` in `src/lib/identity.ts`) is enforced by
+`requirePermission` at the service boundary, not only in components. Until
+review it was checked only where a screen happened to consult it, which made it
+a description of what the UI renders rather than a property of the system: a
+clinician could reach an identified export, delete a patient, repoint or
+un-enrol sync, and erase the database.
+
+Guarded operations throw rather than returning false, because they are
+destructive or disclosing and a caller that ignores a boolean fails open.
+Signed-out is refused as well as under-privileged. Sync now attributes itself
+to the signed-in clinician by default, so the server audit trail names a person
+rather than only a device.
+
+### 6.7 Accountability
 
 Audit logs are hash-chained and cover sign-in, record access (`patient.view`),
 creation, amendment, finalisation, deletion, merge, export, sync, account and

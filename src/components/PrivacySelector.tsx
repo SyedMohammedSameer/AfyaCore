@@ -1,6 +1,7 @@
 import { Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { Card, SectionTitle, cx } from './ui'
 import { useI18n } from '../i18n'
+import { useSession } from '../lib/session'
 import type { DeidentLevel } from '../lib/deidentify'
 
 interface PrivacySelectorProps {
@@ -22,6 +23,7 @@ interface PrivacySelectorProps {
  */
 export function PrivacySelector({ value, onChange }: PrivacySelectorProps) {
   const { t } = useI18n()
+  const { may } = useSession()
 
   const OPTIONS: { key: DeidentLevel; icon: typeof Eye; label: string; hint: string; tone: string }[] = [
     {
@@ -55,7 +57,12 @@ export function PrivacySelector({ value, onChange }: PrivacySelectorProps) {
 
         <fieldset className="flex flex-col gap-2">
           <legend className="sr-only">{t.privacy}</legend>
-          {OPTIONS.map(({ key, icon: Icon, label, hint, tone }) => {
+          {/* An identified export is admin-only in the permission matrix, and
+              `deidentify` now throws for anyone else. Not rendering the option
+              is the UI half: offering a control that will fail is worse than
+              not offering it. */}
+          {OPTIONS.filter((o) => o.key !== 'identified' || may('export.identified')).map(
+            ({ key, icon: Icon, label, hint, tone }) => {
             const selected = value === key
             return (
               <label
@@ -80,7 +87,8 @@ export function PrivacySelector({ value, onChange }: PrivacySelectorProps) {
                 </span>
               </label>
             )
-          })}
+            },
+          )}
         </fieldset>
 
         {value !== 'identified' && (

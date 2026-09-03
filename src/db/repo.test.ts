@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { mergeFields } from './repo'
 import type { Patient } from './schema'
+import { setCurrentActor } from '../lib/audit'
+
+// Service boundaries enforce the permission matrix, so a suite that never
+// signs in is refused. Admin because these exercise the operation, not the
+// gate; the gate has its own tests.
+setCurrentActor('test-admin', 'admin')
 
 /**
  * Merge field rules.

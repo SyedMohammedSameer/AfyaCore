@@ -23,6 +23,7 @@ import {
 } from './repo'
 import { setCurrentActor, verifyAuditChain, recentAudit } from '../lib/audit'
 
+
 async function newPatient(familyName = 'Rakotoarisoa') {
   return createPatient({
     familyName,
@@ -37,7 +38,9 @@ const actions = async () => (await recentAudit()).map((e) => e.action)
 beforeEach(async () => {
   await db.delete()
   await db.open()
-  setCurrentActor('clin_test')
+  // Admin because this suite deletes patients; the role now travels with the
+  // actor and service boundaries enforce it. The gate has its own tests.
+  setCurrentActor('clin_test', 'admin')
 })
 
 describe('audit entries are written for every recorded action', () => {
