@@ -2,6 +2,7 @@ import React from 'react'
 import { AbsoluteFill, Sequence } from 'remotion'
 import { Title } from './Title'
 import { Scene } from './Scene'
+import { Models } from './Models'
 import { Offline } from './Offline'
 import { Numbers } from './Numbers'
 import { theme, FPS } from './theme'
@@ -71,6 +72,12 @@ const BEATS: Beat[] = [
       />
     ),
   },
+  // Placed straight after the dictation beat, where the first model has just
+  // done its work, and before the review beat that says not to trust it
+  // blindly. It also keeps the two card slides apart: this one and the numbers
+  // are the only beats without a photograph of the app, and back to back they
+  // would read as a deck rather than a demo.
+  { d: s(11), el: <Models /> },
   {
     d: s(11),
     el: (
