@@ -16,6 +16,15 @@ import type { PatientLang } from '../i18n/patient'
 export type Sex = 'female' | 'male' | 'unknown'
 
 /**
+ * Consent for secondary use.
+ *
+ * Three states rather than a boolean, because "we asked and they said no" and
+ * "nobody has asked" are different facts about a facility and only one of them
+ * is fixable by asking. A boolean would collapse them and hide the second.
+ */
+export type ConsentState = 'granted' | 'refused' | 'notAsked'
+
+/**
  * Interface languages: the ones with a full 232-key dictionary behind them.
  *
  * Distinct from `PatientLang` (src/i18n/patient.ts), which is the wider set an
@@ -42,6 +51,27 @@ export interface Patient {
   /** Language to speak/print patient instructions in. */
   /** The language this patient's instruction sheet prints in. */
   preferredLang: PatientLang
+  /**
+   * Whether this patient agreed to their record leaving the facility for
+   * research or partner use.
+   *
+   * Absent means `notAsked`, and `notAsked` behaves as a refusal everywhere it
+   * matters. That default is the whole point: a consent field whose absence
+   * reads as permission is worse than no field, because it manufactures a
+   * record of agreement that nobody ever gave.
+   *
+   * Deliberately NOT consent to treatment, and deliberately not a gate on the
+   * clinical record or on statutory reporting. Treatment runs on a different
+   * lawful basis in every regime in docs/COMPLIANCE.md §5, and a monthly
+   * aggregate a ministry requires is not a disclosure a patient can opt out
+   * of. This gates the thing a patient genuinely has a say in: their own
+   * record travelling, record by record, to somebody else's dataset.
+   */
+  researchConsent?: ConsentState
+  /** When it was recorded. A consent with no date cannot be reviewed. */
+  researchConsentAt?: number
+  /** The clinician who recorded it, so the audit trail names a person. */
+  researchConsentBy?: string
   /**
    * Denormalised, accent-stripped, lowercased name + register number.
    * Malagasy names are long and inconsistently accented on paper cards, so
@@ -195,6 +225,8 @@ export type AuditAction =
   | 'device.enrol'
   | 'device.unenrol'
   | 'facility.configure'
+  | 'consent.record'
+  | 'retention.purge'
 
 /**
  * One entry in the local, hash-chained audit trail. See src/lib/audit.ts.

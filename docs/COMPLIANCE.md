@@ -221,7 +221,7 @@ these are ours for a rural outpatient facility with shared devices.
 | R9 | **Enrolment code intercepted (it travels by SMS or voice)** | Med | Med | Single-use, 24 h expiry, 10 attempts/min/address rate limit, ~38 bits of entropy | Low |
 | R10 | **Patient asks for erasure and it is not honoured** | Med | Med | Attachment blobs are destroyed outright | **High.** For everything else, deletion is a tombstone, not erasure (§6.3). |
 | R11 | **Data retained beyond its lawful period** | High | Med | — | **High.** No retention schedule and no purge exist (§6.4). |
-| R12 | **Processing has no valid lawful basis / consent** | High | High | — | **High.** No consent capture exists (§6.2). |
+| R12 | **Processing has no valid lawful basis / consent** | High | High | Research consent recorded per patient and enforced inside `deidentify()`; absence is refusal | **Medium.** Secondary use is covered (§6.2). The lawful basis for the clinical record itself remains the deployer's to determine and document. |
 | R13 | **Supply-chain compromise of the served bundle** | Low | Critical | No runtime third-party calls; models served from the deployer's own origin; SRI-free but same-origin | Medium. A compromised build reaches every facility at once, with no store review in between. |
 | R14 | **Deleting a confirmed consultation changes a figure already reported** | Med | Low | Warned in the UI | Low, and an integrity rather than a privacy risk |
 
@@ -348,16 +348,41 @@ deliberate scope decision for this milestone, not an oversight, and it is the
 largest single gap in the document. Both stores rely on OS-level disk
 encryption.
 
-### 6.2 Lawful basis and consent — **not implemented**
+### 6.2 Lawful basis and consent — **partially implemented**
 
-The app records no consent and offers no way to. A deployer must determine
-their basis (in most of these regimes, a public-health task or vital interests
-is more workable than consent for the clinical record itself, with consent
-separately required for research use) and document it before go-live.
+The gap this document named as mattering most in practice is **secondary use**:
+a patient consenting to treatment has not thereby consented to their record
+leaving in a research export, even a de-identified one. That one is now closed.
 
-The gap that matters most in practice is **secondary use**: a patient consenting
-to treatment has not thereby consented to their record leaving in a research
-export, even a de-identified one.
+Each patient carries a research-consent state — `granted`, `refused`, or
+`notAsked` — recorded with a timestamp and the clinician who took it, and
+audited as `consent.record`. It is enforced inside `deidentify()`, which is the
+single point every record-level export passes through, so no export path can
+bypass it. Patients who have not granted consent are removed from the file
+along with their encounters, and the count travels in the export manifest:
+a dataset that silently excludes a third of a catchment is biased in a way that
+matters clinically, and a recipient cannot correct for a selection they were
+never told about.
+
+Three design points a reviewer should check:
+
+- **Absence is refusal.** A patient with no recorded consent — including every
+  patient created before the field existed — is excluded. A consent field
+  whose absence reads as permission manufactures a record of agreement nobody
+  gave.
+- **Three states, not a boolean.** "We asked and they said no" and "nobody has
+  asked" are different facts about a facility and only one is fixable by
+  asking.
+- **It does not gate care or statutory reporting.** An `identified` export is a
+  clinical act — a referral, a handover, a copy for the patient — and the DHIS2
+  monthly aggregate is a reporting obligation, not a disclosure a patient can
+  opt out of. Blocking either to satisfy a rule about research would be the
+  wrong trade in both directions.
+
+**Still the deployer's:** determining and documenting the lawful basis for the
+clinical record itself. In most of these regimes a public-health task or vital
+interests is more workable than consent for treatment data. The app does not
+and should not decide that.
 
 ### 6.3 Data-subject rights
 

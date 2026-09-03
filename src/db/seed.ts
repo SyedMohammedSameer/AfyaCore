@@ -20,23 +20,27 @@ export async function seedDemoData(): Promise<void> {
   const rasoa = await createPatient({
     familyName: 'RAKOTOARISOA', givenName: 'Voahirana', sex: 'female',
     approximateAge: 34, address: 'Ambohimanga', registerNo: '2041',
-    phone: '034 12 345 67', preferredLang: 'mg',
+    phone: '034 12 345 67', preferredLang: 'mg', researchConsent: 'granted',
   })
 
   const naivo = await createPatient({
     familyName: 'ANDRIANJAFY', givenName: 'Naivo', sex: 'male',
     approximateAge: 6, address: 'Anjozorobe', registerNo: '2042', preferredLang: 'mg',
+    researchConsent: 'granted',
   })
 
   const hery = await createPatient({
     familyName: 'RAZAFIMAHATRATRA', givenName: 'Hery', sex: 'male',
     approximateAge: 58, address: 'Ambatolampy', registerNo: '2043',
-    phone: '032 98 765 43', preferredLang: 'fr',
+    phone: '032 98 765 43', preferredLang: 'fr', researchConsent: 'refused',
   })
 
   await createPatient({
     familyName: 'RANDRIAMBOLOLONA', givenName: 'Miora', sex: 'female',
     approximateAge: 22, address: 'Ambohimanga', registerNo: '2044', preferredLang: 'mg',
+    // Left unasked on purpose: the demo should show what an unanswered
+    // consent does to an export, which is exclude the record.
+    researchConsent: 'notAsked',
   })
 
   // A completed malaria consultation, captured by dictation.

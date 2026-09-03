@@ -44,6 +44,19 @@ export interface DeidentOptions {
   /** Reduce encounter dates to the first of the month. */
   generaliseDates?: boolean
   /**
+   * Drop patients who have not granted consent for secondary use.
+   *
+   * Defaults to **true at de-identified levels**, which are the research ones.
+   * An `identified` export is a clinical act — a referral letter, a copy for
+   * the patient, a handover — and gating it on research consent would block
+   * care to satisfy a rule about research.
+   *
+   * The default is the safe direction on purpose. A caller who wants every
+   * record has to say so explicitly, in code, where a reviewer can find it;
+   * a caller who forgets gets the conservative behaviour.
+   */
+  requireResearchConsent?: boolean
+  /**
    * Optional neural PII pass, run *after* the deterministic scrub and only ever
    * adding redactions. See src/lib/openmed.ts.
    *
@@ -61,6 +74,15 @@ export interface DeidentResult {
   manifest: {
     level: DeidentLevel
     generalisedDates: boolean
+    /**
+     * Patients left out because they had not consented to secondary use.
+     *
+     * In the manifest rather than only in the audit log, because the recipient
+     * is the one who needs it: a dataset that silently excludes a third of a
+     * catchment is biased in a way that matters clinically, and a researcher
+     * cannot correct for a selection they were never told about.
+     */
+    excludedForConsent: number
     patientsProcessed: number
     encountersProcessed: number
     fieldsRemoved: string[]
@@ -221,10 +243,38 @@ export async function deidentify(
         encountersProcessed: encounters.length,
         fieldsRemoved: [],
         freeTextRedactions: 0,
+        excludedForConsent: 0,
         ...(options.country ? { country: options.country } : {}),
       },
     }
   }
+
+  /*
+   * Consent is applied before anything else, so a patient who did not agree is
+   * not merely de-identified — they are not in the file at all.
+   *
+   * De-identification is not a substitute for consent. A pseudonymous record
+   * is still personal data (the salt that reverses it exists on the device),
+   * and even an anonymous one is a record about a person who was never asked.
+   * docs/COMPLIANCE.md §6.2 names secondary use as the consent gap that
+   * matters most in practice; this is where it is closed.
+   *
+   * Encounters go with their patient. Dropping the patient row and keeping the
+   * consultations would leave clinical narrative attached to `UNKNOWN`, which
+   * is a worse outcome than either including or excluding them cleanly.
+   */
+  const requireConsent = options.requireResearchConsent ?? true
+  const consented = requireConsent
+    ? patients.filter((p) => p.researchConsent === 'granted')
+    : patients
+  const excludedForConsent = patients.length - consented.length
+  const allowedIds = new Set(consented.map((p) => p.id))
+  const consentedEncounters = requireConsent
+    ? encounters.filter((e) => allowedIds.has(e.patientId))
+    : encounters
+
+  patients = consented
+  encounters = consentedEncounters
 
   // `anonymous` burns a fresh salt so two exports cannot be joined on the code.
   const salt = level === 'anonymous' ? randomSalt() : (options.salt ?? randomSalt())
@@ -307,6 +357,7 @@ export async function deidentify(
     manifest: {
       level,
       generalisedDates: generaliseDates,
+      excludedForConsent,
       patientsProcessed: outPatients.length,
       encountersProcessed: outEncounters.length,
       fieldsRemoved: [

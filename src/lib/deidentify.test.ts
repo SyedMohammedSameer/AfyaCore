@@ -14,6 +14,10 @@ const patient = (over: Partial<Patient> = {}): Patient => ({
   address: 'Ambohimanga',
   registerNo: '2041',
   preferredLang: 'mg',
+  // Granted by default in this fixture so the tests below exercise
+  // de-identification rather than the consent gate; the gate has its own
+  // describe block, including that omitting this excludes the patient.
+  researchConsent: 'granted',
   searchKey: 'rakotoarisoa voahirana',
   createdAt: 0,
   updatedAt: 0,
@@ -139,10 +143,25 @@ describe('deidentify', () => {
     expect(r.encounters[0]!.patientId).not.toBe('p1')
   })
 
-  it('never emits the original id for an orphan encounter', async () => {
+  it('drops an orphan encounter entirely when consent is required', async () => {
+    // Stricter than the old behaviour, and correct: an encounter whose patient
+    // is not in the roster is an encounter whose consent cannot be checked.
+    // Emitting it as `UNKNOWN` published clinical narrative about somebody
+    // nobody could confirm had agreed.
     const r = await deidentify([], [encounter({ patientId: 'ghost' })], {
       level: 'pseudonymous',
       salt: 's',
+    })
+    expect(r.encounters).toHaveLength(0)
+  })
+
+  it('never emits the original id for an orphan encounter', async () => {
+    // With the gate off, the orphan still must not carry a real patient id
+    // back out: a stray row would otherwise re-link the whole export.
+    const r = await deidentify([], [encounter({ patientId: 'ghost' })], {
+      level: 'pseudonymous',
+      salt: 's',
+      requireResearchConsent: false,
     })
     expect(r.encounters[0]!.patientId).toBe('UNKNOWN')
   })
@@ -238,5 +257,67 @@ describe('de-identified exports', () => {
     })
     const after = aggregateMonth(r.patients, r.encounters, month)
     expect(after.map((c) => [c.indicator, c.count])).toEqual(before.map((c) => [c.indicator, c.count]))
+  })
+})
+
+describe('consent for secondary use', () => {
+  const granted = patient({ id: 'p1', researchConsent: 'granted' })
+  const refused = patient({ id: 'p2', familyName: 'RABE', researchConsent: 'refused' })
+  const notAsked = patient({ id: 'p3', familyName: 'RANAIVO', researchConsent: 'notAsked' })
+  const absent = patient({ id: 'p4', familyName: 'RASOA', researchConsent: undefined })
+
+  const roster = [granted, refused, notAsked, absent]
+  const consultations = roster.map((p) => encounter({ id: `e-${p.id}`, patientId: p.id }))
+
+  it('exports only the patients who agreed', async () => {
+    const { patients, manifest } = await deidentify(roster, consultations, {
+      level: 'pseudonymous',
+    })
+    expect(patients).toHaveLength(1)
+    expect(manifest.excludedForConsent).toBe(3)
+  })
+
+  it('treats an absent consent as a refusal, not as permission', async () => {
+    // The default that matters. A consent field whose absence reads as
+    // agreement is worse than no field at all: it manufactures a record of
+    // permission nobody gave. Every patient created before this feature
+    // existed has no value here, and every one of them must be excluded.
+    const { patients } = await deidentify([absent], [], { level: 'anonymous' })
+    expect(patients).toHaveLength(0)
+  })
+
+  it('takes the encounters out with the patient', async () => {
+    // Dropping the patient row and keeping the consultations would leave
+    // clinical narrative attached to `UNKNOWN` — worse than either including
+    // or excluding them cleanly.
+    const { encounters } = await deidentify(roster, consultations, { level: 'pseudonymous' })
+    expect(encounters).toHaveLength(1)
+  })
+
+  it('does not gate an identified export on research consent', async () => {
+    // An identified export is a clinical act: a referral, a handover, a copy
+    // for the patient. Blocking care to satisfy a rule about research would
+    // be the wrong trade in both directions.
+    const { patients } = await deidentify(roster, consultations, { level: 'identified' })
+    expect(patients).toHaveLength(4)
+  })
+
+  it('can be turned off, but only by saying so', async () => {
+    const { patients, manifest } = await deidentify(roster, consultations, {
+      level: 'pseudonymous',
+      requireResearchConsent: false,
+    })
+    expect(patients).toHaveLength(4)
+    expect(manifest.excludedForConsent).toBe(0)
+  })
+
+  it('tells the recipient how many were left out', async () => {
+    // In the manifest, not only the audit log. A dataset that silently
+    // excludes three quarters of a catchment is biased in a way that matters
+    // clinically, and a researcher cannot correct for a selection they were
+    // never told about.
+    const { manifest } = await deidentify(roster, consultations, { level: 'anonymous' })
+    expect(manifest.excludedForConsent).toBe(3)
+    expect(manifest.patientsProcessed).toBe(1)
   })
 })

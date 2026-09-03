@@ -118,8 +118,12 @@ export function Settings() {
     })
     if (level !== 'identified') {
       const neural = result.manifest.neuralRedactions
+      const excluded = result.manifest.excludedForConsent
       setLastExport(
-        `${result.manifest.freeTextRedactions} ${t.redactionSummary}` +
+        // Consent first: a facility looking at this line most needs to know
+        // who is missing from the file, not how many words were blacked out.
+        (excluded > 0 ? `${excluded} ${t.excludedForConsent} · ` : '') +
+          `${result.manifest.freeTextRedactions} ${t.redactionSummary}` +
           // Reported separately rather than summed: the two passes answer
           // different questions, and a facility deciding whether the 67 MB was
           // worth downloading needs to see what it actually bought.
@@ -133,7 +137,9 @@ export function Settings() {
     await recordAudit({
       action: 'export',
       subjectType: 'export',
-      detail: `level=${level} patients=${result.patients.length} encounters=${result.encounters.length}`,
+      detail:
+        `level=${level} patients=${result.patients.length} ` +
+        `encounters=${result.encounters.length} excludedForConsent=${result.manifest.excludedForConsent}`,
     })
     return result
   }

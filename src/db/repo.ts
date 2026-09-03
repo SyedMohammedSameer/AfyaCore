@@ -1,7 +1,7 @@
 import { db } from './db'
 import { newId } from '../lib/id'
 import { recordAudit } from '../lib/audit'
-import type { Encounter, FieldProvenance, Patient, Prescription, Vitals } from './schema'
+import type { ConsentState, Encounter, FieldProvenance, Patient, Prescription, Vitals } from './schema'
 
 /** Strip diacritics and case so "Rakotoarisoa" and "RAKOTOÀRISOA" match. */
 export function normalise(s: string): string {
@@ -178,6 +178,38 @@ export async function deleteEncounter(id: string): Promise<void> {
  * so nothing else needs to learn they are gone, and they are the only thing
  * here large enough that keeping them would be a real cost.
  */
+/**
+ * Record what a patient said about their record being used for research.
+ *
+ * Separate from `updatePatient` on purpose. Consent is not another demographic
+ * field: it is the thing that decides whether this person's record may leave
+ * the facility, it has to carry who recorded it and when, and it is the one
+ * change to a patient that a regulator will ask to see evidence of. Folding it
+ * into a general update would lose all three.
+ */
+export async function recordResearchConsent(
+  id: string,
+  state: ConsentState,
+  actorId?: string,
+): Promise<void> {
+  const now = Date.now()
+  await db.patients.update(id, {
+    researchConsent: state,
+    researchConsentAt: now,
+    researchConsentBy: actorId,
+    updatedAt: now,
+    syncedAt: undefined,
+  })
+  await recordAudit({
+    action: 'consent.record',
+    subjectType: 'patient',
+    subjectId: id,
+    // The state is in the detail because a withdrawal is the entry that
+    // matters most and it is indistinguishable from a grant without it.
+    detail: `research=${state}`,
+  })
+}
+
 export async function deletePatient(id: string): Promise<void> {
   await db.transaction('rw', db.patients, db.encounters, db.attachments, db.audit, async () => {
     const now = Date.now()
