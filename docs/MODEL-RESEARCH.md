@@ -90,10 +90,12 @@ skin lesions, and at ~3 GB quantized it is incompatible with an on-device app re
 | Need | Tool | Notes |
 |---|---|---|
 | Printed French forms | **Tesseract `fra` LSTM (shipped)** | ~7 MB runtime, on demand. Works well. |
+| Printed English forms | **Tesseract `eng` LSTM (shipped)** | ~9 MB runtime, on demand. Selected by country, not interface language. |
 | Malagasy handwriting | [`EzraFanantenana/trocr-malagasy-v3`](https://hf.co/EzraFanantenana/trocr-malagasy-v3) | TrOCR fine-tune. Handwriting remains the hardest case; expect heavy correction. |
 | Clinical images (wounds, X-ray) | MedGemma 1.5 4B / MedSigLIP 400M | **Server-side only.** Out of scope for v1. |
 
-**Implemented (v0.2):** Tesseract `fra`, LSTM-only WASM core, running fully on-device, the image
+**Implemented (v0.2, `eng` added v0.3):** Tesseract `fra`/`eng`, LSTM-only WASM core, running
+fully on-device, the image
 never leaves the phone. OCR text is fed through the *same* rule extractor as dictation, so a
 photographed form produces the same structured fields, tagged `source: 'photo'` and scaled down by
 the engine's own confidence so it lands in the review screen flagged for checking.
@@ -246,7 +248,7 @@ Manual entry          → always available, zero dependencies      [the substrat
 French voice          → Web Speech API, 0 MB, online             [the accelerator]
 Structured extraction → deterministic rules, offline, 0 MB       [the actual magic]
 Malagasy output       → pre-rendered Opus phrase bank            [the patient win]
-Photo OCR             → Tesseract fra, ~7 MB, on demand          [the paper bridge]
+Photo OCR             → Tesseract fra/eng, ~7-9 MB, on demand    [the paper bridge]
 ```
 
 Nothing in this column requires shipping a neural model in v1. Every model above is an upgrade

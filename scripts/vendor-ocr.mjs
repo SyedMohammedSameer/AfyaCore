@@ -23,10 +23,24 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const outDir = join(root, 'public', 'ocr')
 const cacheDir = join(root, '.cache')
 
-// French only. Malagasy has no Tesseract model, and the paper records this
-// reads are written in French, see docs/MODEL-RESEARCH.md §1.
-const LANG = 'fra'
-const LANG_URL = `https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0_fast/${LANG}.traineddata.gz`
+/**
+ * One model per clinical language the app parses.
+ *
+ * `fra` and `eng`, matching `ClinicalLang` in src/lib/clinicalLocales.ts. This
+ * was French-only, which was correct while Madagascar was the only deployment
+ * and wrong across nine countries: five of them are Anglophone, their paper
+ * registers are in English, and we were reading them with the French model.
+ *
+ * Malagasy is deliberately absent: Tesseract has no `mlg` model, and there is
+ * nothing to vendor. See docs/MODEL-RESEARCH.md §1.
+ *
+ * The `4.0.0_fast` variants are the integerised LSTM models — roughly a third
+ * the size of the full ones, at a small accuracy cost that is dwarfed by the
+ * cost of photographing a handwritten register in bad light.
+ */
+const LANGS = ['fra', 'eng']
+const langUrl = (lang) =>
+  `https://raw.githubusercontent.com/naptha/tessdata/gh-pages/4.0.0_fast/${lang}.traineddata.gz`
 
 /**
  * LSTM-only cores (the smallest that still do modern recognition), in all three
@@ -71,19 +85,30 @@ async function main() {
     console.log(`  copy  ${to} (${(size / 1e6).toFixed(1)} MB)`)
   }
 
-  const langFile = `${LANG}.traineddata.gz`
-  const cached = join(cacheDir, langFile)
-  if (!(await exists(cached))) {
-    console.log(`  fetch ${langFile}…`)
-    const res = await fetch(LANG_URL)
-    if (!res.ok || !res.body) throw new Error(`Failed to fetch ${LANG_URL}: HTTP ${res.status}`)
-    await pipeline(Readable.fromWeb(res.body), createWriteStream(cached))
+  for (const lang of LANGS) {
+    const langFile = `${lang}.traineddata.gz`
+    const cached = join(cacheDir, langFile)
+    if (!(await exists(cached))) {
+      const url = langUrl(lang)
+      console.log(`  fetch ${langFile}…`)
+      const res = await fetch(url)
+      if (!res.ok || !res.body) throw new Error(`Failed to fetch ${url}: HTTP ${res.status}`)
+      // Streamed to a partial name so an interrupted download cannot be
+      // mistaken for a cached one; a truncated model fails opaquely at load.
+      const partial = `${cached}.partial`
+      await pipeline(Readable.fromWeb(res.body), createWriteStream(partial))
+      await copyFile(partial, cached)
+      const { rm } = await import('node:fs/promises')
+      await rm(partial, { force: true })
+    }
+    await copyFile(cached, join(outDir, langFile))
+    const { size } = await stat(join(outDir, langFile))
+    console.log(`  copy  ${langFile} (${(size / 1e6).toFixed(2)} MB)`)
   }
-  await copyFile(cached, join(outDir, langFile))
-  const { size } = await stat(join(outDir, langFile))
-  console.log(`  copy  ${langFile} (${(size / 1e6).toFixed(2)} MB)`)
 
-  console.log('OCR runtime vendored to public/ocr/')
+  // Only ever one model is downloaded by a client: the worker asks for the one
+  // language its country profile names. Server disk, not client bandwidth.
+  console.log(`OCR runtime vendored to public/ocr/ (${LANGS.join(', ')})`)
 }
 
 main().catch((err) => {
