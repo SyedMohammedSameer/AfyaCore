@@ -1,8 +1,22 @@
 /**
  * On-device OCR for photographed paper records.
  *
- * Tesseract with the French model runs entirely in the browser, the image
- * never leaves the phone, which matters because these are patient records.
+ * Tesseract runs entirely in the browser, the image never leaves the phone,
+ * which matters because these are patient records.
+ *
+ * ## The model follows the country, not the interface
+ *
+ * This shipped French-only, which was right when the only deployment was
+ * Madagascar and wrong the moment there were nine countries: a dispensary in
+ * Kenya photographs an English register, and we read it with the French model
+ * and then parsed the result with the English pack. Numerals and drug names
+ * mostly survived that; English prose did not.
+ *
+ * The language is now taken from the country profile's `clinicalLang`, the
+ * same binding the extractor uses and for the same reason — documentation
+ * language is a property of the health system, not of the person holding the
+ * phone. Anything else lets a nurse change the interface language and silently
+ * change how a photograph is read.
  *
  * Cost and how it is managed: the WASM core plus the French model is roughly
  * 12 MB. That is far too much to put in the install, so it is fetched on first
@@ -16,6 +30,9 @@
  * dictation, never as fact.
  */
 
+import { getCountryProfile } from './facility'
+import type { ClinicalLang } from './clinicalLocales'
+
 export interface OcrResult {
   text: string
   /** 0–1, mean over recognised words. */
@@ -26,8 +43,6 @@ export interface OcrResult {
 
 export type OcrProgress = (stage: string, progress: number) => void
 
-// The worker is expensive to spin up (WASM compile + model load), so it is
-// created once and reused for the rest of the session.
 type TesseractWorker = {
   recognize: (image: Blob) => Promise<{
     data: { text: string; confidence: number; words?: { text: string; confidence: number }[] }
@@ -35,12 +50,40 @@ type TesseractWorker = {
   terminate: () => Promise<unknown>
 }
 
-let workerPromise: Promise<TesseractWorker> | null = null
+/**
+ * Tesseract's code for a clinical language.
+ *
+ * Kept as an explicit map rather than a string manipulation so that adding a
+ * clinical language without adding its OCR model is a type error rather than a
+ * request for a `.traineddata` that was never vendored.
+ */
+export const TESSERACT_LANG: Record<ClinicalLang, string> = {
+  fr: 'fra',
+  en: 'eng',
+}
+
+/**
+ * One warm worker per language.
+ *
+ * Keyed rather than singular because a device that changes country mid-session
+ * must not keep recognising with the previous model, and because reusing one
+ * slot would mean tearing down and recompiling the WASM core on every switch.
+ * In practice a device has exactly one country and therefore exactly one entry.
+ */
+const workers = new Map<string, Promise<TesseractWorker>>()
+
+/** The Tesseract language this device should be reading in. */
+async function currentLang(): Promise<string> {
+  const profile = await getCountryProfile()
+  return TESSERACT_LANG[profile.clinicalLang] ?? 'fra'
+}
 
 async function getWorker(onProgress?: OcrProgress): Promise<TesseractWorker> {
-  if (workerPromise) return workerPromise
+  const lang = await currentLang()
+  const existing = workers.get(lang)
+  if (existing) return existing
 
-  workerPromise = (async () => {
+  const created = (async () => {
     // Dynamic import keeps tesseract.js out of the app's entry chunk entirely.
     const { createWorker } = await import('tesseract.js')
 
@@ -49,7 +92,7 @@ async function getWorker(onProgress?: OcrProgress): Promise<TesseractWorker> {
     // and cannot be reliably cached by the service worker.
     const base = `${import.meta.env.BASE_URL}ocr`
 
-    return (await createWorker('fra', 1, {
+    return (await createWorker(lang, 1, {
       workerPath: `${base}/worker.min.js`,
       corePath: base,
       langPath: base,
@@ -59,19 +102,28 @@ async function getWorker(onProgress?: OcrProgress): Promise<TesseractWorker> {
     })) as unknown as TesseractWorker
   })()
 
+  workers.set(lang, created)
   try {
-    return await workerPromise
+    return await created
   } catch (err) {
     // Never cache a failed initialisation, a user who was offline on their
     // first attempt must be able to simply try again once they have signal.
-    workerPromise = null
+    workers.delete(lang)
     throw err
   }
 }
 
-/** True once the OCR pack has been fetched and the worker is warm. */
+/**
+ * True once an OCR pack has been fetched and a worker is warm.
+ *
+ * Deliberately not "the pack for the current country": this is a synchronous
+ * call used to seed a button's label, the country lookup is asynchronous, and
+ * a warm worker for the wrong language still means the 12 MB core is cached.
+ * Getting the language wrong here costs a mislabelled button; making the call
+ * asynchronous would cost a flash of the wrong state on every render.
+ */
 export function isOcrReady(): boolean {
-  return workerPromise !== null
+  return workers.size > 0
 }
 
 /** Pre-fetch the OCR pack. Called from Settings while connectivity exists. */
@@ -98,8 +150,12 @@ export async function recogniseImage(blob: Blob, onProgress?: OcrProgress): Prom
 }
 
 export async function releaseOcr(): Promise<void> {
-  if (!workerPromise) return
-  const worker = await workerPromise.catch(() => null)
-  workerPromise = null
-  await worker?.terminate().catch(() => undefined)
+  const pending = [...workers.values()]
+  workers.clear()
+  await Promise.all(
+    pending.map(async (p) => {
+      const worker = await p.catch(() => null)
+      await worker?.terminate().catch(() => undefined)
+    }),
+  )
 }

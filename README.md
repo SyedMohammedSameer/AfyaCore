@@ -558,10 +558,10 @@ much quieter bug than a wrong one.
 - ⚠️ **Deleting a confirmed consultation changes figures already reported.** The record drops out of
   the monthly aggregate, so a re-export will not match what was submitted. The prompt says so, but
   nothing enforces it; a reporting lock once a month is exported is the real fix.
-- **OCR is French-only.** The Tesseract model is `fra` regardless of interface language, so an
-  English deployment reads a page with the French model and then parses the result with the English
-  pack. Fine for numerals and drug names, poor for English prose. A second model is a build-script
-  change, not an architecture one.
+- **OCR covers French and English only**, and follows the *country*, not the interface language —
+  the same binding the extractor uses, because documentation language is a property of the health
+  system rather than of the person holding the phone. A device downloads exactly one model. There is
+  no Malagasy model: Tesseract has no `mlg`, so a Malagasy register is read with `fra`.
 - **OCR reads print well, handwriting poorly.** Expect heavy correction on handwritten registers,
   this is a property of the problem, not of the implementation.
 - **Diagnoses are not coded.** They are free text; the app does not guess at ICD-10. Reporting
