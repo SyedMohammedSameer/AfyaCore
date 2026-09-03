@@ -1,4 +1,5 @@
 import type { LangCode, Prescription, Vitals, VitalKey } from '../db/schema'
+import { patientPack, type PatientLang } from '../i18n/patient'
 import { VITAL_RANGES } from '../db/schema'
 import type { Strings } from '../i18n/strings'
 
@@ -94,51 +95,25 @@ export function hasAnyVital(v: Vitals): boolean {
 }
 
 /**
- * Malagasy multiplicative numerals ("how many times").
- *
- * These are irregular and cannot be produced by concatenating a digit, "3
- * indray" is not Malagasy, "intelo" is. Dosage frequency is exactly the wrong
- * place to be approximately grammatical, so the common values are spelled out.
- *
- * ⚠️ Unreviewed by a native speaker, see i18n/strings.ts.
- */
-const MALAGASY_TIMES: Record<number, string> = {
-  1: 'indray mandeha',
-  2: 'indroa',
-  3: 'intelo',
-  4: 'inefatra',
-  5: 'indimy',
-  6: 'inenina',
-}
-
-function malagasyTimes(n: number): string {
-  return MALAGASY_TIMES[n] ?? `in-${n}`
-}
-
-/**
  * Render a prescription as an instruction a patient can act on.
  *
  * Deliberately produced from the structured fields rather than echoing the
  * clinician's dictation: the patient needs "1 comprimé, 3 fois par jour,
  * pendant 5 jours", not a transcript of a professional talking to themselves.
  *
- * ⚠️ The Malagasy wording here is an unreviewed draft, see i18n/strings.ts.
+ * The wording comes from the patient pack rather than an if/else chain here,
+ * which is what lets a tenth language be an object in one file instead of
+ * another branch in a function nobody remembers to update.
+ *
+ * ⚠️ Only the French and English packs have been read by a speaker. See
+ * src/i18n/patient.ts.
  */
-export function prescriptionInstruction(p: Prescription, lang: LangCode): string {
+export function prescriptionInstruction(p: Prescription, lang: PatientLang): string {
+  const pack = patientPack(lang)
   const parts: string[] = [p.drug]
   if (p.dose) parts.push(p.dose)
-
-  if (lang === 'mg') {
-    if (p.frequencyPerDay) parts.push(`${malagasyTimes(p.frequencyPerDay)} isan'andro`)
-    if (p.durationDays) parts.push(`mandritra ny ${p.durationDays} andro`)
-  } else if (lang === 'en') {
-    if (p.frequencyPerDay) parts.push(`${p.frequencyPerDay} time${p.frequencyPerDay > 1 ? 's' : ''} per day`)
-    if (p.durationDays) parts.push(`for ${p.durationDays} day${p.durationDays > 1 ? 's' : ''}`)
-  } else {
-    if (p.frequencyPerDay) parts.push(`${p.frequencyPerDay} fois par jour`)
-    if (p.durationDays) parts.push(`pendant ${p.durationDays} jour${p.durationDays > 1 ? 's' : ''}`)
-  }
-
+  if (p.frequencyPerDay) parts.push(pack.timesPerDay(p.frequencyPerDay))
+  if (p.durationDays) parts.push(pack.forDays(p.durationDays))
   return parts.join(', ')
 }
 

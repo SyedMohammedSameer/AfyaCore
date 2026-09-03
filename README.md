@@ -161,8 +161,43 @@ Two things are translated independently, because they are used by different peop
 | | Follows | Currently |
 |---|---|---|
 | Interface | staff preference | French, Malagasy, English |
-| Patient instruction sheet | the patient's recorded language | French, Malagasy, English |
-| **Dictation and extraction** | the interface language | **French, English** |
+| **Patient instruction sheet** | the patient's recorded language | **10 languages, covering all nine countries** |
+| **Dictation and extraction** | the deployment's country | **French, English** |
+
+The patient sheet used to print in French, Malagasy and English — which meant that for **eight of
+the nine countries it printed in the clinician's language**. A dispensary in Tanzania handed out
+English. That is exactly the failure the sheet exists to prevent, and it survived the pan-African
+work because phone patterns, formularies, statutes and HMIS names all generalised and the
+patient-facing surface did not.
+
+It survived for a structural reason worth naming: the sheet rendered from the 232-key *interface*
+dictionary, so adding a patient language meant translating every settings label and error message in
+the app in order to print four lines on a sheet of paper. The cost model made the gap invisible. The
+patient-facing surface is in fact **five strings**, now split into `src/i18n/patient.ts`, and a
+language is one object.
+
+| Country | Patient sheet prints in |
+|---|---|
+| Madagascar | Malagasy · French |
+| Senegal | Wolof · French |
+| Côte d'Ivoire | Dioula · French |
+| DR Congo | Lingala · Kiswahili · French |
+| Kenya · Tanzania | Kiswahili · English |
+| Uganda | Luganda · Kiswahili · English |
+| Nigeria | Hausa · English |
+| Ghana | Twi · English |
+
+⚠️ **Only the French and English packs have been read by someone who speaks them.** Every other pack
+ships `reviewed: false`, and the app prints a warning on the sheet naming the language. This is a
+safety property rather than modesty: "twice a day" and "every two days" differ by one word in most
+languages and by a factor of four in the dose delivered. A facility deploying in one of these
+languages needs a speaker who works in that health system to read five strings before a sheet is
+handed to a patient.
+
+What holds the sheet up meanwhile is the part that needs no translation at all — the drug name as
+written, the numerals, the total count to hand over, and the sunrise/midday/night dosing icons.
+Those were always the load-bearing elements for a patient with limited literacy, and they are
+identical in every language.
 
 The interface language is switched from the chip in the header of any top-level screen, from the
 sidebar on a wide screen, or from `Settings → Language`. On a device's first run it follows the
@@ -563,8 +598,10 @@ much quieter bug than a wrong one.
 
 ## Known limits
 
-- ⚠️ **Malagasy strings are an unreviewed draft.** They need a native speaker before any real
-  deployment, wrong dosage wording is a safety issue, not a polish issue.
+- ⚠️ **Eight of the ten patient-sheet translations are unreviewed**, and the interface Malagasy with
+  them. They need a speaker who works in that health system before any real deployment; wrong dosage
+  wording is a safety issue, not a polish issue. The app says so on the sheet, and the numerals and
+  dosing icons carry the instruction regardless.
 - **Dictation needs network** (browser recogniser). Manual entry always works offline. Offline
   ASR is the first planned upgrade.
 - ⚠️ **The audit chain detects tampering, it does not prevent it.** A hash chain makes an edited or

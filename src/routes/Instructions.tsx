@@ -1,21 +1,15 @@
 import { useState } from 'react'
 import { useParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Moon, Printer, Sun, Sunrise, Volume2 } from 'lucide-react'
+import { Moon, Printer, ShieldAlert, Sun, Sunrise, Volume2 } from 'lucide-react'
 import { AppShell } from '../components/AppShell'
 import { ActionBar, Button, Card, SkeletonRows, cx } from '../components/ui'
 import { db } from '../db/db'
 import { prescriptionInstruction, totalDoses } from '../lib/format'
 import { speak, type RecogniserLang } from '../lib/speech'
 import { useI18n } from '../i18n'
-import { STRINGS } from '../i18n/strings'
-import type { LangCode, Prescription } from '../db/schema'
-
-const SPEECH_LANG: Record<LangCode, RecogniserLang> = {
-  fr: 'fr-FR',
-  mg: 'mg-MG',
-  en: 'en-US',
-}
+import { patientPack, type PatientLang } from '../i18n/patient'
+import type { Prescription } from '../db/schema'
 
 /**
  * When to take a dose, as pictures.
@@ -78,7 +72,7 @@ function DosingClock({ frequencyPerDay }: { frequencyPerDay?: number }) {
   )
 }
 
-function PrescriptionRow({ p, index, lang }: { p: Prescription; index: number; lang: LangCode }) {
+function PrescriptionRow({ p, index, lang }: { p: Prescription; index: number; lang: PatientLang }) {
   const total = totalDoses(p)
   // The drug name is already the card heading, so the detail line drops it.
   const detail = prescriptionInstruction({ ...p, drug: '' }, lang).replace(/^,\s*/, '')
@@ -146,19 +140,22 @@ export function Instructions() {
 
   // The patient's language, not the interface language.
   const lang = patient.preferredLang
-  const strings = STRINGS[lang]
+  const pack = patientPack(lang)
   const fullText = encounter.prescriptions.map((p) => prescriptionInstruction(p, lang)).join('. ')
 
   function readAloud() {
     if (!fullText) return
-    setSpoken(speak(fullText, SPEECH_LANG[lang]) ? 'ok' : 'unavailable')
+    // No voice for most of these languages, which is reported rather than
+    // failing silently: the sheet is the deliverable, speech is a bonus.
+    const voice = pack.speechLang as RecogniserLang | null
+    setSpoken(voice && speak(fullText, voice) ? 'ok' : 'unavailable')
   }
 
   return (
     <AppShell title={t.instructions} subtitle={`${patient.familyName} ${patient.givenName}`} showBack>
       <div className="flex flex-col gap-3 pb-4">
         <div className="rounded-card bg-brand-gradient px-4 py-4 text-white shadow-lift">
-          <p className="text-sm font-semibold text-white/70">{strings.instructionsFor}</p>
+          <p className="text-sm font-semibold text-white/70">{pack.instructionsFor}</p>
           <p className="text-2xl leading-tight font-extrabold">
             {patient.familyName} {patient.givenName}
           </p>
@@ -167,7 +164,7 @@ export function Instructions() {
 
         {encounter.prescriptions.length === 0 ? (
           <Card>
-            <p className="text-ink-3">{strings.noEncounters}</p>
+            <p className="text-ink-3">{pack.noPrescriptions}</p>
           </Card>
         ) : (
           <ol className="flex flex-col gap-3">
@@ -181,6 +178,16 @@ export function Instructions() {
 
         {spoken === 'unavailable' && (
           <p className="rounded-field bg-warn-50 p-3 text-sm text-warn-700 print:hidden">{t.noVoiceAvailable}</p>
+        )}
+
+        {!pack.reviewed && (
+          /* Shown to the clinician handing the sheet over, and printed with it.
+             A translation nobody has checked is a safety claim nobody has
+             checked, and the person who can catch it is the one in the room. */
+          <p className="flex items-start gap-2 rounded-field bg-warn-50 p-2.5 text-xs leading-relaxed text-warn-700">
+            <ShieldAlert size={16} className="mt-0.5 shrink-0" />
+            {t.unreviewedTranslation.replace('{lang}', pack.name)}
+          </p>
         )}
 
         <p className="px-1 text-xs text-ink-4 print:hidden">{t.dataNotice}</p>

@@ -6,8 +6,9 @@ import { ActionBar, Button, Card, Field, Input, Select, SkeletonRows } from '../
 import { db } from '../db/db'
 import { createPatient, updatePatient } from '../db/repo'
 import { useI18n } from '../i18n'
-import { LANG_LABELS } from '../i18n'
-import type { LangCode, Sex } from '../db/schema'
+import { PATIENT_PACKS, patientLangCodes, type PatientLang } from '../i18n/patient'
+import { useCountryProfile } from '../lib/facility'
+import type { Sex } from '../db/schema'
 
 /**
  * Patient registration, and the same form in edit mode.
@@ -24,6 +25,7 @@ import type { LangCode, Sex } from '../db/schema'
  */
 export function NewPatient() {
   const { t } = useI18n()
+  const profile = useCountryProfile()
   const navigate = useNavigate()
   const { patientId } = useParams()
   const editing = patientId !== undefined
@@ -41,7 +43,7 @@ export function NewPatient() {
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
   const [registerNo, setRegisterNo] = useState('')
-  const [preferredLang, setPreferredLang] = useState<LangCode>('mg')
+  const [preferredLang, setPreferredLang] = useState<PatientLang | ''>('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -63,6 +65,21 @@ export function NewPatient() {
     setLoaded(true)
   }, [editing, loaded, existing])
 
+  /*
+   * The languages this country's patients actually read, first.
+   *
+   * A clinician in Tanzania should find Kiswahili at the top of the list, not
+   * buried under three languages nobody in the room speaks. The rest stay
+   * available underneath, because a patient is not obliged to speak the
+   * language of the country they are standing in — a refugee, a trader, a
+   * family that moved. Restricting the list would be modelling the common case
+   * as the only case.
+   */
+  const langOptions: PatientLang[] = [
+    ...profile.patientLangs,
+    ...patientLangCodes().filter((c) => !profile.patientLangs.includes(c)),
+  ]
+
   async function save() {
     if (!familyName.trim()) {
       setError(t.required)
@@ -81,7 +98,7 @@ export function NewPatient() {
         phone: phone.trim() || undefined,
         address: address.trim() || undefined,
         registerNo: registerNo.trim() || undefined,
-        preferredLang,
+        preferredLang: preferredLang || langOptions[0]!,
       }
 
       if (editing && patientId) {
@@ -173,10 +190,14 @@ export function NewPatient() {
             </Field>
 
             <Field label={t.preferredLang} hint={t.preferredLangHint}>
-            <Select value={preferredLang} onChange={(e) => setPreferredLang(e.target.value as LangCode)}>
-              {(Object.keys(LANG_LABELS) as LangCode[]).map((code) => (
+            <Select
+              value={preferredLang || langOptions[0]}
+              onChange={(e) => setPreferredLang(e.target.value as PatientLang)}
+            >
+              {langOptions.map((code) => (
                 <option key={code} value={code}>
-                  {LANG_LABELS[code]}
+                  {PATIENT_PACKS[code].name}
+                  {!PATIENT_PACKS[code].reviewed ? ' ⚠' : ''}
                 </option>
               ))}
             </Select>

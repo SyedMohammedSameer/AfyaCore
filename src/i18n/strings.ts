@@ -175,6 +175,7 @@ export interface Strings {
   withoutDelay: string
   retention: string
   unconfirmed: string
+  unreviewedTranslation: string
   notLegalAdvice: string
   // Optional on-device PII model (OpenMed). An accuracy upgrade over the
   // deterministic scrub, never a replacement for it.
@@ -427,6 +428,8 @@ const fr: Strings = {
   withoutDelay: 'Sans délai',
   retention: 'Durée de conservation',
   unconfirmed: 'À confirmer',
+  unreviewedTranslation:
+    'Traduction en {lang} non relue par un locuteur. Vérifiez la posologie avec le patient.',
   notLegalAdvice: 'Ces informations sont fournies à titre indicatif et n’ont pas été validées par un juriste de ce pays. Elles ne constituent pas un avis juridique.',
   piiPack: 'Modèle d’anonymisation',
   piiPackHint: 'Repère dans les notes les noms que le registre ne contient pas, par exemple un parent cité en passant. Le nettoyage de base fonctionne sans lui.',
@@ -672,6 +675,8 @@ const mg: Strings = {
   withoutDelay: 'Avy hatrany',
   retention: 'Faharetan’ny fitehirizana',
   unconfirmed: 'Mbola hamarinina',
+  unreviewedTranslation:
+    'Tsy mbola nohamarinin’ny mpiteny ny fandikan-teny {lang}. Hamarino amin’ny marary ny dosy.',
   notLegalAdvice: 'Torohevitra fotsiny ireto vaovao ireto ary tsy nohamarinin’ny mpahay lalàna ao amin’ity firenena ity.',
   piiPack: 'Modely fanafenana anarana',
   piiPackHint: 'Mahita anarana tsy ao amin’ny rejisitra ao anaty naotra, ohatra havana voatonona. Miasa ihany ny fanadiovana fototra na tsy misy izy.',
@@ -916,6 +921,8 @@ const en: Strings = {
   withoutDelay: 'Without delay',
   retention: 'Retention period',
   unconfirmed: 'To confirm',
+  unreviewedTranslation:
+    'The {lang} translation has not been checked by a speaker. Confirm the dosage with the patient.',
   notLegalAdvice: 'Recorded for guidance and not reviewed by a lawyer in this jurisdiction. This is not legal advice.',
   piiPack: 'De-identification model',
   piiPackHint: 'Finds names in notes that the roster does not hold, such as a relative mentioned in passing. The deterministic scrub works without it.',
