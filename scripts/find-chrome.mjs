@@ -9,7 +9,8 @@
  *
  * `CHROME_PATH` always wins, so CI and unusual installs need no code change.
  */
-import { access } from 'node:fs/promises'
+import { access, readdir } from 'node:fs/promises'
+import { join } from 'node:path'
 
 export const CHROME_CANDIDATES = [
   process.env.CHROME_PATH,
@@ -26,8 +27,35 @@ export const CHROME_CANDIDATES = [
   '/snap/bin/chromium',
 ].filter(Boolean)
 
+/**
+ * Playwright keeps its Chromium in a versioned directory, so the path cannot
+ * be a constant. Cloud build images (and any machine where the browser came
+ * from `playwright install`) have it here and nowhere else, which is why the
+ * fixed list above finds nothing on them.
+ */
+async function playwrightChromes() {
+  const root = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers'
+  let entries
+  try {
+    entries = await readdir(root)
+  } catch {
+    return []
+  }
+  return entries
+    .filter((name) => name.startsWith('chromium'))
+    // Plain `chromium-*` before `chromium_headless_shell-*`: the headless
+    // shell cannot do everything a full build can, so it is the fallback.
+    .sort()
+    .flatMap((name) => [
+      join(root, name, 'chrome-linux', 'chrome'),
+      join(root, name, 'chrome-linux', 'headless_shell'),
+      join(root, name, 'chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
+    ])
+}
+
 export async function findChrome() {
-  for (const path of CHROME_CANDIDATES) {
+  const candidates = [...CHROME_CANDIDATES, ...(await playwrightChromes())]
+  for (const path of candidates) {
     try {
       await access(path)
       return path
@@ -38,6 +66,6 @@ export async function findChrome() {
   throw new Error(
     'No Chromium-based browser found. Install Chrome, Chromium or Brave, or set\n' +
       'CHROME_PATH to a binary.\n\nTried:\n  ' +
-      CHROME_CANDIDATES.join('\n  '),
+      candidates.join('\n  '),
   )
 }
