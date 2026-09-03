@@ -24,12 +24,12 @@
  *
  *   npm run demo:preview
  *
- * Regenerate it whenever `docs/demo.mp4` changes; the timings below are read
- * from the beat boundaries in `video/src/Demo.tsx`, so they have to move
- * together.
+ * Regenerate it whenever `docs/demo.mp4` changes. The sample points are read
+ * out of `video/src/Demo.tsx` at run time, so adding or reordering a beat
+ * needs no change here.
  */
 import { spawn } from 'node:child_process'
-import { stat, access, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { stat, access, mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -39,30 +39,49 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SOURCE = join(root, 'docs', 'demo.mp4')
 const OUT = join(root, 'docs', 'demo-preview.webp')
 
-/**
- * Where to sample, in seconds into the finished render.
- *
- * These sit a couple of seconds inside each beat rather than at its edge. A
- * beat opens with a spring and a fade, so a sample taken at the boundary
- * catches the shot mid-arrival and reads as a stutter once it loops.
- *
- * Beat boundaries, from `video/src/Demo.tsx`: 0, 6, 15, 24, 34, 45, 55, 68,
- * 78, 92. If those change, these have to.
- */
-const SAMPLES = [
-  2.5, // title
-  9, // open it and start
-  18, // find anyone in seconds
-  27, // speak the consultation
-  37, // you stay in charge
-  48, // the patient takes it home
-  60, // offline
-  71, // reports the ministry expects
-  82, // the numbers
-  94, // open source
-]
-
 const CLIP_SECONDS = 1.8
+
+/**
+ * How far into a beat to start sampling, in seconds.
+ *
+ * Not at the boundary. A beat opens with a spring and a fade, so a sample
+ * taken at its edge catches the shot mid-arrival and reads as a stutter once
+ * the montage loops.
+ */
+const SETTLE = 2.5
+
+/**
+ * Read the beat lengths out of the composition rather than restating them.
+ *
+ * This was a hand-maintained list of timestamps with a comment saying "if the
+ * beats change, these have to". Adding one beat in the middle silently shifted
+ * every sample after it into the wrong shot, and nothing would have complained
+ * — the preview would just have shown the same beat twice and skipped another.
+ * That is the same failure the screenshots had: an artefact that stays
+ * plausible after the thing it describes has moved.
+ *
+ * `Demo.tsx` already holds the durations in the only place they can be right,
+ * so this parses them from there. It throws rather than guessing if the shape
+ * it expects is gone.
+ */
+async function sampleTimes() {
+  const source = await readFile(join(root, 'video', 'src', 'Demo.tsx'), 'utf8')
+  const durations = [...source.matchAll(/d:\s*s\((\d+(?:\.\d+)?)\)/g)].map((m) => Number(m[1]))
+  if (durations.length === 0) {
+    throw new Error('no beat durations found in video/src/Demo.tsx; has `d: s(n)` changed shape?')
+  }
+
+  const samples = []
+  let at = 0
+  for (const duration of durations) {
+    // Clamp so a beat shorter than the settle time plus the clip still yields
+    // frames from inside itself rather than spilling into the next one.
+    const latest = Math.max(0, duration - CLIP_SECONDS - 0.2)
+    samples.push(Number((at + Math.min(SETTLE, latest)).toFixed(2)))
+    at += duration
+  }
+  return samples
+}
 const FPS = 10
 const WIDTH = 800
 
@@ -145,6 +164,7 @@ async function main() {
   // The source is 16:9; deriving the height keeps this correct if that ever
   // changes rather than hard-coding 450 and silently squashing the frame.
   const height = Math.round((WIDTH * 1080) / 1920)
+  const SAMPLES = await sampleTimes()
 
   console.log(`building the README preview from docs/demo.mp4`)
   console.log(`  ${SAMPLES.length} samples x ${CLIP_SECONDS}s at ${FPS} fps, ${WIDTH}x${height}\n`)

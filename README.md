@@ -36,7 +36,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/demo.mp4"><strong>Watch the full 99 seconds</strong></a> · silent, 1920x1080, 6 MB
+  <a href="docs/demo.mp4"><strong>Watch the full 110 seconds</strong></a> · silent, 1920x1080, 6.7 MB
 </p>
 
 The loop above is a trailer, two seconds sampled from each beat of the real render. Every frame of
@@ -53,10 +53,11 @@ npm --prefix video run render:web         # the smaller copy committed above
 npm run demo:preview                      # the looping WebP at the top of this section
 ```
 
-`demo:preview` samples the render rather than converting it. A 99-second animation is about a
-thousand frames and would dwarf the video it advertises on a page people open to read; sampling
-each beat gives 20 seconds in 0.6 MB, which plays inline where GitHub would only offer a link. Its
-sample points are the beat boundaries from `video/src/Demo.tsx`, so the two move together.
+`demo:preview` samples the render rather than converting it. A 110-second animation is over a
+thousand frames and would dwarf the video it advertises on a page people open to read; taking two
+seconds out of each beat gives 22 seconds in 0.6 MB, which plays inline where GitHub would only
+offer a link. It reads the beat lengths out of `video/src/Demo.tsx` at run time, so adding or
+reordering a beat needs no change to the preview script.
 
 The offline sequence is captured live rather than composed from stills, because it is the claim the
 project rests on: the capture enrols the device against a throwaway sync server, switches the
