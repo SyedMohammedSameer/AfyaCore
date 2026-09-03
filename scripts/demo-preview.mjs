@@ -42,11 +42,12 @@ const OUT = join(root, 'docs', 'demo-preview.webp')
 const CLIP_SECONDS = 1.8
 
 /**
- * How far into a beat to start sampling, in seconds.
+ * How far into a beat to start sampling, as a share of a beat written at 1x.
  *
  * Not at the boundary. A beat opens with a spring and a fade, so a sample
  * taken at its edge catches the shot mid-arrival and reads as a stutter once
- * the montage loops.
+ * the montage loops. Expressed in authoring seconds and divided by the render
+ * speed below, because the entrance animation compresses with everything else.
  */
 const SETTLE = 2.5
 
@@ -71,13 +72,29 @@ async function sampleTimes() {
     throw new Error('no beat durations found in video/src/Demo.tsx; has `d: s(n)` changed shape?')
   }
 
+  /*
+   * Beats are written at one speed and rendered at another.
+   *
+   * `Demo.tsx` counts in authoring seconds; the file plays back at `SPEED`
+   * times that, so a beat written as eleven seconds is five and a half in the
+   * mp4 this script is seeking through. Reading the constant rather than
+   * assuming 1 keeps the samples pointing at the beats they name — the same
+   * coupling that made the hard-coded timestamp list wrong.
+   */
+  const theme = await readFile(join(root, 'video', 'src', 'theme.ts'), 'utf8')
+  const speed = Number(theme.match(/export const SPEED = (\d+(?:\.\d+)?)/)?.[1] ?? 1)
+  if (!Number.isFinite(speed) || speed <= 0) {
+    throw new Error('could not read SPEED from video/src/theme.ts')
+  }
+
   const samples = []
   let at = 0
-  for (const duration of durations) {
+  for (const authored of durations) {
+    const duration = authored / speed
     // Clamp so a beat shorter than the settle time plus the clip still yields
     // frames from inside itself rather than spilling into the next one.
     const latest = Math.max(0, duration - CLIP_SECONDS - 0.2)
-    samples.push(Number((at + Math.min(SETTLE, latest)).toFixed(2)))
+    samples.push(Number((at + Math.min(SETTLE / speed, latest)).toFixed(2)))
     at += duration
   }
   return samples
