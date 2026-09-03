@@ -91,17 +91,14 @@ Every screenshot below is the real build against the synthetic demo workspace, r
 | <img src="docs/screenshots/mobile-lock.webp" alt="PIN entry lock screen" width="240"> | <img src="docs/screenshots/mobile-review.webp" alt="Review screen showing per-field provenance" width="240"> | <img src="docs/screenshots/mobile-instructions.webp" alt="Patient instruction sheet in Malagasy with dosing icons" width="240"> |
 | A shared phone needs to know who is holding it, or the audit trail says "someone at this facility". | Per-field provenance. Low-confidence values are flagged *Check this* before anything is saved. | Rendered in the **patient's** language, with dosing icons for anyone who cannot read. |
 
-The one screen worth dwelling on. Install the speech model (`npm run vendor:whisper`) and dictation
-is transcribed by Whisper in a worker **on the phone**: nothing is sent anywhere, it works with the
-network off, and the panel says so. Without it, the browser's dictation streams audio to the
-vendor's recognition service, so the microphone is **not offered** until somebody accountable for
-the facility's data says that is acceptable — and once it is, a reminder stays on screen for as long
-as it is in force:
+The one screen worth dwelling on, in all three states it can be in. These are three captures of the
+same screen under two deployment configurations — `npm run screenshots` moves the speech model aside
+and back so both are photographed from the running app rather than described:
 
-| Before acknowledgement | After |
-|---|---|
-| <img src="docs/screenshots/mobile-dictation-disclosure.webp" alt="Dictation disclosure: audio leaves the device" width="240"> | <img src="docs/screenshots/mobile-encounter.webp" alt="Consultation capture with the dictation panel active" width="240"> |
-| No microphone. Typing works offline and never leaves the device, so refusing costs typing speed rather than function. | Audited, withdrawable, and never silent about what it is doing. |
+| With the speech model | Without it | After acknowledgement |
+|---|---|---|
+| <img src="docs/screenshots/mobile-encounter.webp" alt="Dictation panel confirming recognition happens on the device" width="220"> | <img src="docs/screenshots/mobile-dictation-disclosure.webp" alt="Dictation disclosure: audio leaves the device" width="220"> | <img src="docs/screenshots/mobile-encounter-remote.webp" alt="Dictation panel with the external-recognition reminder in force" width="220"> |
+| Whisper transcribes in a worker on the phone. Nothing is sent anywhere and it works with the network off. **This is the deployment to ship.** | No microphone until somebody accountable for the facility's data says the transfer is acceptable. Typing works offline and never leaves the device, so refusing costs typing speed rather than function. | Audited, withdrawable, and never silent about what it is doing: the reminder stays for as long as it is in force. |
 
 The same build on a laptop, where the roster becomes a rail and the reporting screen has room to
 breathe:
