@@ -32,7 +32,7 @@
  *
  * We use the smallest French one that exists:
  * `OpenMed-PII-French-ClinicalE5-Small-33M-v1-onnx-android`, 33M parameters,
- * ~67 MB as fp16. The 44M SuperClinical variant is a DeBERTa-v2 whose fp32
+ * ~70 MB as int8. The 44M SuperClinical variant is a DeBERTa-v2 whose fp32
  * graph is 566 MB with an 8 MB SentencePiece tokenizer, which is not a download
  * to ask of a health post.
  *
@@ -289,6 +289,25 @@ export async function isModelAvailable(fetchImpl: typeof fetch = fetch): Promise
 let cached: NerBackend | null = null
 
 /**
+ * Where and whether to look for the model.
+ *
+ * These exist for the evaluation harness, which runs under Node rather than in
+ * a browser, and the distinction is not cosmetic. `isModelAvailable` fetches
+ * `/models/...`, an origin-relative path that is meaningful in a page and a
+ * `TypeError` in Node; `localModelPath` is a URL prefix in the browser and a
+ * filesystem directory in Node. Left as they were, the harness caught the
+ * throw, reported "model absent", and would have gone on doing so after a
+ * perfectly successful download — which is the sort of thing that gets
+ * diagnosed as "the model doesn't work".
+ */
+export interface LoadBackendOptions {
+  /** URL prefix in a browser, filesystem directory under Node. Must end in a separator. */
+  modelRoot?: string
+  /** Presence check. Defaults to fetching the config over HTTP. */
+  available?: () => Promise<boolean>
+}
+
+/**
  * Load the model and return a backend, or null if it is not present.
  *
  * Returns null rather than throwing. The caller is an export path, and an
@@ -299,9 +318,11 @@ let cached: NerBackend | null = null
  * onnxruntime-web enters the initial bundle. The whole premise of the app is a
  * 130 kB install over 2G.
  */
-export async function loadBackend(): Promise<NerBackend | null> {
+export async function loadBackend(options: LoadBackendOptions = {}): Promise<NerBackend | null> {
+  const { modelRoot = '/models/', available = isModelAvailable } = options
+
   if (cached) return cached
-  if (!(await isModelAvailable())) return null
+  if (!(await available())) return null
 
   try {
     const { pipeline, env } = await import('@huggingface/transformers')
@@ -312,14 +333,19 @@ export async function loadBackend(): Promise<NerBackend | null> {
     // filtered connection is the normal case, not the edge case.
     env.allowRemoteModels = false
     env.allowLocalModels = true
-    env.localModelPath = '/models/'
+    env.localModelPath = modelRoot
     // Optional-chained: the shape of `env.backends` depends on which
     // transformers.js build resolves, and a missing backend must degrade to the
     // deterministic scrub rather than throw inside an export.
     if (env.backends?.onnx?.wasm) env.backends.onnx.wasm.wasmPaths = '/ort/'
 
+    // int8, matching the graph `scripts/vendor-openmed.mjs` vendors. The model
+    // card names int8 the "CPU, WebAssembly, and Android default" and reserves
+    // fp16 for WebGPU, and we ship no WebGPU runtime. Changing one of these
+    // two without the other means the pipeline looks for a file that is not
+    // there, which surfaces as a silent fall back to the deterministic scrub.
     const pipe = await pipeline('token-classification', 'openmed-pii-fr', {
-      dtype: 'fp16',
+      dtype: 'int8',
     })
 
     cached = async (text: string) => {
@@ -349,7 +375,14 @@ export async function loadBackend(): Promise<NerBackend | null> {
   }
 }
 
-/** Drop the cached pipeline, freeing its memory. */
+/**
+ * Drop the cached pipeline, freeing its memory.
+ *
+ * Also the escape hatch for `loadBackend`'s cache, which is keyed on nothing:
+ * a second call with different options returns the first backend. That is
+ * correct for the app, which only ever has one model, and a trap for a test
+ * that wants two.
+ */
 export function unloadBackend(): void {
   cached = null
 }
