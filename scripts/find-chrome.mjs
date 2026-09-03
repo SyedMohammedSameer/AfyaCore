@@ -53,6 +53,29 @@ async function playwrightChromes() {
     ])
 }
 
+/**
+ * Launch flags every script here needs, in the same one place as the browser.
+ *
+ * `--no-sandbox` was previously added only when running as root, on the
+ * reasoning that Chromium refuses to start as root with its sandbox on and
+ * that this is a container-only problem. Both halves were wrong, and the
+ * offline smoke walk failed on every CI run from the day it was added because
+ * of it: a GitHub runner is *not* root, so the flag was withheld, and Ubuntu
+ * 23.10 and later restrict unprivileged user namespaces through AppArmor, so
+ * Chromium's zygote aborts before the first page loads. Ten red runs, and the
+ * step had never once been green.
+ *
+ * Turning the sandbox off unconditionally is safe here in a way it would not
+ * be in a browser: every one of these scripts drives our own build, served
+ * from localhost, in a throwaway profile. The sandbox exists to contain
+ * hostile page content, and there is none. Nothing here ever visits the web.
+ *
+ * `--disable-dev-shm-usage` is the companion fix for the other container
+ * failure: /dev/shm defaults to 64 MB in Docker and Chromium fills it, which
+ * shows up as a tab crashing mid-run rather than as an error anyone can read.
+ */
+export const LAUNCH_ARGS = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+
 export async function findChrome() {
   const candidates = [...CHROME_CANDIDATES, ...(await playwrightChromes())]
   for (const path of candidates) {
