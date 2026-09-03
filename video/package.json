@@ -6,7 +6,8 @@
   "scripts": {
     "capture": "node capture.mjs",
     "studio": "remotion studio src/index.ts",
-    "render": "remotion render src/index.ts Demo out/afyacore-demo.mp4 --muted"
+    "render": "node render.mjs",
+    "render:web": "node render.mjs ../docs/demo.mp4 26"
   },
   "dependencies": {
     "@remotion/bundler": "^4.0.520",
