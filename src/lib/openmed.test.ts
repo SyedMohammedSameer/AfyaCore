@@ -664,3 +664,53 @@ describe('the guard survives WordPiece fragmentation', () => {
     expect(out).toContain('sels de réhydratation orale')
   })
 })
+
+describe('spans are snapped to whole words', () => {
+  it('protects a drug the model only tagged part of', () => {
+    // The actual reason `paracétamol` survived three rounds of guard fixes:
+    // the guard was never asked about `paracétamol`, it was asked about
+    // `para`. No formulary contains `para`, so no amount of widening the
+    // lists could have helped.
+    const text = 'matin et soir, paracétamol si fièvre'
+    const at = text.indexOf('paracétamol')
+    const { text: out } = applyEntities(text, [
+      { label: 'LASTNAME', start: at, end: at + 4, score: 0.9 },
+    ])
+    expect(out).toBe(text)
+  })
+
+  it('leaves no tail when only part of a name is tagged', () => {
+    // The privacy half, and the worse one. `Raman` redacted out of
+    // `Ramanantsoa` leaves `[…]antsoa`, which is still legible — and an
+    // evaluation asking whether the output contains `Ramanantsoa` scores that
+    // as a successful removal. A partial redaction leaks and reports success.
+    const text = 'adressé par Ramanantsoa hier'
+    const at = text.indexOf('Ramanantsoa')
+    const { text: out } = applyEntities(text, [
+      { label: 'LASTNAME', start: at, end: at + 5, score: 0.9 },
+    ])
+    expect(out).toBe('adressé par […] hier')
+    expect(out).not.toMatch(/antsoa/)
+  })
+
+  it('snaps from the middle of a word outwards in both directions', () => {
+    const text = 'vu par Rakotomalala'
+    const at = text.indexOf('koto')
+    const { text: out } = applyEntities(text, [
+      { label: 'LASTNAME', start: at, end: at + 4, score: 0.9 },
+    ])
+    expect(out).toBe('vu par […]')
+  })
+
+  it('does not swallow across a hyphen or an apostrophe', () => {
+    // Boundaries, so that `Henoch-Schönlein` and `l'état` are not absorbed
+    // whole from a single tagged piece.
+    const text = "altération de l'état général"
+    const at = text.indexOf('tat')
+    const [{ start, end }] = [{ start: at, end: at + 3 }]
+    const { text: out } = applyEntities(text, [
+      { label: 'LASTNAME', start, end, score: 0.9 },
+    ])
+    expect(out).toBe("altération de l'[…] général")
+  })
+})

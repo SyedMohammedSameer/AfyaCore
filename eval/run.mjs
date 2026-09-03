@@ -51,6 +51,17 @@ const asJson = process.argv.includes('--json')
  */
 const stubNeural = process.argv.includes('--stub-neural')
 
+/**
+ * `--explain`: print what the model called every span, for the cases where
+ * clinical content was lost.
+ *
+ * The destroyed-terms list says what went missing and never says what the
+ * model thought it was, which is the one fact needed to fix it. Three rounds
+ * of guard changes were reasoned without it and each traded one failure for
+ * another.
+ */
+const explainSpans = process.argv.includes('--explain')
+
 /* ------------------------------------------------------------------ *
  * Extraction
  * ------------------------------------------------------------------ */
@@ -210,6 +221,9 @@ function prf(tp, fp, fn) {
  */
 const protectedTally = { count: 0 }
 
+/** Populated only under --explain. */
+const explained = []
+
 async function runDeident(scrubFreeText, applyEntities, backend) {
   const corpus = JSON.parse(await readFile(join(here, 'corpus', 'deident.json'), 'utf8'))
 
@@ -290,7 +304,11 @@ async function runDeident(scrubFreeText, applyEntities, backend) {
     ? await score(async (text) => {
         const scrubbed = scrubFreeText(text, terms).text
         try {
-          const applied = applyEntities(scrubbed, await backend(scrubbed))
+          const applied = applyEntities(scrubbed, await backend(scrubbed), {
+            explain: explainSpans
+              ? (e) => explained.push({ text: scrubbed, ...e })
+              : undefined,
+          })
           protectedTally.count += applied.protectedSpans
           return applied.text
         } catch {
@@ -302,7 +320,7 @@ async function runDeident(scrubFreeText, applyEntities, backend) {
       })
     : null
 
-  return { deterministic, neural, ...deterministic }
+  return { deterministic, neural, explained, ...deterministic }
 }
 
 /* ------------------------------------------------------------------ *
@@ -540,6 +558,17 @@ function printReport(report) {
     for (const over of overRedactions) line(`    ${over.id.padEnd(28)} ${over.destroyed}`)
   }
   destroyedList('clinical content destroyed:', d.overRedactions)
+
+  if (explainSpans && report.deident.explained?.length) {
+    line()
+    line('  every span the model produced, and what was done with it:')
+    for (const e of report.deident.explained) {
+      line(
+        `    ${e.action.padEnd(9)} ${JSON.stringify(e.span).padEnd(34)} ` +
+          `[${e.labels.join(', ')}]`,
+      )
+    }
+  }
   // The neural pass's over-redactions are the cost side of the trade, and the
   // one a reviewer asks about first: drug names and place-of-treatment look
   // like proper nouns to any NER model. Listed by name rather than left as a
