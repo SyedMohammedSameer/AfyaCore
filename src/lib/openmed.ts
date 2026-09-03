@@ -276,6 +276,20 @@ export interface NeuralScrubOptions {
    * medical eponyms. Pass `() => false` to measure the model unguarded.
    */
   protect?: (text: string, start: number, end: number) => boolean
+  /**
+   * Called once per merged span with what was decided about it.
+   *
+   * For diagnosis, not for control flow. Three rounds of fixing this guard
+   * were reasoned from the destroyed-terms list alone and each traded one
+   * failure for another, because that list says what was lost and never says
+   * what the model called it. This is how you find that out.
+   */
+  explain?: (event: {
+    span: string
+    labels: string[]
+    action: 'redacted' | 'protected' | 'split'
+    kept?: string[]
+  }) => void
 }
 
 /**
@@ -317,6 +331,36 @@ export function mergeSpans(entities: NerEntity[], text: string): Array<[number, 
  * Spans are spliced back to front so earlier offsets stay valid as the string
  * shortens, the same technique `scrubFreeText` uses.
  */
+/**
+ * Grow a span out to whole-word boundaries.
+ *
+ * Offsets come back from alignment at WordPiece granularity, so when only some
+ * pieces of a word carry a name label the entity covers a fragment of it. Two
+ * things follow, and both are bugs:
+ *
+ *   `paracétamol` tagged as `para` -> the guard is asked whether `para` is a
+ *   drug, which it is not, so the drug is destroyed however complete the
+ *   formulary is. Three rounds of widening the lists could never have fixed
+ *   this, because the lists were never the problem.
+ *
+ *   `Ramanantsoa` tagged as `Raman` -> the output is `[…]antsoa`. The surname
+ *   is still legible, and worse, an evaluation that asks whether the output
+ *   still contains `Ramanantsoa` scores that as a successful removal. A
+ *   partial redaction leaks and reports itself as a success.
+ *
+ * Letters and digits only. Hyphens and apostrophes are left as boundaries so
+ * that `Henoch-Schönlein` and `l'état` are not swallowed whole from one piece.
+ */
+const WORD_CHAR = /[\p{L}\p{N}]/u
+
+function snapToWord(text: string, start: number, end: number): [number, number] {
+  let from = start
+  let to = end
+  while (from > 0 && WORD_CHAR.test(text[from - 1]!)) from--
+  while (to < text.length && WORD_CHAR.test(text[to]!)) to++
+  return [from, to]
+}
+
 /**
  * The parts of a span that may be redacted, once protected words are excluded.
  *
@@ -365,16 +409,25 @@ export function applyEntities(
     labels = REDACTABLE_LABELS,
     redacted = '[…]',
     protect = isProtectedSpan,
+    explain,
   } = options
 
-  const candidates = entities.filter(
-    (e) =>
-      e.score >= minScore &&
-      labels.has(e.label.toUpperCase()) &&
-      e.end > e.start &&
-      e.start >= 0 &&
-      e.end <= text.length,
-  )
+  const candidates = entities
+    .filter(
+      (e) =>
+        e.score >= minScore &&
+        labels.has(e.label.toUpperCase()) &&
+        e.end > e.start &&
+        e.start >= 0 &&
+        e.end <= text.length,
+    )
+    // Whole words before anything else looks at them: the guard has to be
+    // asked about `paracétamol`, not `para`, and a redaction has to take the
+    // whole surname rather than leaving its tail in the record.
+    .map((e) => {
+      const [start, end] = snapToWord(text, e.start, e.end)
+      return { ...e, start, end }
+    })
 
   const spans = mergeSpans(candidates, text)
   let out = text
@@ -407,17 +460,31 @@ export function applyEntities(
      * multi-word terms and eponymous constructions. Then, if that does not
      * hold, word by word — which is what keeps an adjacent name redactable.
      */
+    // Labels of the entities that produced this merged span, for `explain`.
+    const labelsHere = explain
+      ? [...new Set(candidates.filter((e) => e.start < end && e.end > start).map((e) => e.label))]
+      : []
+
     if (protect(text, start, end)) {
       protectedSpans++
+      explain?.({ span: slice, labels: labelsHere, action: 'protected' })
       continue
     }
 
     const runs = redactableRuns(text, start, end, protect)
     if (runs.length === 0) {
       protectedSpans++
+      explain?.({ span: slice, labels: labelsHere, action: 'protected' })
       continue
     }
-    if (runs.length > 1 || runs[0]![0] !== start || runs[0]![1] !== end) protectedSpans++
+    const partial = runs.length > 1 || runs[0]![0] !== start || runs[0]![1] !== end
+    if (partial) protectedSpans++
+    explain?.({
+      span: slice,
+      labels: labelsHere,
+      action: partial ? 'split' : 'redacted',
+      kept: partial ? [text.slice(start, end)] : undefined,
+    })
 
     // Back to front, so earlier offsets stay valid as the string shortens.
     for (const [runStart, runEnd] of [...runs].reverse()) {
