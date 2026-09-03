@@ -507,12 +507,14 @@ destroyed. Accuracy numbers never fail a build; correctness failures do.
 | Cases | 12 | 10 |
 | Median latency | 0.44 ms | 0.51 ms |
 
-| De-identification | |
-|---|---|
-| Identifiers **on** the roster removed | **100%** (6/6) |
-| Identifiers **off** the roster removed | **0%** (0/5) |
-| Clinical content retained | 100% (18/18 terms) |
-| Median latency | 0.10 ms |
+| De-identification | deterministic | + OpenMed |
+|---|---|---|
+| Identifiers **on** the roster removed | **100%** (6/6) | 100% |
+| Identifiers **off** the roster removed | **0%** (0/5) | **40%** (2/5) |
+| Clinical content retained, synthetic | 100% (18/18) | 100% |
+| Clinical content retained, **real French** (E3C, n=1258) | 100% | **98.3%** |
+| Clinical content retained, **real English** (E3C, n=1014) | 100% | **99.3%** |
+| Median latency per field | 0.05 ms | 2.7 ms |
 
 | Install | |
 |---|---|
@@ -523,13 +525,24 @@ destroyed. Accuracy numbers never fail a build; correctness failures do.
 
 Three things this table is careful about:
 
-**The off-roster row is the whole case for the neural pass**, and it is 0% by construction: exact
-matching cannot reach a name the device does not hold. That is the number a 67 MB download has to
-move, and it is reported separately precisely so a combined figure cannot hide it.
+**The off-roster row is the whole case for the neural pass.** Exact matching cannot reach a name the
+device does not hold, so it is 0% by construction. The 70 MB download moves it to **40%** — real,
+and nowhere near solved. The three it missed were `Ramanantsoa`, `Manjakandriana` and `Solofo`, all
+Malagasy: this is a French model with a 30,522-token *English* WordPiece vocabulary and accent
+stripping, so Malagasy proper nouns fragment heavily. It is weakest exactly where this app is
+deployed, which is worth more as a finding than a good number would have been.
 
 **Clinical retention is not decoration.** A scrubber that redacts every word scores 100% recall and
-destroys the record, so precision is measured against clinical terms that must survive, including
-drug names, which look like proper nouns to any NER model.
+destroys the record. On real French the model cost 2.4% of gold clinical entities before a guard was
+added, and the worst losses were `lymphome malin non hodgkinien`, `hernie de Spiegel`,
+`Castleman's disease` and `Henoch-Schönlein purpura` — because Hodgkin, Spiegel, Castleman, Henoch
+and Schönlein are **surnames**. A PII model is right to flag them and the result is a record missing
+its diagnosis. It also ate `paracétamol`. Neither failure was findable on a corpus we wrote
+ourselves: a "must keep" list can only contain terms somebody thought of, and nobody thinks of
+eponyms until a model eats one. See [`docs/MODEL-RESEARCH.md`](docs/MODEL-RESEARCH.md) §4b for the
+guard and for the residual 1.7%, which is lowercase common nouns like `lyse` and `melena` that are
+also given names — reported rather than engineered around, because the obvious fix (distrust a name
+label on a lowercase token) is dangerous when dictation output is frequently all-lowercase.
 
 **Clinical retention is also measured on real clinical text.** `npm run vendor:e3c` scores
 retention against gold `CLINENTITY` annotations in the [E3C corpus](https://doi.org/10.57771/dey2-g751)

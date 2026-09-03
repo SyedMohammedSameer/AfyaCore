@@ -172,41 +172,75 @@ bandwidth onto an unsupported runtime is not a saving.
 
 ### What it actually does, measured
 
-First run over the synthetic de-identification corpus and over 1,258 gold-annotated clinical
-entities in real French clinical text (E3C), `npm run eval`:
+`npm run eval`, over the synthetic de-identification corpus and over 2,272
+gold-annotated clinical entities in real clinical narrative (E3C):
 
 | | deterministic | + OpenMed |
 |---|---|---|
 | Identifiers **on** the roster | 100% | 100% |
 | Identifiers **off** the roster | 0% | **40%** (2/5) |
-| Clinical retention, synthetic corpus | 100% | 94.4% |
-| Clinical retention, **real** French (E3C, n=1258) | 100% | **97.6%** |
-| Clinical retention, **real** English (E3C, n=1014) | 100% | **99.1%** |
-| Median latency per field | 0.055 ms | 2.4 ms |
+| Clinical retention, synthetic (n=18) | 100% | 100% |
+| Clinical retention, **real French** (E3C, n=1258) | 100% | **98.3%** |
+| Clinical retention, **real English** (E3C, n=1014) | 100% | **99.3%** |
+| Median latency per field | 0.05 ms | 2.7 ms |
 
-Three findings worth reporting, none of which the synthetic corpus could have produced:
+Model activity on that run: 1,347 calls, 2,164 tokens tagged, 1,472 spans after
+offset alignment, 17 spans kept by the clinical guard.
 
-**1. The model destroys diagnoses named after people.** The worst losses on real French were
-`lymphome malin non hodgkinien`, `hernie de Spiegel`, `Castleman's disease` and `Henoch-Schönlein
-purpura`. Hodgkin, Spiegel, Castleman, Henoch and Schönlein are surnames; the model is correct and
-the result is a record missing its diagnosis. Mitigated by `isProtectedSpan` in
-`src/lib/openmed.ts`, which vetoes redaction of formulary drugs, a list of eponym stems, and
-anything in an eponymous construction (`maladie de X`, `X's disease`) so that eponyms not on the
-list are still caught.
+Four findings, three of them only visible on text we did not write.
 
-**2. It destroys drug names.** `paracétamol` went on the first run. To a NER model a drug name is a
-capitalised token of no obvious semantic class, which is what a surname is. The formulary is now a
-protected list.
+**1. It destroys diagnoses named after people.** The worst French losses were
+`lymphome malin non hodgkinien` and `hernie de Spiegel`; the English ones
+`Castleman's disease` and `Henoch-Schönlein purpura`. Hodgkin, Spiegel,
+Castleman, Henoch and Schönlein are surnames, the model is correct, and the
+result is a record missing its diagnosis. Mitigated by `isProtectedSpan`:
+formulary drugs, eponym stems, and the constructions eponyms appear in
+(`maladie de X`, `X's disease`) so that eponyms absent from the list are still
+caught. Eponyms that are also ordinary names — Gilbert, Paget, Pott, Conn,
+Barré — are protected **only** inside such a construction, because protecting
+`Gilbert` on sight keeps the surname standing next to it.
 
-**3. Recall on Malagasy proper nouns is poor.** The two off-roster identifiers it caught were
-`Hanta` and `Ambodivona`; it missed `Ramanantsoa`, `Manjakandriana` and `Solofo`. This is a French
-clinical model with a 30,522-token **English** WordPiece vocabulary and accent stripping, so
-Malagasy names fragment heavily. 40% off-roster recall is a real improvement on 0% and is nowhere
-near enough to present as a solved problem.
+**2. It destroys drug names.** `paracétamol` went on the first working run. To
+a NER model a drug name is a capitalised token of no obvious semantic class,
+which is exactly what a surname is. The formulary is now a protected list.
 
-The honest summary: the pass earns its 70 MB where identifiers are European-shaped, costs measurable
-clinical content without the guard, and is weakest exactly where this app is deployed. It stays
+**3. Recall on Malagasy proper nouns is poor.** It caught `Hanta` and
+`Ambodivona`; it missed `Ramanantsoa`, `Manjakandriana` and `Solofo`. This is a
+French clinical model with a 30,522-token **English** WordPiece vocabulary and
+accent stripping, so Malagasy names fragment heavily. 40% is a real improvement
+on 0% and nowhere near a solved problem — and it is weakest exactly where this
+app is deployed.
+
+**4. The residual loss is lowercase common nouns read as names.** What survives
+the guard is `lyse`, `melena`, `nasal`, `galactorrhée`, `tuméfaction`,
+`diplopie`. `Lyse` and `Melena` genuinely are given names in French and
+English, so the model is not obviously wrong. This is **not** fixed, and it is
+reported rather than engineered around: the obvious heuristic — distrust a name
+label on a lowercase token — is actively dangerous here, because dictation
+output is frequently all-lowercase and real names in it would be too.
+
+The honest summary: the pass earns its 70 MB where identifiers are
+European-shaped, costs 0.7–1.7% of clinical content on real text even with the
+guard, and is weakest on the names this app will actually meet. It stays
 optional and off by default.
+
+### How much of this was the model, and how much was us
+
+Worth recording, because the first four measured runs were all wrong and none
+of them looked wrong:
+
+| Defect | Effect |
+|---|---|
+| fp16 graph paired with a WASM-only runtime | The publisher's docs say not to |
+| `isModelAvailable` fetching an origin-relative path under Node | Reported "model absent" after a successful download |
+| `runDeident` never calling the backend it was passed | Printed "measured" while measuring nothing |
+| The pipeline returns no character offsets; we filtered on them | **Every token discarded — the pass was a no-op from the day it was written** |
+| Offsets reconstructed at WordPiece granularity, never widened | Guard asked about `para`, not `paracétamol`; `Raman` redacted out of `Ramanantsoa` leaving `[…]antsoa` |
+
+The last one is the instructive pair: a partial redaction leaks *and* scores as
+a successful removal, because the evaluation asks whether the output still
+contains the identifier. Both halves are fixed by snapping spans to whole words
+before anything looks at them.
 
 ### Why it is a filter over output, not a step in capture
 
