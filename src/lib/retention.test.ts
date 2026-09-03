@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '../db/db'
 import { purgeExpired, retentionCutoff, retentionStatus, setRetentionYears } from './retention'
 import type { Encounter, Patient } from '../db/schema'
+import { setCurrentActor } from './audit'
 
 const YEAR = 365.2425 * 86_400_000
 const NOW = Date.UTC(2026, 8, 3)
@@ -39,6 +40,10 @@ const encounter = (over: Partial<Encounter> & { id: string; patientId: string })
 })
 
 beforeEach(async () => {
+  // Service boundaries now enforce the permission matrix, so a test that
+  // never signs in is refused. Admin here because these exercise the
+  // operation rather than the gate; the gate has its own tests.
+  setCurrentActor('test-admin', 'admin')
   await db.delete()
   await db.open()
 })

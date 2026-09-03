@@ -269,6 +269,28 @@ describe('push and pull', () => {
     expect(payload.conflicts[0]).toMatchObject({ id: 'p1', reason: 'server_newer' })
   })
 
+  it('returns the canonical record with the conflict', async () => {
+    // Without the body the client cannot converge: the canonical row's
+    // sequence is below its cursor, so a pull will never send it again, and
+    // the two copies diverge permanently.
+    const token = await enrol(facility())
+    const auth = { authorization: `Bearer ${token}` }
+
+    await post(
+      '/sync',
+      { cursor: 0, changes: { patients: [{ id: 'p1', updatedAt: 100, familyName: 'CANONICAL' }] } },
+      auth,
+    )
+    const stale = await post(
+      '/sync',
+      { cursor: 0, changes: { patients: [{ id: 'p1', updatedAt: 50, familyName: 'STALE' }] } },
+      auth,
+    )
+
+    const conflict = (await stale.json()).conflicts[0]
+    expect(conflict.record).toMatchObject({ id: 'p1', updatedAt: 100, familyName: 'CANONICAL' })
+  })
+
   it('treats an identical re-push as idempotent', async () => {
     const token = await enrol(facility())
     const auth = { authorization: `Bearer ${token}` }

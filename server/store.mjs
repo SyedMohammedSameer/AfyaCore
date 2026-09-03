@@ -108,7 +108,9 @@ export function openStore(dbPath) {
 
 export function makeRecordQueries(db) {
   const selectOne = db.prepare(
-    'SELECT updated_at, deleted_at FROM records WHERE facility_id = ? AND kind = ? AND id = ?',
+    // `body` is selected so a conflict can return the server's canonical row:
+    // a rejection without it leaves the client unable to converge.
+    'SELECT updated_at, deleted_at, body FROM records WHERE facility_id = ? AND kind = ? AND id = ?',
   )
   const upsert = db.prepare(`
     INSERT INTO records (facility_id, kind, id, updated_at, deleted_at, seq, body)

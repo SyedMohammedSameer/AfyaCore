@@ -1,4 +1,5 @@
 import { db } from './db'
+import { requirePermission } from '../lib/identity'
 import { createPatient, createDraftEncounter, patchEncounter, finaliseEncounter } from './repo'
 import { newId } from '../lib/id'
 
@@ -91,6 +92,7 @@ export async function seedDemoData(): Promise<void> {
 }
 
 export async function clearAllData(): Promise<void> {
+  requirePermission('manage.device')
   await db.transaction('rw', db.patients, db.encounters, db.attachments, async () => {
     await Promise.all([db.patients.clear(), db.encounters.clear(), db.attachments.clear()])
   })

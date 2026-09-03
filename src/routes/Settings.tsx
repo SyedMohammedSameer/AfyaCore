@@ -18,6 +18,7 @@ import { StaffPanel } from '../components/StaffPanel'
 import { CountryPanel } from '../components/CountryPanel'
 import { RetentionPanel } from '../components/RetentionPanel'
 import { getFacilityCountry } from '../lib/facility'
+import { useSession } from '../lib/session'
 import { deidentify, type DeidentLevel } from '../lib/deidentify'
 import type { NerBackend } from '../lib/openmed'
 import { LANG_LABELS, useI18n } from '../i18n'
@@ -54,6 +55,7 @@ async function facilitySalt(): Promise<string> {
 
 export function Settings() {
   const { t, lang, setLang } = useI18n()
+  const { may } = useSession()
   const [quota, setQuota] = useState<{ usage: number; quota: number } | null>(null)
   const [ocrState, setOcrState] = useState<'idle' | 'loading' | 'ready' | 'error'>(
     isOcrReady() ? 'ready' : 'idle',
@@ -76,6 +78,9 @@ export function Settings() {
   useEffect(() => {
     db.settings.get('deident.level').then((row) => {
       const v = row?.value
+      // A clinician who somehow holds a stored 'identified' preference is put
+      // back on the safe level rather than shown a control that will throw.
+      if (v === 'identified' && !may('export.identified')) return
       if (v === 'identified' || v === 'pseudonymous' || v === 'anonymous') setLevel(v)
     })
   }, [])

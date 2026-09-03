@@ -23,7 +23,25 @@
  * facility's entire record set.
  */
 import { db, unsyncedRecords } from '../db/db'
+import { getCurrentActor } from './audit'
+import { requirePermission } from './identity'
 import type { Encounter, Patient } from '../db/schema'
+
+/**
+ * A record the server refused because its own copy was newer.
+ *
+ * `record` is the server's canonical row. It is optional only so that an older
+ * server, which sent conflicts without bodies, still parses — against one of
+ * those the client leaves the row pending rather than falsely marking it
+ * synced, which is the safe half of the fix and works without a server upgrade.
+ */
+export interface SyncConflict {
+  kind: 'patients' | 'encounters'
+  id: string
+  reason: string
+  serverUpdatedAt?: number
+  record?: Patient | Encounter
+}
 
 export interface SyncSettings {
   serverUrl: string
@@ -85,6 +103,7 @@ export async function getSyncSettings(): Promise<SyncSettings> {
  * let a caller believe it had set a facility when it had not.
  */
 export async function setSyncSettings(next: { serverUrl?: string }): Promise<void> {
+  requirePermission('manage.device')
   if (next.serverUrl !== undefined) {
     await db.settings.put({ key: SETTING_KEYS.url, value: next.serverUrl.trim().replace(/\/+$/, '') })
   }
@@ -108,6 +127,7 @@ export async function enrolDevice(
   deviceName: string,
   options: SyncOptions = {},
 ): Promise<EnrolmentResult> {
+  requirePermission('manage.device')
   const { timeoutMs = 30_000, fetchImpl = fetch } = options
   const { serverUrl } = await getSyncSettings()
   if (!serverUrl) return { ok: false, error: 'not_configured' }
@@ -156,6 +176,7 @@ export async function enrolDevice(
  * that has been stolen cannot be asked to un-enrol itself.
  */
 export async function unenrolDevice(): Promise<void> {
+  requirePermission('manage.device')
   await db.settings.bulkPut([
     { key: SETTING_KEYS.token, value: '' },
     { key: SETTING_KEYS.deviceId, value: '' },
@@ -262,7 +283,10 @@ export interface SyncOptions {
  * attempt because the local store is only updated after a successful response.
  */
 export async function runSync(options: SyncOptions = {}): Promise<SyncOutcome> {
-  const { timeoutMs = 30_000, fetchImpl = fetch, actorId } = options
+  // Defaults to whoever is signed in. Passing nothing meant the server's
+  // audit trail recorded a device and no person, on both manual and automatic
+  // syncs, which is the entry a reviewer most needs.
+  const { timeoutMs = 30_000, fetchImpl = fetch, actorId = getCurrentActor() } = options
   const settings = await getSyncSettings()
   const base: SyncOutcome = {
     ok: false,
@@ -313,15 +337,48 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncOutcome> {
     const payload = (await response.json()) as {
       cursor: number
       pushed: number
-      conflicts?: unknown[]
+      conflicts?: SyncConflict[]
       changes: { patients: Patient[]; encounters: Encounter[] }
     }
 
+    const conflicts = payload.conflicts ?? []
+
+    /*
+     * A rejected record is not a pushed record.
+     *
+     * `markPushed` used to acknowledge everything submitted, including the
+     * rows the server refused as stale. The device then believed its stale
+     * copy was synced, and the pull would never correct it: the canonical
+     * row's sequence is below the device's cursor, so it is never sent again.
+     * The two copies diverged permanently and silently.
+     *
+     * It got worse once retention landed, because `purgeExpired` treats
+     * `syncedAt !== undefined` as proof the server holds the record. A
+     * diverged row could be destroyed locally while the server held something
+     * different — divergence turning into data loss.
+     */
+    const rejected = new Set(conflicts.map((c) => c.id))
+
     const now = Date.now()
-    await markPushed(changes.patients, changes.encounters, now)
+    await markPushed(
+      changes.patients.filter((p) => !rejected.has(p.id)),
+      changes.encounters.filter((e) => !rejected.has(e.id)),
+      now,
+    )
+
+    // Conflicts carry the canonical row, so they converge through the same
+    // path as a pull — which means drafts are still protected and the
+    // updatedAt guard still applies.
+    const conflictPatients = conflicts
+      .filter((c) => c.kind === 'patients' && c.record)
+      .map((c) => c.record as Patient)
+    const conflictEncounters = conflicts
+      .filter((c) => c.kind === 'encounters' && c.record)
+      .map((c) => c.record as Encounter)
+
     const { pulled, refused } = await applyPulled(
-      payload.changes?.patients ?? [],
-      payload.changes?.encounters ?? [],
+      [...(payload.changes?.patients ?? []), ...conflictPatients],
+      [...(payload.changes?.encounters ?? []), ...conflictEncounters],
     )
 
     const cursor = Number.isFinite(payload.cursor) ? payload.cursor : base.cursor
@@ -331,7 +388,7 @@ export async function runSync(options: SyncOptions = {}): Promise<SyncOutcome> {
       ok: true,
       pushed: payload.pushed ?? 0,
       pulled,
-      conflicts: payload.conflicts?.length ?? 0,
+      conflicts: conflicts.length,
       refused,
       cursor,
       finishedAt: Date.now(),

@@ -12,6 +12,12 @@ import { describe, expect, it } from 'vitest'
 import { REDACTABLE_LABELS, alignTokenOffsets, applyEntities, decodeBio, isModelAvailable, isProtectedSpan, mergeSpans, normaliseForAlignment, type NerEntity } from './openmed'
 import { deidentify, REDACTED } from './deidentify'
 import type { Encounter, Patient } from '../db/schema'
+import { setCurrentActor } from './audit'
+
+// Service boundaries enforce the permission matrix, so a suite that never
+// signs in is refused. Admin because these exercise the operation, not the
+// gate; the gate has its own tests.
+setCurrentActor('test-admin', 'admin')
 
 const at = (label: string, start: number, end: number, score = 0.9): NerEntity => ({
   label,

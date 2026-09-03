@@ -63,7 +63,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setClinician(next)
     // Set before the audit call, so every write from here on is attributed
     // without any repository call site having to know about it.
-    setCurrentActor(next.id)
+    setCurrentActor(next.id, next.role)
     await recordAudit({
       actorId: next.id,
       action: 'signin',

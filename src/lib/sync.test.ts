@@ -22,6 +22,7 @@ import {
   unenrolDevice,
 } from './sync'
 import type { Encounter, Patient } from '../db/schema'
+import { setCurrentActor } from './audit'
 
 const SERVER = 'https://sync.example.org'
 
@@ -68,6 +69,10 @@ const encounter = (over: Partial<Encounter> = {}): Encounter => ({
 const emptyPull = { cursor: 0, pushed: 0, conflicts: [], changes: { patients: [], encounters: [] } }
 
 beforeEach(async () => {
+  // Service boundaries now enforce the permission matrix, so a test that
+  // never signs in is refused. Admin here because these exercise the
+  // operation rather than the gate; the gate has its own tests.
+  setCurrentActor('test-admin', 'admin')
   await db.delete()
   await db.open()
 })
@@ -343,5 +348,117 @@ describe('applying what the server sends back', () => {
       conflicts: [{ kind: 'patients', id: 'p1', reason: 'server_newer' }],
     })
     expect((await runSync({ fetchImpl: impl })).conflicts).toBe(1)
+  })
+})
+
+describe('a record the server rejected', () => {
+  async function enrolled() {
+    await setSyncSettings({ serverUrl: SERVER })
+    const { impl } = stubFetch(200, { token: 'afya_tok', deviceId: 'dev_1', facilityId: 'CSB2' })
+    await enrolDevice('ABCD-2345', 'phone', { fetchImpl: impl })
+  }
+
+  /**
+   * The failure this guards against, in order:
+   *
+   *   1. Device pushes a stale row.
+   *   2. Server keeps its own copy and reports a conflict.
+   *   3. Device marks the row synced anyway.
+   *   4. The pull never corrects it, because the canonical row's sequence is
+   *      below the device's cursor.
+   *
+   * The two copies then differ for good. And since `purgeExpired` treats
+   * `syncedAt !== undefined` as proof the server holds the record, the
+   * diverged local row becomes eligible for destruction — divergence turning
+   * into data loss.
+   */
+  const stale = () =>
+    patient({ id: 'p1', familyName: 'RAKOTOARISOA', updatedAt: 1000, syncedAt: undefined })
+
+  const canonical = {
+    ...patient({ id: 'p1', familyName: 'RASOAMANANA', updatedAt: 5000 }),
+  }
+
+  it('is not marked as synced', async () => {
+    await enrolled()
+    await db.patients.put(stale())
+    const { impl } = stubFetch(200, {
+      ...emptyPull,
+      pushed: 0,
+      conflicts: [{ kind: 'patients', id: 'p1', reason: 'server_newer', record: canonical }],
+    })
+
+    await runSync({ fetchImpl: impl })
+    const row = await db.patients.get('p1')
+    // Either it took the canonical row (and is synced as that), or it stayed
+    // pending — but it must never be the stale body marked as acknowledged.
+    expect(row!.familyName === 'RAKOTOARISOA' && row!.syncedAt !== undefined).toBe(false)
+  })
+
+  it('converges on the server copy', async () => {
+    await enrolled()
+    await db.patients.put(stale())
+    const { impl } = stubFetch(200, {
+      ...emptyPull,
+      conflicts: [{ kind: 'patients', id: 'p1', reason: 'server_newer', record: canonical }],
+    })
+
+    await runSync({ fetchImpl: impl })
+    expect((await db.patients.get('p1'))!.familyName).toBe('RASOAMANANA')
+  })
+
+  it('leaves the row pending when an older server sends no body', async () => {
+    // Backwards compatible: against a server that reports conflicts without
+    // the canonical record, the client cannot converge — but it must still
+    // refuse to claim the row is synced. Pending is recoverable; a false
+    // acknowledgement is not.
+    await enrolled()
+    await db.patients.put(stale())
+    const { impl } = stubFetch(200, {
+      ...emptyPull,
+      conflicts: [{ kind: 'patients', id: 'p1', reason: 'server_newer' }],
+    })
+
+    await runSync({ fetchImpl: impl })
+    expect((await db.patients.get('p1'))!.syncedAt).toBeUndefined()
+  })
+
+  it('still acknowledges the records that were accepted', async () => {
+    // The fix must not throw away the acknowledgement for everything else.
+    await enrolled()
+    await db.patients.put(stale())
+    await db.patients.put(patient({ id: 'p2', updatedAt: 1000, syncedAt: undefined }))
+    const { impl } = stubFetch(200, {
+      ...emptyPull,
+      conflicts: [{ kind: 'patients', id: 'p1', reason: 'server_newer', record: canonical }],
+    })
+
+    await runSync({ fetchImpl: impl })
+    expect((await db.patients.get('p2'))!.syncedAt).toBeDefined()
+  })
+
+  it('does not overwrite a local draft with a conflicting server copy', async () => {
+    // Conflicts go through applyPulled, so the draft protection still applies:
+    // a consultation somebody is part-way through typing is not replaced.
+    await enrolled()
+    await db.encounters.put(
+      encounter({ id: 'e1', status: 'draft', updatedAt: 1000, syncedAt: undefined }),
+    )
+    const { impl } = stubFetch(200, {
+      ...emptyPull,
+      conflicts: [
+        {
+          kind: 'encounters',
+          id: 'e1',
+          reason: 'server_newer',
+          record: { ...encounter({ id: 'e1', updatedAt: 9000 }), diagnosis: 'from server' },
+        },
+      ],
+    })
+
+    await runSync({ fetchImpl: impl })
+    const row = await db.encounters.get('e1')
+    expect(row!.status).toBe('draft')
+    expect(row!.diagnosis).not.toBe('from server')
   })
 })

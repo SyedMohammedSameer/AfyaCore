@@ -21,6 +21,7 @@
  * says so.
  */
 import { db } from '../db/db'
+import { getCurrentRole } from './audit'
 import { newId } from './id'
 import type { Clinician, Role } from '../db/schema'
 
@@ -291,6 +292,35 @@ export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS][number]
 export function can(role: Role | undefined, permission: Permission): boolean {
   if (!role) return false
   return (PERMISSIONS[role] as readonly string[]).includes(permission)
+}
+
+/** Raised when a service call is made without the permission it requires. */
+export class PermissionError extends Error {
+  constructor(readonly permission: Permission) {
+    super(`missing permission: ${permission}`)
+    this.name = 'PermissionError'
+  }
+}
+
+/**
+ * Enforce a permission at a service boundary. Throws when it is missing.
+ *
+ * The matrix above was previously consulted only by components, which made it
+ * a description of what the UI happens to render rather than a property of the
+ * system. A clinician could still reach an identified export, un-enrol the
+ * device, delete a patient and erase the database — every one of those is an
+ * admin permission that was declared and not enforced.
+ *
+ * Throwing rather than returning false is deliberate: these guard destructive
+ * and disclosing operations, and a caller that ignores a boolean fails open.
+ * A caller that ignores an exception does not.
+ *
+ * Signed out is refused too. Nothing in this app should reach a guarded
+ * operation with no session, and if something does, that is the bug the throw
+ * surfaces.
+ */
+export function requirePermission(permission: Permission): void {
+  if (!can(getCurrentRole(), permission)) throw new PermissionError(permission)
 }
 
 /* ------------------------------------------------------------------ *

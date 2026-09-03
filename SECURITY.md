@@ -19,6 +19,9 @@ stops being true.
 | **Rate limiting** | 10 enrolment attempts per minute per address, which turns a ~38-bit code from guessable into not. |
 | **Origin allow-listing** | CORS is restricted to origins the deployer names. It previously allowed `*`, meaning any page on the internet could drive a facility's server. |
 
+| **Role enforcement at service boundaries** | The clinician/admin matrix is checked by `requirePermission` inside the services themselves, not only in components. Identified exports, patient deletion, sync configuration, retention purge and database erase all refuse a clinician and refuse a signed-out caller. |
+| **Sync conflicts converge** | A record the server rejects as stale comes back with the server's canonical row, and is never marked as synced. Previously a rejected push was acknowledged anyway and the two copies diverged permanently. |
+
 ## Known gaps
 
 | Gap | Impact | Status |

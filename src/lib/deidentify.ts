@@ -22,6 +22,7 @@ import type { Encounter, Patient } from '../db/schema'
 import { patientAge } from '../db/repo'
 import { applyEntities, MODEL_REPO, type NerBackend } from './openmed'
 import { allPhonePatterns } from './countries'
+import { requirePermission } from './identity'
 
 export type DeidentLevel =
   /** No change. Identifiers included. */
@@ -233,6 +234,17 @@ export async function deidentify(
   const { level } = options
 
   if (level === 'identified') {
+    /*
+     * An identified export is the single most disclosing thing this app does:
+     * names, phone numbers and villages leaving the device in a file.
+     *
+     * Guarded here rather than in the export screen, because the screen was
+     * the only thing checking and it was not checking at all — a clinician
+     * could select "identified" from the dropdown and download the roster.
+     * `export.identified` has been an admin-only permission in the declared
+     * matrix the whole time.
+     */
+    requirePermission('export.identified')
     return {
       patients,
       encounters,

@@ -3,6 +3,12 @@ import { bandAge, deidentify, REDACTED, scrubFreeText } from './deidentify'
 import { toFhirBundle } from './fhir'
 import { aggregateMonth } from './dhis2'
 import type { Encounter, Patient } from '../db/schema'
+import { setCurrentActor } from './audit'
+
+// Service boundaries enforce the permission matrix, so a suite that never
+// signs in is refused. Admin because these exercise the operation, not the
+// gate; the gate has its own tests.
+setCurrentActor('test-admin', 'admin')
 
 const patient = (over: Partial<Patient> = {}): Patient => ({
   id: 'p1',
