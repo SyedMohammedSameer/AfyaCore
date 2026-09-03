@@ -30,7 +30,7 @@ import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import puppeteer from '../node_modules/puppeteer-core/lib/puppeteer/puppeteer-core.js'
-import { findChrome } from '../scripts/find-chrome.mjs'
+import { findChrome, LAUNCH_ARGS } from '../scripts/find-chrome.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repo = join(here, '..')
@@ -208,7 +208,7 @@ async function captureOffline() {
   const browser = await puppeteer.launch({
     executablePath: await findChrome(),
     headless: 'new',
-    args: process.getuid?.() === 0 ? ['--no-sandbox'] : [],
+    args: LAUNCH_ARGS,
   })
   const page = await browser.newPage()
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 })

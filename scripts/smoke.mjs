@@ -29,7 +29,7 @@
  * Exits non-zero on the first failed step, so CI can gate on it.
  */
 import puppeteer from 'puppeteer-core'
-import { findChrome } from './find-chrome.mjs'
+import { findChrome, LAUNCH_ARGS } from './find-chrome.mjs'
 
 const BASE = process.env.AFYACORE_URL ?? 'http://localhost:4173'
 
@@ -63,6 +63,30 @@ async function settle(page) {
     { timeout: 20_000 },
   )
   await sleep(500)
+}
+
+/**
+ * Wait for the signed-in shell specifically.
+ *
+ * `settle` is satisfied by *either* surface, which is what makes it useful for
+ * a page load that might land on either. It is the wrong thing to wait on
+ * after pressing unlock: the lock screen is still mounted while the PIN is
+ * being verified, so `settle` returns at once, sleeps its 500 ms and hands
+ * back a page that may still be the lock screen.
+ *
+ * That race was always there and was being won by a hair. Deriving a key with
+ * 600k PBKDF2 iterations takes a few hundred milliseconds, and once the
+ * settings screen began probing for the speech and de-identification models on
+ * mount, the margin went. A step that fails when the app is working is worse
+ * than no step at all, so this waits for the thing it actually means.
+ */
+async function waitForShell(page, why) {
+  try {
+    await page.waitForSelector('main', { timeout: 20_000 })
+  } catch {
+    throw new Error(why)
+  }
+  await sleep(300)
 }
 
 async function clickText(page, selector, pattern) {
@@ -107,8 +131,7 @@ async function unlockIfNeeded(page) {
     }, digit)
   }
   await clickText(page, 'button', /^unlock$/)
-  await page.waitForSelector('main', { timeout: 20_000 })
-  await sleep(400)
+  await waitForShell(page, 'could not unlock')
 }
 
 async function visit(page, path, waitUntil = 'networkidle2') {
@@ -122,7 +145,7 @@ async function main() {
   const browser = await puppeteer.launch({
     executablePath,
     headless: 'new',
-    args: process.getuid?.() === 0 ? ['--no-sandbox'] : [],
+    args: LAUNCH_ARGS,
   })
 
   const page = await browser.newPage()
@@ -194,7 +217,7 @@ async function main() {
         }, digit)
       }
       await clickText(page, 'button', /^unlock$/)
-      assert((await page.$('main')) !== null, 'could not unlock offline')
+      await waitForShell(page, 'could not unlock offline')
     })
 
     await step('opens the roster offline and sees the demo patients', async () => {

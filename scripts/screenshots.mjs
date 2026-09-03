@@ -20,7 +20,7 @@
 import { mkdir, access, rename, stat, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import puppeteer from 'puppeteer-core'
-import { findChrome } from './find-chrome.mjs'
+import { findChrome, LAUNCH_ARGS } from './find-chrome.mjs'
 
 const BASE = process.env.AFYACORE_URL ?? 'http://localhost:4173'
 const OUT = 'docs/screenshots'
@@ -265,10 +265,7 @@ async function main() {
       '--hide-scrollbars',
       '--force-color-profile=srgb',
       '--font-render-hinting=none',
-      // Chromium refuses to start as root with its sandbox on. That is the
-      // normal situation inside a CI container and nowhere else, so the flag is
-      // added only in that case rather than being on by default.
-      ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []),
+      ...LAUNCH_ARGS,
     ],
   })
 
