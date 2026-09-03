@@ -47,6 +47,26 @@ jobs:
       - name: Evaluate
         run: npm run eval | tee eval-report.txt
 
+      # The claim the whole project rests on, checked in a real browser against
+      # the real build: open with no network, sign in, record a consultation,
+      # reload, and still have it. Unit tests cannot see the service worker,
+      # the precache manifest or IndexedDB persistence working together, and a
+      # precache that missed the shell fails in front of an audience.
+      #
+      # ubuntu-latest ships Chromium; CHROME_PATH points puppeteer-core at it
+      # rather than downloading a second browser.
+      - name: Offline smoke walk
+        run: |
+          npx vite preview --port 4173 &
+          # Plain curl loop rather than `npx wait-on`, which would fetch a
+          # package at CI time to do what four lines of shell already does.
+          for _ in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:4173 && break
+            sleep 1
+          done
+          CHROME_PATH="$(command -v chromium || command -v chromium-browser || command -v google-chrome)" \
+            npm run smoke
+
       - name: Report
         if: always()
         run: |

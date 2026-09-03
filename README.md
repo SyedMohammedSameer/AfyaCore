@@ -472,6 +472,7 @@ npm run admin      # server administration: facilities, enrolment codes, devices
 npm test           # extraction, merge, FHIR, de-identification, auth and audit suites
 npm run eval       # accuracy, de-identification recall and install cost
 npm run eval:stub  # the same, exercising the neural path against a fake backend
+npm run smoke      # offline walk in a real browser: build and preview first
 npm run typecheck  # tsc --noEmit, no build
 npm run build      # vendor OCR assets + typecheck + production build
 npm run preview    # serve the production build
@@ -621,6 +622,22 @@ eight characters, so the defect was invisible at the levels most often exercised
 id was emitted as `urn:uuid:<not-a-uuid>`, which a validator rejects at the bundle level. Running
 `org.hl7.fhir.validator` over identified, pseudonymous and anonymous fixtures is the outstanding
 work before the claim goes back.
+
+**The offline claim is tested in a browser, not asserted.** `npm run smoke` drives the production
+build through Chromium: create an account, load the demo, **turn the network off**, reload, sign in,
+open the roster, record a consultation, reload again, and come back online. Eleven steps, all of
+which must pass. Unit tests cannot see the service worker, the precache manifest and IndexedDB
+persistence working *together*, and a precache that missed the shell fails in front of an audience
+rather than in CI. Verified by breaking it: with `**/*.html` and `**/*.js` added to `globIgnores`,
+the offline reload step fails, which is the whole point of having it.
+
+**Schema upgrades are tested against a database with data in it.** `src/db/migration.test.ts` opens
+a v1 and a v2 database, writes real consultations, then opens the current schema over the top —
+which is exactly what a phone that has been in a health post for a year does after an update. A PWA
+has no review queue and no staged rollout: a push reaches every device at the facility on the next
+load. The test that matters most there asserts that a patient recorded before the consent field
+existed is treated as **not** having consented, because a migration that backfilled `granted` would
+silently enrol a year of patients into research nobody asked them about.
 
 **Clinical retention is also measured on real clinical text.** `npm run vendor:e3c` scores
 retention against gold `CLINENTITY` annotations in the [E3C corpus](https://doi.org/10.57771/dey2-g751)
