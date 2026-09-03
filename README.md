@@ -31,9 +31,16 @@
 
 ## Two minutes of it running
 
-[**docs/demo.mp4**](docs/demo.mp4) — 99 seconds, silent, 1920x1080.
+<p align="center">
+  <img src="docs/demo-preview.webp" alt="AfyaCore demo: a consultation captured, dictated on the device, printed in the patient's language, and working with the network off" width="820">
+</p>
 
-Every frame of the app in it is a photograph of the running build. Nothing is a mockup, a Figma
+<p align="center">
+  <a href="docs/demo.mp4"><strong>Watch the full 99 seconds</strong></a> · silent, 1920x1080, 6 MB
+</p>
+
+The loop above is a trailer, two seconds sampled from each beat of the real render. Every frame of
+the app in either is a photograph of the running build. Nothing is a mockup, a Figma
 export or a re-creation of the UI in a motion tool: `video/capture.mjs` drives the production
 build in a real browser and `video/` composes those frames with [Remotion](https://remotion.dev),
 which is never asked to draw the application. Regenerate the whole thing with:
@@ -43,7 +50,13 @@ npm run build && npm run preview          # in one terminal
 npm --prefix video run capture            # photograph the app
 npm --prefix video run render             # 1920x1080 master, visually lossless
 npm --prefix video run render:web         # the smaller copy committed above
+npm run demo:preview                      # the looping WebP at the top of this section
 ```
+
+`demo:preview` samples the render rather than converting it. A 99-second animation is about a
+thousand frames and would dwarf the video it advertises on a page people open to read; sampling
+each beat gives 20 seconds in 0.6 MB, which plays inline where GitHub would only offer a link. Its
+sample points are the beat boundaries from `video/src/Demo.tsx`, so the two move together.
 
 The offline sequence is captured live rather than composed from stills, because it is the claim the
 project rests on: the capture enrols the device against a throwaway sync server, switches the
