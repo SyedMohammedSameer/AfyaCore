@@ -402,6 +402,7 @@ npm run sync       # sync server on :8787
 npm run admin      # server administration: facilities, enrolment codes, devices, audit
 npm test           # extraction, merge, FHIR, de-identification, auth and audit suites
 npm run eval       # accuracy, de-identification recall and install cost
+npm run eval:stub  # the same, exercising the neural path against a fake backend
 npm run typecheck  # tsc --noEmit, no build
 npm run build      # vendor OCR assets + typecheck + production build
 npm run preview    # serve the production build
@@ -410,6 +411,14 @@ npm run preview    # serve the production build
 `npm run build` runs `scripts/vendor-ocr.mjs` first, which copies the Tesseract runtime out of
 `node_modules` and fetches the French model into `public/ocr/`. Those files are ~7 MB and are **not
 committed**, they are regenerated at build time, and the fetched model is cached in `.cache/`.
+
+`npm run vendor:e3c` fetches the E3C clinical corpus into `.cache/` so the evaluation can measure
+clinical retention against **real** clinical narrative with gold annotations, rather than only
+against the synthetic corpus we wrote ourselves. It is not committed and not redistributed: the
+licence could not be established from a primary source (secondary sources disagree between CC BY 4.0
+and CC BY-NC 4.0), so rather than guess — the rule this project applies to retention periods and
+breach deadlines — it is fetched by whoever runs the evaluation, used for evaluation only, and
+cited. See the header of `scripts/vendor-e3c.mjs`.
 
 `npm run vendor:openmed` is separate and optional. It fetches the ~67 MB OpenMed French PII model
 and the ONNX Runtime core into `public/models/` and `public/ort/`, enabling the neural
@@ -522,7 +531,14 @@ move, and it is reported separately precisely so a combined figure cannot hide i
 destroys the record, so precision is measured against clinical terms that must survive, including
 drug names, which look like proper nouns to any NER model.
 
-**The corpus is synthetic and was written alongside the implementation.** These numbers bound
+**Clinical retention is also measured on real clinical text.** `npm run vendor:e3c` scores
+retention against gold `CLINENTITY` annotations in the [E3C corpus](https://doi.org/10.57771/dey2-g751)
+— real published clinical narrative in French and English, annotated by people with no interest in
+how this scrubber performs. It is out of domain (hospital case reports, not health-post dictation)
+and it has no PII layer, so it cannot measure recall; it measures the half our own corpus is least
+able to judge honestly, which is how much real clinical content a scrub destroys.
+
+**The extraction and recall corpus is synthetic and was written alongside the implementation.** These numbers bound
 correctness on cases we anticipated. They are *not* evidence of performance on real clinical
 dictation, which remains unmeasured, and the harness says so in its own output rather than in a
 footnote.

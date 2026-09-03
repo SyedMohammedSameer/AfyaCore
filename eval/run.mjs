@@ -26,6 +26,7 @@
  *    record. `mustKeep` is what stops that from looking like success.
  */
 import { readFile, readdir, stat } from 'node:fs/promises'
+import { scoreE3C } from './e3c.mjs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
@@ -294,6 +295,53 @@ async function runDeident(scrubFreeText, applyEntities, backend) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Real clinical text
+ * ------------------------------------------------------------------ */
+
+/**
+ * Clinical retention over E3C, if it has been fetched.
+ *
+ * Absent is the normal case and reported as such, the same way the model is.
+ * See scripts/vendor-e3c.mjs for what this corpus measures, what it cannot
+ * (there is no PII layer, so recall is not measurable here), and why it is not
+ * committed.
+ */
+async function runRealText(scrubFreeText, applyEntities, backend) {
+  const out = {}
+
+  for (const [code, label] of [
+    ['fr', 'French'],
+    ['en', 'English'],
+  ]) {
+    let corpus
+    try {
+      corpus = JSON.parse(await readFile(join(root, '.cache', 'e3c', `${code}.json`), 'utf8'))
+    } catch {
+      continue
+    }
+
+    // No roster: E3C is somebody else's corpus and there is no patient list to
+    // match against. That is the point — this measures what a scrub destroys
+    // when it has no roster to guide it, which is the worst case.
+    const deterministic = await scoreE3C(corpus.rows, (t) => scrubFreeText(t, []).text)
+    const neural = backend
+      ? await scoreE3C(corpus.rows, async (t) => {
+          const scrubbed = scrubFreeText(t, []).text
+          try {
+            return applyEntities(scrubbed, await backend(scrubbed)).text
+          } catch {
+            return scrubbed
+          }
+        })
+      : null
+
+    out[code] = { label, dataset: corpus.dataset, config: corpus.config, deterministic, neural }
+  }
+
+  return Object.keys(out).length ? out : null
+}
+
+/* ------------------------------------------------------------------ *
  * Install cost
  * ------------------------------------------------------------------ */
 
@@ -467,6 +515,29 @@ function printReport(report) {
   // percentage, because "which words did it eat" is the actionable question.
   if (n) destroyedList('clinical content destroyed by the neural pass:', n.overRedactions)
 
+  if (report.realText) {
+    line()
+    line('Clinical retention on REAL clinical text (E3C)')
+    line('-'.repeat(72))
+    line('  Out of domain: published hospital case reports, not health-post dictation.')
+    line('  No PII layer, so recall is not measurable here. This is the other half:')
+    line('  how much real clinical content a scrub destroys, against gold spans.')
+    line()
+    for (const r of Object.values(report.realText)) {
+      const d = r.deterministic
+      const n = r.neural
+      line(
+        `  ${r.label.padEnd(9)} deterministic ${pct(d.retention).padStart(7)}` +
+          `${n ? `   + OpenMed ${pct(n.retention).padStart(7)}` : ''}` +
+          `   (${d.total} gold entities, ${d.sentences} sentences)`,
+      )
+      const worst = n ? n.worst : d.worst
+      if (worst.length) {
+        line(`    most-destroyed: ${worst.map((w) => `${w.term} (${w.count})`).join(', ')}`)
+      }
+    }
+  }
+
   line()
   line('Install cost')
   line('-'.repeat(72))
@@ -491,7 +562,14 @@ function printReport(report) {
   line('  Clinical retention is not a nice-to-have: a scrubber that redacts every')
   line('  word scores 100% recall and destroys the record.')
   line()
-  line('  Numbers are over a SYNTHETIC corpus written alongside the implementation.')
+  if (!report.realText) {
+    line('  E3C was not fetched, so every number above is over a corpus we wrote')
+    line('  ourselves. Run `npm run vendor:e3c` to score retention against real')
+    line('  clinical text with gold annotations.')
+    line()
+  }
+  line('  Extraction and recall numbers are over a SYNTHETIC corpus written alongside')
+  line('  the implementation.')
   line('  They bound correctness on cases we anticipated; they are not evidence of')
   line('  performance on real clinical dictation, which remains unmeasured.')
   line()
@@ -573,6 +651,7 @@ async function main() {
     corpusNote: 'no real patient data (CONTRIBUTING.md)',
     extraction: await runExtraction(extractClinical, CLINICAL_LOCALES),
     deident: await runDeident(scrubFreeText, applyEntities, backend),
+    realText: await runRealText(scrubFreeText, applyEntities, backend),
     bundle: await measureBundle(),
   }
 

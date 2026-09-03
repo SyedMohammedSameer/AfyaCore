@@ -20,6 +20,7 @@
     "eval:stub": "vite-node eval/run.mjs -- --stub-neural",
     "vendor:ocr": "node scripts/vendor-ocr.mjs",
     "vendor:openmed": "node scripts/vendor-openmed.mjs",
+    "vendor:e3c": "node scripts/vendor-e3c.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "sync": "node server/sync-server.mjs",
     "admin": "node server/cli.mjs"
