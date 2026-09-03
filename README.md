@@ -28,6 +28,33 @@
 
 ---
 
+## Two minutes of it running
+
+[**docs/demo.mp4**](docs/demo.mp4) — 99 seconds, silent, 1920x1080.
+
+Every frame of the app in it is a photograph of the running build. Nothing is a mockup, a Figma
+export or a re-creation of the UI in a motion tool: `video/capture.mjs` drives the production
+build in a real browser and `video/` composes those frames with [Remotion](https://remotion.dev),
+which is never asked to draw the application. Regenerate the whole thing with:
+
+```bash
+npm run build && npm run preview          # in one terminal
+npm --prefix video run capture            # photograph the app
+npm --prefix video run render             # 1920x1080 master, visually lossless
+npm --prefix video run render:web         # the smaller copy committed above
+```
+
+The offline sequence is captured live rather than composed from stills, because it is the claim the
+project rests on: the capture enrols the device against a throwaway sync server, switches the
+browser's network off, reloads the page from nothing, and photographs each step. The sync chip
+above each phone in that shot is the app's own indicator, magnified — the first cut left sync
+unconfigured, so the chip read "Saved on device" whether the network was up or down and the online
+and offline frames were identical in the one place a viewer would look.
+
+It is silent on purpose. Add your own music.
+
+---
+
 ## What review found
 
 `0.0.2` exists because an external review read the whole repository and found
@@ -77,7 +104,8 @@ breathe:
 
 <p align="center">
   <img src="docs/screenshots/desktop-roster.webp" alt="Patient roster on desktop" width="820"><br><br>
-  <img src="docs/screenshots/desktop-settings.webp" alt="Reporting, sync and export privacy settings" width="820">
+  <img src="docs/screenshots/desktop-settings.webp" alt="Storage, photo reading and de-identification settings" width="820"><br><br>
+  <img src="docs/screenshots/desktop-reports.webp" alt="Monthly DHIS2 return, CSV export and the active country profile" width="820">
 </p>
 
 ## The interface
