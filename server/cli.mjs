@@ -31,6 +31,8 @@ const USAGE = `AfyaCore sync server administration
   device:revoke <deviceId>             Revoke a device's token immediately
   audit:verify                         Verify the audit hash chain
   audit:tail <facilityId> [n]          Show recent audit entries
+  retention:status <facilityId> <yrs>  Count records past a retention period
+  retention:purge <facilityId> <yrs>   Destroy them. Irreversible.
 
 Database: ${DB_PATH} (override with AFYACORE_DB)
 `
@@ -162,6 +164,74 @@ switch (command) {
         `${when(row.at)}  ${String(row.action).padEnd(18)} ${(row.device_id ?? '—').padEnd(20)} ${row.detail}`,
       )
     }
+    break
+  }
+
+  /*
+   * Retention on the server side.
+   *
+   * A device can only purge its own copy, so a facility that purges every
+   * phone and leaves the server holding the records has not applied a
+   * retention policy — it has moved the data. This is the other half, and it
+   * is a separate deliberate command rather than something the sync protocol
+   * does on a device's say-so: a compromised or misconfigured phone must not
+   * be able to tell the server to destroy a facility's records.
+   *
+   * Age is measured on `updated_at`, the only timestamp the server has. That
+   * is later than the encounter date the device measures from, so the server
+   * is the more conservative of the two and can never destroy something the
+   * device would still consider current.
+   */
+  case 'retention:status':
+  case 'retention:purge': {
+    const facilityId = requireArg(args[0], 'facility id')
+    const years = Number(requireArg(args[1], 'retention years'))
+    if (!Number.isFinite(years) || years <= 0) {
+      console.error('error: retention years must be a positive number')
+      process.exit(1)
+    }
+
+    const cutoff = Date.now() - years * 365.2425 * 86_400_000
+    // Tombstones are included. A soft-deleted row still carries its body, so
+    // leaving them behind would mean the records a facility deleted outlive
+    // the ones it kept — the opposite of a retention policy.
+    const { count } = db
+      .prepare(`SELECT COUNT(*) AS count FROM records WHERE facility_id = ? AND updated_at < ?`)
+      .get(facilityId, cutoff)
+
+    if (command === 'retention:status') {
+      console.log(`${count} records older than ${years} years in ${facilityId}`)
+      break
+    }
+
+    if (count === 0) {
+      console.log('nothing to purge')
+      break
+    }
+
+    // node:sqlite has no transaction() wrapper, so the statements are bracketed
+    // by hand. The audit entry is inside the transaction: one written after a
+    // purge that then rolled back would describe a deletion that never
+    // happened, which is worse than no entry at all.
+    db.exec('BEGIN IMMEDIATE')
+    try {
+      db.prepare(`DELETE FROM records WHERE facility_id = ? AND updated_at < ?`).run(
+        facilityId,
+        cutoff,
+      )
+      audit.record({
+        facilityId,
+        action: 'retention.purge',
+        detail: { years, records: count },
+      })
+      db.exec('COMMIT')
+    } catch (err) {
+      db.exec('ROLLBACK')
+      throw err
+    }
+
+    console.log(`purged ${count} records from ${facilityId}`)
+    console.log('Irreversible. The audit chain records it; the records are gone.')
     break
   }
 

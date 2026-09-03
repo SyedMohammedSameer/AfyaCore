@@ -220,7 +220,7 @@ these are ours for a rural outpatient facility with shared devices.
 | R8 | **Staff member browses records with no clinical reason** | Med | Med | `patient.view` is audited; roles restrict export, deletion, staff management | Medium. Detection only, and only if someone reads the log. |
 | R9 | **Enrolment code intercepted (it travels by SMS or voice)** | Med | Med | Single-use, 24 h expiry, 10 attempts/min/address rate limit, ~38 bits of entropy | Low |
 | R10 | **Patient asks for erasure and it is not honoured** | Med | Med | Attachment blobs are destroyed outright | **High.** For everything else, deletion is a tombstone, not erasure (§6.3). |
-| R11 | **Data retained beyond its lawful period** | High | Med | — | **High.** No retention schedule and no purge exist (§6.4). |
+| R11 | **Data retained beyond its lawful period** | High | Med | Facility retention period, eligibility preview, audited purge on device and server | **Medium.** The mechanism exists on both sides; what remains unresolved is the *period*, which is `null` for most countries because we could not establish it from a primary source (§5.3). |
 | R12 | **Processing has no valid lawful basis / consent** | High | High | Research consent recorded per patient and enforced inside `deidentify()`; absence is refusal | **Medium.** Secondary use is covered (§6.2). The lawful basis for the clinical record itself remains the deployer's to determine and document. |
 | R13 | **Supply-chain compromise of the served bundle** | Low | Critical | No runtime third-party calls; models served from the deployer's own origin; SRI-free but same-origin | Medium. A compromised build reaches every facility at once, with no store review in between. |
 | R14 | **Deleting a confirmed consultation changes a figure already reported** | Med | Low | Warned in the UI | Low, and an integrity rather than a privacy risk |
@@ -394,10 +394,50 @@ and should not decide that.
 | Portability | Partial. FHIR R4 export is a genuinely portable format, but it is facility-level, not per-patient. |
 | Objection / restriction | No mechanism. |
 
-### 6.4 Retention — **not implemented**
+### 6.4 Retention — **implemented, manual**
 
-No schedule, no purge, no expiry, on either side. Nothing has ever been deleted
-from a device in the sense a regulator would mean.
+A facility sets a retention period (Settings → Retention), defaulting to the
+country profile's `retentionYears` and to *unset* where that is `null`, which is
+most of the nine. **Unset means nothing is ever eligible**, so a period nobody
+has established cannot cause a deletion.
+
+An administrator sees the eligible count before anything happens and confirms
+it. Purged rows are destroyed rather than tombstoned — this is the difference
+from `deletePatient`, and the reason both exist.
+
+A record is eligible only when all three hold:
+
+| Condition | Why |
+|---|---|
+| Past the period, measured from the **encounter date** | Retention law counts from when care was given, not when the row was typed. A record back-entered from a paper register can already be expired. |
+| `final`, never a draft | A draft is unfinished work, not a record; its age says nothing about whether it may be destroyed. |
+| **Already synced** | Purging an unsynced record destroys the only copy. A phone offline for a month is the normal case here. |
+
+The third is what makes an irreversible operation survivable. Records past the
+period that cannot be purged for want of a sync are counted and shown
+separately, because that is a backup problem rather than a retention one and
+folding it into "kept" hides that the facility has records living on exactly
+one device.
+
+**It is deliberately not automatic.** A destructive operation on a timer, on a
+device that may have the wrong date, in a facility whose retention period
+nobody has confirmed with counsel, is a way to lose a year of consultations at
+3am.
+
+**The server is purged separately**, with `npm run admin retention:status` and
+`retention:purge`. A device can only destroy its own copy, so a facility that
+purges every phone and leaves the server holding the records has moved the data
+rather than applied a policy. It is a separate deliberate command and not
+something the sync protocol does on a device's say-so: a compromised or
+misconfigured phone must not be able to tell the server to destroy a facility's
+records. The server measures age on `updated_at`, the only timestamp it has,
+which is later than the encounter date and therefore strictly more
+conservative. Tombstones are purged too — a soft-deleted row still carries its
+body, and letting deleted records outlive kept ones is the opposite of a
+retention policy.
+
+Both sides write `retention.purge` into the hash-chained audit log, inside the
+transaction, so an entry can never describe a deletion that rolled back.
 
 ### 6.5 Breach response
 
@@ -487,7 +527,9 @@ check any of them.
 
 - [ ] Controller identified and registered with the regulator if required
 - [ ] Lawful basis determined and documented; separate basis for any research use
-- [ ] Retention schedule established from health-sector rules
+- [ ] Retention schedule established from health-sector rules **and entered in Settings → Retention** (unset means nothing is ever deleted)
+- [ ] Server-side purge scheduled alongside the device one (`npm run admin retention:purge`)
+- [ ] Research consent recorded for patients whose records may be exported; staff trained that an unanswered consent excludes the record
 - [ ] This DPIA reviewed and re-scored for the actual setting
 - [ ] Country row reviewed by local counsel; `counselReviewed` set
 - [ ] Sync server behind TLS (`AFYACORE_TLS_CERT`/`KEY`, or a terminating proxy)

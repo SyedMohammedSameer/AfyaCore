@@ -610,12 +610,15 @@ much quieter bug than a wrong one.
 - ⚠️ **Records are not encrypted at rest.** IndexedDB on the device and SQLite on the server are both
   plain text, so an unlocked phone or the server's filesystem gives up the roster. Device encryption
   is the only thing protecting them today.
-- ⚠️ **No consent capture, no retention schedule, and deletion is a tombstone.** Nothing records a
-  lawful basis, nothing expires, and `deletePatient` destroys the attachment photographs but leaves
+- ⚠️ **Erasure is still a tombstone.** `deletePatient` destroys the attachment photographs but leaves
   the patient and encounter rows as tombstones on both the device and the server — correct for sync
-  convergence, wrong for a data-subject erasure request. These are the three gaps between a demo and
-  a lawful deployment; they are enumerated as R10–R12 in
-  [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
+  convergence, wrong for a data-subject erasure request, which wants the clinical content gone from
+  both sides. Retention purge (below) destroys rows properly, but it works on age, not on a
+  patient's request. Tracked as R10 in [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
+- ⚠️ **The retention *period* is unknown for most countries.** The mechanism exists on both device
+  and server; the number does not. Retention is generally set by health-sector rules rather than the
+  data-protection statute, and we could not establish it from a primary source for seven of the
+  nine. Unset means nothing is ever deleted, which is the safe direction but is not a policy.
 - **Malagasy dictation is not supported** and falls back to French. See `docs/MODEL-RESEARCH.md` §2.2.
 - ⚠️ **The DHIS2 export contains placeholder UIDs.** DHIS2 identifies data elements by
   instance-specific IDs we do not have. The JSON is structurally valid and will import once

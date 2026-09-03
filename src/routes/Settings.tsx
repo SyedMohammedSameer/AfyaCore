@@ -16,6 +16,7 @@ import { PrivacySelector } from '../components/PrivacySelector'
 import { SyncPanel } from '../components/SyncPanel'
 import { StaffPanel } from '../components/StaffPanel'
 import { CountryPanel } from '../components/CountryPanel'
+import { RetentionPanel } from '../components/RetentionPanel'
 import { getFacilityCountry } from '../lib/facility'
 import { deidentify, type DeidentLevel } from '../lib/deidentify'
 import type { NerBackend } from '../lib/openmed'
@@ -333,6 +334,8 @@ export function Settings() {
         </section>
 
         <CountryPanel />
+
+        <RetentionPanel />
 
         <SyncPanel />
 

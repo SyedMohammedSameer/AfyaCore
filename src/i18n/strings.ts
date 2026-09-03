@@ -182,6 +182,15 @@ export interface Strings {
   consentRefused: string
   consentNotAsked: string
   excludedForConsent: string
+  retentionHint: string
+  retentionYears: string
+  retentionUnset: string
+  retentionEligible: string
+  retentionBlocked: string
+  retentionPurge: string
+  retentionConfirm: string
+  retentionDone: string
+  retentionServerNote: string
   notLegalAdvice: string
   // Optional on-device PII model (OpenMed). An accuracy upgrade over the
   // deterministic scrub, never a replacement for it.
@@ -442,6 +451,16 @@ const fr: Strings = {
   consentRefused: 'Refusé',
   consentNotAsked: 'Non demandé',
   excludedForConsent: 'patients exclus, sans consentement',
+  retentionHint: 'Durée de conservation des dossiers dans cet établissement.',
+  retentionYears: 'Durée de conservation',
+  retentionUnset: 'Aucune durée définie : rien n’est supprimé.',
+  retentionEligible: 'Consultations supprimables',
+  retentionBlocked: 'Bloquées, non synchronisées',
+  retentionPurge: 'Supprimer les dossiers échus',
+  retentionConfirm: 'Supprimer définitivement {n} consultations ? Action irréversible.',
+  retentionDone: '{n} consultations supprimées.',
+  retentionServerNote:
+    'Cet appareil ne supprime que sa propre copie. Purgez le serveur séparément avec « npm run admin retention:purge ».',
   notLegalAdvice: 'Ces informations sont fournies à titre indicatif et n’ont pas été validées par un juriste de ce pays. Elles ne constituent pas un avis juridique.',
   piiPack: 'Modèle d’anonymisation',
   piiPackHint: 'Repère dans les notes les noms que le registre ne contient pas, par exemple un parent cité en passant. Le nettoyage de base fonctionne sans lui.',
@@ -695,6 +714,16 @@ const mg: Strings = {
   consentRefused: 'Nolavina',
   consentNotAsked: 'Tsy mbola nangatahina',
   excludedForConsent: 'marary tsy tafiditra, tsy nanaiky',
+  retentionHint: 'Faharetan’ny fitehirizana ny antontan-taratasy eto.',
+  retentionYears: 'Faharetan’ny fitehirizana',
+  retentionUnset: 'Tsy misy faharetana voafaritra : tsy misy fafana.',
+  retentionEligible: 'Fitsidihana azo fafana',
+  retentionBlocked: 'Voasakana, tsy mbola nampifanarahana',
+  retentionPurge: 'Fafao ny antontan-taratasy efa lany',
+  retentionConfirm: 'Hofafana tanteraka ny fitsidihana {n}? Tsy azo averina.',
+  retentionDone: 'Voafafa ny fitsidihana {n}.',
+  retentionServerNote:
+    'Ity fitaovana ity ihany no voafafa. Fafao mitokana ny serivera amin’ny « npm run admin retention:purge ».',
   notLegalAdvice: 'Torohevitra fotsiny ireto vaovao ireto ary tsy nohamarinin’ny mpahay lalàna ao amin’ity firenena ity.',
   piiPack: 'Modely fanafenana anarana',
   piiPackHint: 'Mahita anarana tsy ao amin’ny rejisitra ao anaty naotra, ohatra havana voatonona. Miasa ihany ny fanadiovana fototra na tsy misy izy.',
@@ -947,6 +976,16 @@ const en: Strings = {
   consentRefused: 'Refused',
   consentNotAsked: 'Not asked',
   excludedForConsent: 'patients excluded, no consent',
+  retentionHint: 'How long this facility keeps records.',
+  retentionYears: 'Retention period',
+  retentionUnset: 'No period set: nothing is ever deleted.',
+  retentionEligible: 'Consultations eligible',
+  retentionBlocked: 'Blocked, not synced',
+  retentionPurge: 'Delete expired records',
+  retentionConfirm: 'Permanently delete {n} consultations? This cannot be undone.',
+  retentionDone: '{n} consultations deleted.',
+  retentionServerNote:
+    'This device deletes only its own copy. Purge the server separately with “npm run admin retention:purge”.',
   notLegalAdvice: 'Recorded for guidance and not reviewed by a lawyer in this jurisdiction. This is not legal advice.',
   piiPack: 'De-identification model',
   piiPackHint: 'Finds names in notes that the roster does not hold, such as a relative mentioned in passing. The deterministic scrub works without it.',
