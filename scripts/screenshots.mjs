@@ -254,6 +254,16 @@ async function main() {
     await visit(page, `${BASE}/patients`)
     await clickText(page, 'a[href^="/patient/"]', /ANDRIANJAFY/)
     await clickText(page, 'button', /new consultation/)
+
+    // The disclosure is the honest first state of this screen: the browser's
+    // dictation sends audio to a third party, so the microphone is not offered
+    // until somebody accountable says that is acceptable. Captured before it
+    // is dismissed, because it is the control and not an interruption.
+    await shot(page, 'mobile-dictation-disclosure')
+
+    // Then the working screen, which is what a clinician sees every day after
+    // the one-time acknowledgement.
+    await clickText(page, 'button', /understood|compris|azoko/)
     await shot(page, 'mobile-encounter')
   } finally {
     await browser.close()

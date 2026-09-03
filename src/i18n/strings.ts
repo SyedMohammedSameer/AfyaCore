@@ -555,7 +555,7 @@ const fr: Strings = {
   clearDataConfirm: 'Effacer toutes les données de cet appareil ?',
   noReportData: 'Aucune consultation validée ce mois-ci.',
   prototypeNotice:
-    'AfyaCore v0.0.1, prototype. Les libellés en malgache n’ont pas encore été relus par un locuteur natif. L’export DHIS2 contient des identifiants à remplacer.',
+    'AfyaCore v0.0.2, prototype. Huit des dix traductions destinées aux patients n’ont pas été relues par un locuteur. L’export DHIS2 contient des identifiants à remplacer. Les dossiers ne sont pas chiffrés sur l’appareil.',
 }
 
 const mg: Strings = {
@@ -821,7 +821,7 @@ const mg: Strings = {
   clearDataConfirm: 'Hofafana ny rakitra rehetra ato amin’ity finday ity?',
   noReportData: 'Tsy nisy fitsaboana vita ity volana ity.',
   prototypeNotice:
-    'AfyaCore v0.0.1, andrana. Mbola tsy voahamarin’ny tompon-teny ny teny malagasy. Misy laharana tokony hosoloina ny fanondranana DHIS2.',
+    'AfyaCore v0.0.2, andrana. Valo amin’ny folo ny fandikan-teny ho an’ny marary tsy mbola voahamarina. Misy laharana tokony hosoloina ny fanondranana DHIS2. Tsy voaisy fiarovana ny antontan-taratasy ao amin’ny fitaovana.',
 }
 
 const en: Strings = {
@@ -1087,7 +1087,7 @@ const en: Strings = {
   clearDataConfirm: 'Erase all data on this device?',
   noReportData: 'No confirmed consultations this month.',
   prototypeNotice:
-    'AfyaCore v0.0.1, prototype. The Malagasy labels have not yet been reviewed by a native speaker. The DHIS2 export contains placeholder identifiers.',
+    'AfyaCore v0.0.2, prototype. Eight of the ten patient-facing translations have not been reviewed by a speaker. The DHIS2 export contains placeholder identifiers. Records are not encrypted on the device.',
 }
 
 export const STRINGS: Record<LangCode, Strings> = { fr, mg, en }
