@@ -19,7 +19,8 @@
 </p>
 
 > **Status: pilot candidate, `0.0.2`.** Not yet validated with a facility or an NGO, and no clinician
-> has used it. Records are stored unencrypted on the device. An external review in September 2026
+> has used it. Records are stored unencrypted on the device, and on-device speech recognition ships
+> but its accuracy on clinical French has not been measured by us. An external review in September 2026
 > found five release blockers — dictation sending audio off-device while the docs claimed otherwise,
 > rejected sync records silently marked as synced, "anonymous" exports that were still linkable,
 > role permissions declared but not enforced, and invalid FHIR identifiers — all now fixed, each
@@ -65,7 +66,7 @@ than it behaved**, and nothing that failed when it did.
 
 | Found | Was | Now |
 |---|---|---|
-| Dictation | Audio streamed to the browser vendor while SECURITY.md claimed no third-party call at runtime | On-device where the browser supports it; otherwise off until acknowledged, audited, withdrawable |
+| Dictation | Audio streamed to the browser vendor while SECURITY.md claimed no third-party call at runtime | Transcribed on the device by a vendored Whisper model; where none is installed, on-device if the browser can, else off until acknowledged, audited, withdrawable |
 | Sync conflicts | A record the server rejected was marked as synced, and the pull could never correct it — permanent silent divergence | The canonical row travels with the rejection and converges; rejected rows are never acknowledged |
 | "Anonymous" exports | Stable encounter and prescription ids, exact row timestamps, and prescription notes never scrubbed at all | All ids pseudonymised per export, row timestamps dropped, notes scrubbed |
 | Role permissions | Declared in a matrix that only components consulted, and Settings did not | Enforced at the service boundary; a clinician cannot export identified, delete, repoint sync or erase |
@@ -90,9 +91,12 @@ Every screenshot below is the real build against the synthetic demo workspace, r
 | <img src="docs/screenshots/mobile-lock.webp" alt="PIN entry lock screen" width="240"> | <img src="docs/screenshots/mobile-review.webp" alt="Review screen showing per-field provenance" width="240"> | <img src="docs/screenshots/mobile-instructions.webp" alt="Patient instruction sheet in Malagasy with dosing icons" width="240"> |
 | A shared phone needs to know who is holding it, or the audit trail says "someone at this facility". | Per-field provenance. Low-confidence values are flagged *Check this* before anything is saved. | Rendered in the **patient's** language, with dosing icons for anyone who cannot read. |
 
-The one screen worth dwelling on. The browser's dictation sends audio to the vendor's recognition
-service, so the microphone is **not offered** until somebody accountable for the facility's data
-says that is acceptable — and once it is, a reminder stays on screen for as long as it is in force:
+The one screen worth dwelling on. Install the speech model (`npm run vendor:whisper`) and dictation
+is transcribed by Whisper in a worker **on the phone**: nothing is sent anywhere, it works with the
+network off, and the panel says so. Without it, the browser's dictation streams audio to the
+vendor's recognition service, so the microphone is **not offered** until somebody accountable for
+the facility's data says that is acceptable — and once it is, a reminder stays on screen for as long
+as it is in force:
 
 | Before acknowledgement | After |
 |---|---|
@@ -447,14 +451,15 @@ facility staff are bilingual. That splits one hard problem into a tractable one 
 
 | | Language | Status |
 |---|---|---|
-| Clinician dictates → record | French | Works today |
+| Clinician dictates → record | French | Works today, on-device (Whisper) |
 | Record → patient instructions | Malagasy | Works today |
 | Patient speaks → record | Malagasy | Deferred (~30–50% WER) |
 | Paper photo → record | French print | Works today (Tesseract, on-device) |
 
-**Nothing heavy ships in the install.** Dictation uses the browser's built-in recogniser (0 MB), and
-the field extraction is deterministic rules that run offline in microseconds. OCR is the one large
-dependency (~7 MB) and it is downloaded only when someone asks for it. Every model in
+**Nothing heavy ships in the install.** The field extraction is deterministic rules that run offline
+in microseconds, and every model is an optional download placed on the deployment's own origin, not
+a launch blocker: OCR (~12 MB), speech (~45–81 MB) and de-identification (~70 MB) are each fetched
+by an explicit script and none of them is in the install. Every model in
 [`docs/MODEL-RESEARCH.md`](docs/MODEL-RESEARCH.md) is an upgrade path behind an interface, not a
 launch blocker, which is what keeps the install small enough for a 2G connection.
 
@@ -518,11 +523,20 @@ and CC BY-NC 4.0), so rather than guess — the rule this project applies to ret
 breach deadlines — it is fetched by whoever runs the evaluation, used for evaluation only, and
 cited. See the header of `scripts/vendor-e3c.mjs`.
 
-`npm run vendor:openmed` is separate and optional. It fetches the ~67 MB OpenMed French PII model
-and the ONNX Runtime core into `public/models/` and `public/ort/`, enabling the neural
-de-identification pass. It is deliberately **not** part of `npm run build`: the pass is an accuracy
-upgrade over a scrub that already works, and making it a build step would break the build anywhere
-the Hub is unreachable.
+Two model scripts are separate and optional, and neither is part of `npm run build` — making them
+build steps would break the build anywhere the Hub is unreachable, which includes the connections
+this project is about:
+
+```bash
+npm run vendor:whisper          # ~81 MB. On-device dictation. Add `-- tiny` for ~45 MB.
+npm run vendor:openmed          # ~70 MB. Neural de-identification.
+```
+
+Both write into `public/models/` and `public/ort/`, so the phone fetches them from the facility's
+own origin and the service worker can cache them. `vendor:whisper` is the one that changes a
+*claim* rather than a number: with it, dictated audio never leaves the device and the disclosure in
+`src/lib/dictation.ts` stops being reachable. Whisper base rather than tiny by default, because the
+error a speech model makes here lands in a drug name or a dose.
 
 Load `Settings → Load demo workspace` for synthetic patients to click through.
 
@@ -544,6 +558,19 @@ Tests sit next to what they cover (`*.test.ts`) and run in Node with no DOM, so 
 IndexedDB is factored into a pure function first and tested there.
 
 ## How dictation works
+
+Two stages, and it is worth keeping them apart: **speech to text**, which is a model, and **text to
+fields**, which is not. The second is deterministic rules, runs in 0.05 ms, and is where every
+number in the evaluation comes from. The first is Whisper on the device, or the browser's
+recogniser where no model is installed.
+
+Whisper does not stream — it transcribes a finished buffer — so `src/lib/audio.ts` cuts the
+microphone at pauses and each utterance is transcribed as it closes. A segment has to be at least
+three seconds before a pause can end it, because clinicians pause constantly and a model handed
+"trente-huit neuf" alone has no idea it is looking at a temperature. Inference runs in a worker: a
+base-model pass takes seconds of CPU on the phones this targets, and a frozen screen during a
+consultation is not a trade worth making. Silence is never sent to the model at all, and the known
+subtitle artefacts Whisper emits on it are dropped if one arrives anyway.
 
 Say, in French:
 
@@ -690,13 +717,19 @@ much quieter bug than a wrong one.
   them. They need a speaker who works in that health system before any real deployment; wrong dosage
   wording is a safety issue, not a polish issue. The app says so on the sheet, and the numerals and
   dosing icons carry the instruction regardless.
-- ⚠️ **Dictation sends audio to the browser vendor**, not just "needs network". Chrome and Edge
-  stream captured audio to their own recognition service, so a dictated consultation discloses the
-  patient's voice, name and diagnosis to a third party. The app asks for on-device recognition where
-  the browser supports it (Chrome 138+), and where it does not, dictation is **off until an
-  administrator acknowledges the disclosure** — audited, withdrawable, and reminded on screen while
-  in force. Typing always works offline and never leaves the device. Offline ASR is the upgrade that
-  removes the disclosure rather than merely stating it.
+- ⚠️ **Dictation sends audio to the browser vendor unless the speech model is installed.** With
+  `npm run vendor:whisper` it does not: Whisper runs in a worker on the phone and there is nothing
+  to disclose. Without it, Chrome and Edge stream captured audio to their own recognition service,
+  so a dictated consultation discloses the patient's voice, name and diagnosis to a third party; the
+  app then asks for browser on-device recognition (Chrome 138+), and where that is unavailable too,
+  dictation is **off until an administrator acknowledges the disclosure** — audited, withdrawable,
+  and reminded on screen while in force. Typing always works offline and never leaves the device.
+- ⚠️ **On-device speech is unmeasured here, and covers French and English only.** The word error
+  rate of the vendored model on clinical French, in a consultation room, on the phones this
+  targets, has not been measured by us — the published Common Voice figures are not that setting.
+  Malagasy is deliberately excluded: Whisper produces confident French for Malagasy input rather
+  than failing, and a wrong transcription in a clinical field is worse than none, so Malagasy stays
+  on the browser path. Measure it before relying on it.
 - ⚠️ **The audit chain detects tampering, it does not prevent it.** A hash chain makes an edited or
   deleted entry visible, but anyone who can rewrite the whole chain leaves no trace. Recording the
   head hash off the device is the mitigation, and it is manual.

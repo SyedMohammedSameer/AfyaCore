@@ -37,17 +37,22 @@ These are implemented and tested, and are the parts you can rely on:
 
 - **Records never leave the device without an explicit action.** There is no
   telemetry, no analytics and no crash reporting. Outbound requests are: the
-  sync server you configure yourself, a one-time OCR or PII model download you
-  ask for, and — if you enable it — dictation.
-- ⚠️ **Dictation is the exception, and it is disclosed.** The browser's Web
-  Speech API streams captured audio to the browser vendor's recognition
-  service, so a dictated consultation sends the patient's voice, name and
-  diagnosis to a third party. This file previously claimed the app made no
-  third-party runtime call at all, which was false. The app now asks the
-  browser for on-device recognition where it exists, and where it does not,
-  dictation stays **off** until an administrator acknowledges the disclosure —
-  audited, withdrawable, and reminded on screen while it is in force. Typing
-  always works, offline, and never leaves the device.
+  sync server you configure yourself, a one-time OCR, speech or PII model
+  download you ask for, and — if you fall back to it — dictation.
+- **Dictation runs on the device when the speech model is installed.** Run
+  `npm run vendor:whisper` and Whisper transcribes in a worker on the phone.
+  Nothing is sent anywhere, there is no disclosure to make, and it works with
+  the network off. This is the configuration to deploy.
+- ⚠️ **Without that model, dictation is the one exception, and it is
+  disclosed.** The browser's Web Speech API streams captured audio to the
+  browser vendor's recognition service, so a dictated consultation sends the
+  patient's voice, name and diagnosis to a third party. This file previously
+  claimed the app made no third-party runtime call at all, which was false.
+  Where no model is installed the app asks the browser for on-device
+  recognition, and where that is unavailable too, dictation stays **off**
+  until an administrator acknowledges the disclosure — audited, withdrawable,
+  and reminded on screen while it is in force. Typing always works, offline,
+  and never leaves the device.
 - **Every record-level export passes through one de-identification step**, so no
   export path can bypass the level you chose. Pseudonyms are SHA-256 under a salt
   generated on the device that never leaves it.

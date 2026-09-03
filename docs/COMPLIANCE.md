@@ -143,28 +143,45 @@ Four properties this diagram is meant to make checkable:
    it, or audit its onward use. That is why the de-identification level is a
    deliberate, logged choice and not a default.
 
-### 3.1 Dictation — the one place audio leaves
+### 3.1 Dictation — where the audio goes
 
 The browser's Web Speech API is not local: in Chrome and Edge it streams
 captured audio to the vendor's recognition service. A dictated consultation
-therefore discloses the patient's **voice** — biometric data under several of
-the regimes in §5 — along with their name and diagnosis, to a processor the
+would therefore disclose the patient's **voice** — biometric data under several
+of the regimes in §5 — along with their name and diagnosis, to a processor the
 facility has no agreement with and this project does not control.
 
 This was previously undisclosed, and both this document and SECURITY.md stated
-the opposite. The correction:
+the opposite. It is now removed rather than merely disclosed. Three paths, in
+the order `src/lib/dictation.ts` tries them:
 
-- On-device recognition is requested every time, and used where the browser
-  supports it (Chrome 138+ with the language pack). Then nothing leaves and
-  nothing is asked.
-- Otherwise dictation is **off** until an administrator acknowledges it. The
-  acknowledgement is audited (`facility.configure`, `remoteDictation=…`), can
-  be withdrawn, and a reminder stays on screen while it is in force.
-- Typing is unaffected: offline, always available, never leaves the device.
+1. **A vendored speech model (recommended).** With `npm run vendor:whisper`
+   run against the deployment's own origin, Whisper transcribes in a Web
+   Worker on the phone. No request is made, the audio never reaches a network
+   stack, and it works offline. **Nothing in this section applies** to a
+   deployment configured this way: there is no transfer, no processor and no
+   lawful basis to establish, and `dictationLeavesDevice()` returns false.
+2. **Browser on-device recognition.** Chrome 138+ with the language pack
+   installed. Also local, but not under the facility's control: a browser
+   update or a wiped language pack can remove it, silently, which is why the
+   vendored model is tried first.
+3. **The vendor's service.** Reached only when neither of the above is
+   available. Dictation stays **off** until an administrator acknowledges it.
+   The acknowledgement is audited (`facility.configure`,
+   `remoteDictation=…`), can be withdrawn, and a reminder stays on screen
+   while it is in force.
 
-A deployer relying on dictation needs this in their DPIA and, in most of these
-regimes, a lawful basis for the transfer — which is a cross-border one, since
-the recognition service is not in-country (§5.5).
+Typing is unaffected throughout: offline, always available, never leaves the
+device.
+
+Two limits worth stating plainly. The vendored model covers French and English
+only; **Malagasy dictation stays on path 2 or 3**, because Whisper's Malagasy
+coverage is poor enough that it produces confident French for Malagasy input
+rather than failing, and a wrong transcription in a clinical field is worse
+than none. And a deployer who ships without the model, or who dictates in
+Malagasy, is on path 3 and needs this in their DPIA along with a lawful basis
+for the transfer — a cross-border one, since the recognition service is not
+in-country (§5.5).
 
 ### 3.2 Sync
 
@@ -537,8 +554,9 @@ would be dishonest.
 
 ### 7.4 Supply chain
 
-No runtime third-party network calls **except dictation**, which is disclosed
-and off by default where it is not on-device (§3.4). A compromised CDN cannot
+No runtime third-party network calls at all where the speech model is
+installed. Without it, dictation is the sole exception, disclosed and off by
+default where it is not on-device (§3.1). A compromised CDN cannot
 reach a facility. Models are vendored to the deployer's own origin by an explicit
 script, never fetched from Hugging Face at runtime. `npm audit --omit=dev` is
 clean; the development dependency `@huggingface/transformers` carries advisories
@@ -585,7 +603,8 @@ check any of them.
 ## 9. Maintaining this document
 
 Re-read it when any of these change: `src/lib/countries.ts` (§5),
-`src/lib/deidentify.ts` (§3.2–3.3), the sync protocol (§3.1), the audit action
+`src/lib/deidentify.ts` (§3.3–3.4), the sync protocol (§3.2), the speech and
+de-identification model vendoring scripts (§3.1, §7.4), the audit action
 list (§6.6), or anything in the risk register.
 
 Corrections to §5 are especially welcome and especially likely to be needed —

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Mic, ShieldAlert, Square, WandSparkles, WifiOff } from 'lucide-react'
+import { Mic, ShieldAlert, ShieldCheck, Square, WandSparkles, WifiOff } from 'lucide-react'
 import { Button, Card, cx } from './ui'
 import { useOnline } from './AppShell'
 import { recogniser } from '../lib/speech'
+import { LocalWhisperRecogniser } from '../lib/asr'
 import { acknowledgeRemoteDictation, dictationState, type DictationState } from '../lib/dictation'
 import { extractClinical, type ExtractionResult } from '../lib/clinicalExtract'
 import { useClinicalLocale } from '../lib/facility'
@@ -39,41 +40,73 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
   // avoids a stale closure inside the recogniser callback.
   const finalRef = useRef('')
 
+  /*
+   * The on-device recogniser, built only once a pack is known to be installed.
+   *
+   * Held in a ref rather than state because constructing it spawns a worker
+   * that parses an 80 MB graph, and a re-render must not do that twice. It is
+   * also the reason it is created lazily on the first press rather than on
+   * mount: a clinician who never dictates should never pay for the model.
+   */
+  const local = useRef<LocalWhisperRecogniser | null>(null)
+  const localPack = disclosure?.status === 'local-model' ? disclosure.pack : null
+
   const stop = useCallback(() => {
-    recogniser.stop()
+    if (local.current) local.current.stop(locale.speechLang)
+    else recogniser.stop()
     setListening(false)
     setInterim('')
-  }, [])
+  }, [locale.speechLang])
 
   // A recogniser left running when the user navigates away holds the mic open
-  // and drains the battery.
-  useEffect(() => () => recogniser.stop(), [])
+  // and drains the battery. The worker goes too: it is holding the model.
+  useEffect(
+    () => () => {
+      recogniser.stop()
+      local.current?.dispose()
+      local.current = null
+    },
+    [],
+  )
+
+  // Switching clinical language mid-consultation must not leave a worker
+  // loaded for the old one.
+  useEffect(() => {
+    local.current?.dispose()
+    local.current = null
+  }, [localPack, locale.speechLang])
 
   // Where the audio would go, and whether anyone has been told. Re-checked per
-  // language: on-device availability is per language pack.
+  // language: both the vendored pack and browser on-device support are per
+  // language.
   useEffect(() => {
     dictationState(locale.speechLang).then(setDisclosure)
   }, [locale.speechLang])
 
+  const onResult = useCallback(({ transcript, isFinal }: { transcript: string; isFinal: boolean }) => {
+    if (isFinal) {
+      finalRef.current = `${finalRef.current} ${transcript}`.trim()
+      setFinalText(finalRef.current)
+      setInterim('')
+    } else {
+      setInterim(transcript)
+    }
+  }, [])
+
+  const onError = useCallback((e: string) => {
+    setError(e === 'not-allowed' ? 'microphone' : e)
+    setListening(false)
+  }, [])
+
   function start() {
     setError('')
     setListening(true)
-    recogniser.start(
-      locale.speechLang,
-      ({ transcript, isFinal }) => {
-        if (isFinal) {
-          finalRef.current = `${finalRef.current} ${transcript}`.trim()
-          setFinalText(finalRef.current)
-          setInterim('')
-        } else {
-          setInterim(transcript)
-        }
-      },
-      (e) => {
-        setError(e === 'not-allowed' ? 'microphone' : e)
-        setListening(false)
-      },
-    )
+    if (localPack) {
+      local.current ??= new LocalWhisperRecogniser(localPack)
+      void local.current.start(locale.speechLang, onResult, onError)
+      return
+    }
+    recogniser.start(locale.speechLang, onResult, onError)
   }
 
   function apply() {
@@ -88,7 +121,10 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
     setInterim('')
   }
 
-  if (!recogniser.available) {
+  // The local path needs a microphone and a worker, not the browser's Web
+  // Speech API, so `disclosure` decides rather than `recogniser.available`:
+  // a browser without the vendor API can still dictate with a pack installed.
+  if (disclosure?.status === 'unavailable' || (!disclosure && !recogniser.available)) {
     return <Card className="bg-sunken text-sm text-ink-2">{t.micUnavailable}</Card>
   }
 
@@ -123,7 +159,9 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
   }
 
   const hasText = finalText.trim().length > 0
-  const blocked = !online && recogniser.requiresNetwork
+  // On-device recognition works with the network off, which is the point of
+  // installing it. Only the browser path needs connectivity.
+  const blocked = !online && !localPack && recogniser.requiresNetwork
   const remote = disclosure?.status === 'remote-acknowledged'
 
   return (
@@ -141,6 +179,15 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
         <p className="flex items-start gap-2 rounded-field bg-warn-50 p-2.5 text-xs leading-relaxed text-warn-700">
           <ShieldAlert size={15} className="mt-0.5 shrink-0" />
           {t.dictationRemoteActive}
+        </p>
+      )}
+      {localPack && (
+        /* The counterpart of the warning above, and it earns its place: the
+           facility paid 80 MB for this and the clinician is the one who has to
+           be able to tell a patient where their voice went. */
+        <p className="flex items-start gap-2 rounded-field bg-ok-50 p-2.5 text-xs leading-relaxed text-ok-700">
+          <ShieldCheck size={15} className="mt-0.5 shrink-0" />
+          {t.dictationLocalActive}
         </p>
       )}
       {blocked && (
@@ -172,7 +219,9 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
           <p className="text-lg leading-tight font-extrabold tracking-[-0.03em] text-ink">
             {listening ? t.listening : t.dictate}
           </p>
-          <p className="mt-0.5 text-sm leading-snug text-ink-3">{t.dictationHint}</p>
+          <p className="mt-0.5 text-sm leading-snug text-ink-3">
+            {localPack ? t.dictationLocalHint : t.dictationHint}
+          </p>
         </div>
       </div>
 
