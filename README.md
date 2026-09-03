@@ -36,7 +36,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/demo.mp4"><strong>Watch the full 110 seconds</strong></a> · silent, 1920x1080, 6.7 MB
+  <a href="docs/demo.mp4"><strong>Watch the full 55 seconds</strong></a> · silent, 1920x1080 at 60 fps, 4.6 MB
 </p>
 
 The loop above is a trailer, two seconds sampled from each beat of the real render. Every frame of
@@ -53,11 +53,17 @@ npm --prefix video run render:web         # the smaller copy committed above
 npm run demo:preview                      # the looping WebP at the top of this section
 ```
 
-`demo:preview` samples the render rather than converting it. A 110-second animation is over a
-thousand frames and would dwarf the video it advertises on a page people open to read; taking two
-seconds out of each beat gives 22 seconds in 0.6 MB, which plays inline where GitHub would only
-offer a link. It reads the beat lengths out of `video/src/Demo.tsx` at run time, so adding or
-reordering a beat needs no change to the preview script.
+`demo:preview` samples the render rather than converting it. Converting the whole thing would be
+over a thousand frames and would dwarf the video it advertises on a page people open to read;
+taking two seconds out of each beat gives 22 seconds in 0.7 MB, which plays inline where GitHub
+would only offer a link. It reads the beat lengths out of `video/src/Demo.tsx` and the playback
+speed out of `video/src/theme.ts` at run time, so adding, reordering or re-timing a beat needs no
+change to the preview script.
+
+The cut runs at **2x**, set by `SPEED` in `video/src/theme.ts`. The composition keeps its frame
+count and is rendered at twice the frame rate, so every hold and animation compresses by exactly
+half with real frames rather than a time-stretch. It is fast to read on purpose; set `SPEED` back
+to `1` for the 110-second cut, which runs the same 500 words at a more comfortable 4.5 per second.
 
 The offline sequence is captured live rather than composed from stills, because it is the claim the
 project rests on: the capture enrols the device against a throwaway sync server, switches the
