@@ -1,5 +1,6 @@
 import React from 'react'
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion'
+import { Img, staticFile } from 'remotion'
 import { Phone } from './Phone'
 import { theme } from './theme'
 
@@ -16,7 +17,9 @@ export const Scene: React.FC<{
   kicker: string
   claim: string
   note?: string
-}> = ({ src, kicker, claim, note }) => {
+  /** Desktop shots are not phone shaped, so they get a laptop-ish card instead. */
+  wide?: boolean
+}> = ({ src, kicker, claim, note, wide }) => {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
 
@@ -29,10 +32,10 @@ export const Scene: React.FC<{
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 110,
+          gap: wide ? 70 : 110,
           width: '100%',
           height: '100%',
-          padding: '0 130px',
+          padding: wide ? '0 90px' : '0 130px',
         }}
       >
         <div
@@ -42,7 +45,22 @@ export const Scene: React.FC<{
             flexShrink: 0,
           }}
         >
-          <Phone src={src} scale={1.02} />
+          {wide ? (
+            <div
+              style={{
+                width: 980,
+                borderRadius: 18,
+                overflow: 'hidden',
+                background: theme.surface,
+                border: `1px solid ${theme.line}`,
+                boxShadow: '0 40px 90px -20px rgba(28,35,33,0.4)',
+              }}
+            >
+              <Img src={staticFile(src)} style={{ width: '100%', display: 'block' }} />
+            </div>
+          ) : (
+            <Phone src={src} scale={0.98} />
+          )}
         </div>
 
         <div style={{ opacity: interpolate(frame, [6, 24], [0, 1], { extrapolateRight: 'clamp' }) }}>
@@ -60,12 +78,12 @@ export const Scene: React.FC<{
           </div>
           <div
             style={{
-              fontSize: 62,
+              fontSize: wide ? 46 : 62,
               lineHeight: 1.14,
               fontWeight: 700,
               letterSpacing: '-0.022em',
               color: theme.ink,
-              maxWidth: 900,
+              maxWidth: wide ? 640 : 900,
             }}
           >
             {claim}
@@ -73,11 +91,11 @@ export const Scene: React.FC<{
           {note && (
             <div
               style={{
-                marginTop: 30,
-                fontSize: 30,
+                marginTop: wide ? 24 : 30,
+                fontSize: wide ? 25 : 30,
                 lineHeight: 1.45,
                 color: theme.ink3,
-                maxWidth: 820,
+                maxWidth: wide ? 640 : 820,
               }}
             >
               {note}

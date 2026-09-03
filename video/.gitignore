@@ -2,3 +2,6 @@ node_modules
 out
 # Captured from the running app by `npm run capture`; regenerated, never edited.
 public
+
+# Throwaway sync database, created and destroyed by `npm run capture`.
+.capture
