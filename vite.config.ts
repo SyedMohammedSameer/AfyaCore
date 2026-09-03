@@ -87,6 +87,37 @@ export default defineConfig({
             },
           },
           {
+            /*
+             * Model *manifests* revalidate. Everything else about a model is
+             * immutable and enormous; `config.json` is neither, and it is the
+             * file `isPackAvailable` and `isModelAvailable` read to decide
+             * whether a model is installed at all.
+             *
+             * Under the CacheFirst rule below that decision could never be
+             * revised. Two ways it went wrong, and the second is the one that
+             * matters: an administrator who removes a model leaves the app
+             * still claiming it is there, and — worse — a probe that runs
+             * before the model is vendored gets the SPA fallback, which a real
+             * server answers with 200 and HTML, and that HTML is then pinned
+             * forever. The app would go on sending dictation audio to a third
+             * party while the administrator believed they had installed the
+             * on-device model, with nothing on any screen to say so.
+             *
+             * Registration order matters: workbox takes the first matching
+             * route, so this has to precede the CacheFirst rule.
+             */
+            urlPattern: ({ url }: { url: URL }) =>
+              url.pathname.startsWith('/models/') && url.pathname.endsWith('/config.json'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'afyacore-model-manifests',
+              // Offline, the last known answer is the right one. Online, the
+              // network is.
+              networkTimeoutSeconds: 5,
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // The OpenMed PII model, same bargain as the OCR pack: ~67 MB that
             // a facility downloads once while it has signal, and must then keep
             // working with no network at all. Never precached, because the

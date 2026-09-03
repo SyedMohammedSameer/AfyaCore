@@ -17,13 +17,25 @@
  * Every screenshot is taken against the synthetic demo workspace. No real
  * patient data goes anywhere near this script, and none should.
  */
-import { mkdir, access, stat, rm } from 'node:fs/promises'
+import { mkdir, access, rename, stat, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import puppeteer from 'puppeteer-core'
 import { findChrome } from './find-chrome.mjs'
 
 const BASE = process.env.AFYACORE_URL ?? 'http://localhost:4173'
 const OUT = 'docs/screenshots'
+/**
+ * The directory `npm run preview` is serving.
+ *
+ * Needed because two of these screenshots are of *deployment configurations*
+ * rather than screens: whether the on-device speech model is installed changes
+ * what the dictation panel says, and both states are real and both are
+ * documented. Moving the model directory aside for one shot and back for the
+ * next captures each of them from the running app, which is the rule this
+ * script exists to keep. Nothing is mocked and no state is faked.
+ */
+const SERVED = process.env.AFYACORE_DIST ?? 'dist'
+const SPEECH_PACKS = ['whisper-base', 'whisper-tiny']
 
 
 /**
@@ -55,6 +67,68 @@ async function settle(page) {
     { timeout: 15_000 },
   )
   await sleep(700)
+}
+
+/**
+ * Whether a speech pack is being served, and the ability to hide it briefly.
+ *
+ * `hidePacks` returns false when there was nothing to hide, which is the
+ * signal that this run cannot produce the on-device shots at all — the
+ * caller then captures the fallback configuration under its own names and
+ * `main` warns loudly, rather than quietly writing an asset that describes a
+ * deployment nobody is recommending.
+ */
+let packsPresent = false
+const hidden = []
+
+const exists = (p) =>
+  access(p).then(
+    () => true,
+    () => false,
+  )
+
+async function detectPacks() {
+  for (const pack of SPEECH_PACKS) {
+    if (await exists(join(SERVED, 'models', pack))) packsPresent = true
+  }
+  return packsPresent
+}
+
+async function hidePacks() {
+  if (!packsPresent) return false
+  for (const pack of SPEECH_PACKS) {
+    const from = join(SERVED, 'models', pack)
+    if (!(await exists(from))) continue
+    const to = `${from}.hidden`
+    await rename(from, to)
+    hidden.push([from, to])
+  }
+  return hidden.length > 0
+}
+
+async function restorePacks() {
+  while (hidden.length > 0) {
+    const [from, to] = hidden.pop()
+    await rename(to, from).catch(() => {})
+  }
+}
+
+/**
+ * Fail rather than write a screenshot of the wrong configuration.
+ *
+ * The whole class of bug here is an asset that keeps being used after the
+ * behaviour it depicts has changed, and it is invisible: the picture still
+ * looks like the app. Asserting the sentence the panel is supposed to be
+ * showing turns that into a failed command.
+ */
+async function assertDictation(page, expected) {
+  const text = await page.evaluate(() => document.body.textContent ?? '')
+  if (!expected.test(text)) {
+    throw new Error(
+      `the dictation panel does not match ${expected}. ` +
+        `Either the copy changed or the speech pack state is not what this run assumed.`,
+    )
+  }
 }
 
 /** Scroll the first element whose text matches into view, then let it settle. */
@@ -171,6 +245,19 @@ async function main() {
   await rm(OUT, { recursive: true, force: true })
   await mkdir(OUT, { recursive: true })
 
+  await detectPacks()
+  if (packsPresent) {
+    console.log(`speech pack: found in ${SERVED}/models, capturing both configurations`)
+  } else {
+    console.warn(
+      `\nWARNING: no speech pack in ${SERVED}/models.\n` +
+        '  The dictation screenshots will show the browser recogniser sending audio\n' +
+        '  off the device, which is the fallback and not the recommended deployment.\n' +
+        '  Run `npm run vendor:whisper && npm run build` first for the shots the\n' +
+        '  README and the demo video actually want.\n',
+    )
+  }
+
   const browser = await puppeteer.launch({
     executablePath,
     headless: true,
@@ -251,22 +338,46 @@ async function main() {
     await visit(page, `${page.url().replace('/review', '/instructions')}`)
     await shot(page, 'mobile-instructions')
 
-    // A fresh draft, to show the capture screen with the dictation panel.
-    await visit(page, `${BASE}/patients`)
-    await clickText(page, 'a[href^="/patient/"]', /ANDRIANJAFY/)
-    await clickText(page, 'button', /new consultation/)
+    /*
+     * The dictation panel, in both configurations it actually ships in.
+     *
+     * With the speech model installed, transcription happens on the device and
+     * the panel says so. Without it, the browser's recogniser sends audio to a
+     * third party, so the microphone is not offered until somebody accountable
+     * says that is acceptable.
+     *
+     * `mobile-encounter` is the first of those, because it is the configuration
+     * this project recommends and the one the demo video shows. It used to be
+     * the second, captured by clicking through the disclosure, and that asset
+     * went on being used after the model landed — so the video's dictation beat
+     * showed the app warning that audio leaves the device in the same breath as
+     * claiming it does not. Naming the two shots apart is what stops that
+     * recurring.
+     */
+    const draft = async () => {
+      await visit(page, `${BASE}/patients`)
+      await clickText(page, 'a[href^="/patient/"]', /ANDRIANJAFY/)
+      await clickText(page, 'button', /new consultation/)
+    }
 
-    // The disclosure is the honest first state of this screen: the browser's
-    // dictation sends audio to a third party, so the microphone is not offered
-    // until somebody accountable says that is acceptable. Captured before it
-    // is dismissed, because it is the control and not an interruption.
-    await shot(page, 'mobile-dictation-disclosure')
+    if (await hidePacks()) {
+      try {
+        await draft()
+        // Captured before it is dismissed, because it is the control and not
+        // an interruption.
+        await shot(page, 'mobile-dictation-disclosure')
+        await clickText(page, 'button', /understood|compris|azoko/)
+        await shot(page, 'mobile-encounter-remote')
+      } finally {
+        await restorePacks()
+      }
+    }
 
-    // Then the working screen, which is what a clinician sees every day after
-    // the one-time acknowledgement.
-    await clickText(page, 'button', /understood|compris|azoko/)
+    await draft()
     await shot(page, 'mobile-encounter')
+    await assertDictation(page, packsPresent ? /does not leave/i : /audio leaves/i)
   } finally {
+    await restorePacks()
     await browser.close()
   }
 }

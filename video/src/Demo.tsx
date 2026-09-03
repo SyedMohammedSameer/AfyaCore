@@ -66,8 +66,8 @@ const BEATS: Beat[] = [
       <Scene
         src="screens/mobile-encounter.webp"
         kicker="Speak the consultation"
-        claim="Dictate it. Get structured fields back."
-        note="Temperature, pulse, blood pressure, diagnosis and prescriptions parsed straight out of natural speech, in French or English, using the clinical conventions each one actually uses."
+        claim="Dictate it. Nothing leaves the phone."
+        note="Speech recognition runs on the device, so the patient's voice never reaches a third party. Temperature, pulse, blood pressure, diagnosis and prescriptions are parsed straight out of natural speech, in French or English."
       />
     ),
   },
