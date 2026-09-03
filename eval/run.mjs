@@ -478,6 +478,23 @@ function printReport(report) {
   )
   if (!n) line(`  neural pass                   not run (model absent)`)
 
+  const diag = report.backendDiagnostics
+  if (diag) {
+    line()
+    line(
+      `  model: ${diag.calls} calls, ${diag.tokensTagged} tokens tagged, ` +
+        `${diag.spansAligned} spans after alignment`,
+    )
+    // The check that would have caught a pass which loaded 70 MB, ran the
+    // model, and discarded every token it produced.
+    if (diag.tokensTagged > 0 && diag.spansAligned === 0) {
+      line('  *** the model tagged tokens and NONE survived alignment — this is a bug ***')
+    }
+    if (diag.tokensTagged === 0 && diag.calls > 0) {
+      line('  *** the model tagged nothing at all — check the labels and the graph ***')
+    }
+  }
+
   if (n) {
     line()
     // The two rows that decide whether the download was worth it. Stated as a
@@ -586,7 +603,9 @@ async function main() {
   const { extractClinical } = await import('../src/lib/clinicalExtract.ts')
   const { CLINICAL_LOCALES } = await import('../src/lib/clinicalLocales.ts')
   const { scrubFreeText } = await import('../src/lib/deidentify.ts')
-  const { loadBackend, applyEntities } = await import('../src/lib/openmed.ts')
+  const { loadBackend, applyEntities, getBackendDiagnostics } = await import(
+    '../src/lib/openmed.ts',
+  )
 
   /*
    * Load the model from the filesystem rather than over HTTP.
@@ -652,6 +671,8 @@ async function main() {
     extraction: await runExtraction(extractClinical, CLINICAL_LOCALES),
     deident: await runDeident(scrubFreeText, applyEntities, backend),
     realText: await runRealText(scrubFreeText, applyEntities, backend),
+    // Read after every scoring pass, so it covers the whole run.
+    backendDiagnostics: backend && !stubNeural ? getBackendDiagnostics() : null,
     bundle: await measureBundle(),
   }
 

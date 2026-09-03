@@ -241,6 +241,100 @@ export function decodeBio(
 }
 
 /* ------------------------------------------------------------------ *
+ * Character offsets
+ * ------------------------------------------------------------------ */
+
+/**
+ * Normalise text the way a BERT WordPiece tokeniser does, keeping an index map.
+ *
+ * `tokenizer_config.json` for this model sets `do_lower_case: true` and leaves
+ * `strip_accents` null, which in BERT means "follow do_lower_case" — so the
+ * tokeniser sees `febriles` where the record says `fébriles`. Aligning the
+ * tokeniser's output back onto the original string therefore has to compare
+ * against the same normalisation.
+ *
+ * Accent stripping is not length-preserving (`é` is one codepoint, its NFD form
+ * is two, and one of them is dropped), so a map from normalised index back to
+ * original index is built alongside. Without it every offset after the first
+ * accented character is wrong, and in French clinical text that is the first
+ * few words.
+ */
+export function normaliseForAlignment(text: string): { normalised: string; map: number[] } {
+  let normalised = ''
+  const map: number[] = []
+
+  for (let i = 0; i < text.length; i++) {
+    // Decompose one character at a time so each output character keeps the
+    // index of the source character it came from.
+    const decomposed = text[i]!.normalize('NFD')
+    for (const char of decomposed) {
+      // Drop combining marks: the accent-stripping half of BertNormalizer.
+      if (/\p{Mn}/u.test(char)) continue
+      normalised += char.toLowerCase()
+      map.push(i)
+    }
+  }
+
+  return { normalised, map }
+}
+
+/**
+ * Recover character offsets for tokens a pipeline did not give offsets for.
+ *
+ * transformers.js's token-classification pipeline returns `entity`, `score`,
+ * `index` and `word`, and carries a literal `// TODO: Add support for start and
+ * end` where the offsets should be. Our code filtered on
+ * `start !== undefined`, which dropped every token, which meant `decodeBio`
+ * always received an empty array and the neural pass redacted nothing — while
+ * loading 70 MB, running the model, and reporting itself as active. It cost
+ * 2.4 ms a sentence to do nothing at all.
+ *
+ * So offsets are reconstructed here. Greedy forward search over the normalised
+ * text, the same technique the E3C scorer uses for the same reason: token
+ * lengths do not sum to the source, so any offset computed by addition drifts
+ * and then mislabels every span after it.
+ *
+ * WordPiece continuations may arrive as `##ies` or, once decoded, as `ies`.
+ * Both are handled by stripping the marker and searching from the cursor,
+ * which finds a continuation immediately at the cursor and a fresh word after
+ * the intervening space.
+ *
+ * A token that cannot be located is dropped rather than guessed at. Dropping
+ * loses one redaction; guessing redacts the wrong span, and a redaction marker
+ * over clinical content is worse than a missed one is here, where a
+ * deterministic pass has already run.
+ */
+export function alignTokenOffsets(
+  text: string,
+  tokens: Array<{ word: string; entity: string; score: number }>,
+): Array<{ label: string; start: number; end: number; score: number }> {
+  const { normalised, map } = normaliseForAlignment(text)
+  const aligned: Array<{ label: string; start: number; end: number; score: number }> = []
+  let cursor = 0
+
+  for (const token of tokens) {
+    const piece = token.word.replace(/^##/, '').toLowerCase()
+    if (!piece) continue
+
+    const at = normalised.indexOf(piece, cursor)
+    if (at === -1) continue
+
+    const startNorm = at
+    const endNorm = at + piece.length
+    const start = map[startNorm]
+    // `map` holds the source index of each normalised character, so the end of
+    // the span is one past the source index of its last character.
+    const lastSource = map[endNorm - 1]
+    if (start === undefined || lastSource === undefined) continue
+
+    aligned.push({ label: token.entity, start, end: lastSource + 1, score: token.score })
+    cursor = endNorm
+  }
+
+  return aligned
+}
+
+/* ------------------------------------------------------------------ *
  * Runtime loading
  * ------------------------------------------------------------------ */
 
@@ -287,6 +381,32 @@ export async function isModelAvailable(fetchImpl: typeof fetch = fetch): Promise
 }
 
 let cached: NerBackend | null = null
+
+/**
+ * What the last backend call actually did.
+ *
+ * Exposed so the evaluation harness can report "the model tagged N tokens and
+ * none of them survived", which is the sentence that would have caught the
+ * offset bug on the day it was written instead of after a 70 MB download.
+ */
+export interface BackendDiagnostics {
+  /** Calls to the backend. */
+  calls: number
+  /** Tokens the model labelled as something other than `O`. */
+  tokensTagged: number
+  /** Spans that survived offset alignment and BIO decoding. */
+  spansAligned: number
+}
+
+let diagnostics: BackendDiagnostics = { calls: 0, tokensTagged: 0, spansAligned: 0 }
+
+export function getBackendDiagnostics(): BackendDiagnostics {
+  return { ...diagnostics }
+}
+
+export function resetBackendDiagnostics(): void {
+  diagnostics = { calls: 0, tokensTagged: 0, spansAligned: 0 }
+}
 
 /**
  * Where and whether to look for the model.
@@ -353,19 +473,29 @@ export async function loadBackend(options: LoadBackendOptions = {}): Promise<Ner
         entity?: string
         entity_group?: string
         score: number
-        start?: number
-        end?: number
+        word?: string
       }>
-      return decodeBio(
-        raw
-          .filter((t) => t.start !== undefined && t.end !== undefined)
-          .map((t) => ({
-            label: t.entity ?? t.entity_group ?? 'O',
-            start: t.start!,
-            end: t.end!,
-            score: t.score,
-          })),
-      )
+
+      const tagged = raw
+        .filter((t) => t.word)
+        .map((t) => ({
+          word: t.word!,
+          entity: t.entity ?? t.entity_group ?? 'O',
+          score: t.score,
+        }))
+
+      const entities = decodeBio(alignTokenOffsets(text, tagged))
+
+      // Counters, because the way this failed before was silence: the model
+      // ran, returned tokens, and every one of them was discarded downstream
+      // without anything anywhere recording that it had happened.
+      diagnostics = {
+        calls: diagnostics.calls + 1,
+        tokensTagged: diagnostics.tokensTagged + tagged.filter((t) => t.entity !== 'O').length,
+        spansAligned: diagnostics.spansAligned + entities.length,
+      }
+
+      return entities
     }
     return cached
   } catch {
