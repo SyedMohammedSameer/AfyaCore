@@ -33,9 +33,18 @@ stops being true.
 These are implemented and tested, and are the parts you can rely on:
 
 - **Records never leave the device without an explicit action.** There is no
-  telemetry, no analytics, no crash reporting and no third-party network call at
-  runtime. The only outbound request the app makes is to a sync server you
-  configure yourself, plus a one-time OCR model download you have to ask for.
+  telemetry, no analytics and no crash reporting. Outbound requests are: the
+  sync server you configure yourself, a one-time OCR or PII model download you
+  ask for, and — if you enable it — dictation.
+- ⚠️ **Dictation is the exception, and it is disclosed.** The browser's Web
+  Speech API streams captured audio to the browser vendor's recognition
+  service, so a dictated consultation sends the patient's voice, name and
+  diagnosis to a third party. This file previously claimed the app made no
+  third-party runtime call at all, which was false. The app now asks the
+  browser for on-device recognition where it exists, and where it does not,
+  dictation stays **off** until an administrator acknowledges the disclosure —
+  audited, withdrawable, and reminded on screen while it is in force. Typing
+  always works, offline, and never leaves the device.
 - **Every record-level export passes through one de-identification step**, so no
   export path can bypass the level you chose. Pseudonyms are SHA-256 under a salt
   generated on the device that never leaves it.

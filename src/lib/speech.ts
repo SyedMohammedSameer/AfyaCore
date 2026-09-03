@@ -2,12 +2,36 @@
  * Speech input, behind an interface.
  *
  * v1 uses the browser's built-in recogniser: it costs zero bytes of bundle, is
- * already present on every Android Chrome, and handles French well. Its cost is
- * that it needs network. That is an acceptable trade *only* because voice is an
- * accelerator over a manual form that always works, see docs/MODEL-RESEARCH.md §2.1.
+ * already present on every Android Chrome, and handles French well.
+ *
+ * ## ⚠️ It sends audio off the device
+ *
+ * The Web Speech API is not local. In Chrome and Edge the captured audio is
+ * streamed to the browser vendor's recognition service, which is why
+ * `requiresNetwork` is true. That means **a clinician dictating a consultation
+ * sends the patient's name, complaint and diagnosis, in their own voice, to a
+ * third party** — and voice is biometric data in several of the regimes in
+ * docs/COMPLIANCE.md §5.
+ *
+ * This module previously said only "it needs network", and SECURITY.md claimed
+ * the app made no third-party runtime call at all. Both were wrong in the same
+ * direction, and it is the worst direction: understating where patient data
+ * goes. Needing a network and sending audio to Google are different facts, and
+ * only one of them is a disclosure.
+ *
+ * Two things follow, and neither is optional:
+ *
+ *  1. **Prefer on-device recognition.** Chrome 138+ exposes `processLocally`
+ *     and a static `available()`; where the language pack is installed, nothing
+ *     leaves. We ask for it every time and report which mode we got.
+ *  2. **Disclose when it is not local.** `src/lib/dictation.ts` gates remote
+ *     recognition behind an explicit, audited acknowledgement by an
+ *     administrator. Until that is given, dictation stays off and the manual
+ *     form — which always works and never leaves the device — is the path.
  *
  * The on-device Malagasy path (ONNX Whisper / w2v-BERT) slots in behind this
- * same interface later without touching a single component.
+ * same interface later without touching a single component, and would make the
+ * disclosure unnecessary rather than merely honest.
  */
 
 export type RecogniserLang = 'fr-FR' | 'mg-MG' | 'en-US'
@@ -17,11 +41,31 @@ export interface SpeechResult {
   isFinal: boolean
 }
 
+/**
+ * Where the audio is processed.
+ *
+ * `remote` is the honest name for what the Web Speech API does by default, and
+ * naming it is the point: a facility cannot weigh a disclosure it cannot see.
+ */
+export type RecognitionMode = 'on-device' | 'remote'
+
 export interface SpeechRecogniser {
   readonly available: boolean
   /** True when this recogniser needs connectivity to produce results. */
   readonly requiresNetwork: boolean
-  start(lang: RecogniserLang, onResult: (r: SpeechResult) => void, onError: (e: string) => void): void
+  /**
+   * Whether on-device recognition can be used for this language.
+   *
+   * Resolves to `remote` whenever we cannot prove otherwise. Assuming local
+   * because a check was inconclusive is exactly how a false privacy claim gets
+   * made, so the uncertain case takes the answer that requires disclosure.
+   */
+  modeFor(lang: RecogniserLang): Promise<RecognitionMode>
+  start(
+    lang: RecogniserLang,
+    onResult: (r: SpeechResult) => void,
+    onError: (e: string) => void,
+  ): void
   stop(): void
 }
 
@@ -32,6 +76,8 @@ interface SpeechRecognitionLike {
   continuous: boolean
   interimResults: boolean
   maxAlternatives: number
+  /** Chrome 138+. Absent elsewhere, which is why it is optional and probed. */
+  processLocally?: boolean
   start(): void
   stop(): void
   abort(): void
@@ -55,12 +101,37 @@ function getCtor(): RecognitionCtor | undefined {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition
 }
 
+/**
+ * Ask the browser whether it can recognise this language without the network.
+ *
+ * `SpeechRecognition.available()` is Chrome 138+ and returns one of
+ * `available` / `downloadable` / `downloading` / `unavailable`. Only
+ * `available` counts: `downloadable` means the pack is not there yet, and
+ * starting anyway would fall back to the remote service — which is precisely
+ * the silent case this exists to prevent.
+ */
+async function localAvailable(lang: RecogniserLang): Promise<boolean> {
+  const Ctor = getCtor() as unknown as
+    | { available?: (o: { langs: string[]; processLocally: boolean }) => Promise<string> }
+    | undefined
+  if (typeof Ctor?.available !== 'function') return false
+  try {
+    return (await Ctor.available({ langs: [lang], processLocally: true })) === 'available'
+  } catch {
+    return false
+  }
+}
+
 class WebSpeechRecogniser implements SpeechRecogniser {
   private recognition: SpeechRecognitionLike | null = null
   private stopped = false
 
   readonly available = getCtor() !== undefined
   readonly requiresNetwork = true
+
+  async modeFor(lang: RecogniserLang): Promise<RecognitionMode> {
+    return (await localAvailable(lang)) ? 'on-device' : 'remote'
+  }
 
   start(lang: RecogniserLang, onResult: (r: SpeechResult) => void, onError: (e: string) => void): void {
     const Ctor = getCtor()
@@ -73,6 +144,11 @@ class WebSpeechRecogniser implements SpeechRecogniser {
 
     const recognition = new Ctor()
     recognition.lang = lang
+    // Asked for unconditionally. Where the browser honours it the audio never
+    // leaves; where it does not, the property is simply ignored and the
+    // disclosure gate in dictation.ts is what stands between the microphone
+    // and a third party.
+    recognition.processLocally = true
     // Consultations are dictated in several breaths; a recogniser that stops at
     // the first pause would truncate half of them.
     recognition.continuous = true

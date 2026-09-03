@@ -143,7 +143,30 @@ Four properties this diagram is meant to make checkable:
    it, or audit its onward use. That is why the de-identification level is a
    deliberate, logged choice and not a default.
 
-### 3.1 Sync
+### 3.1 Dictation — the one place audio leaves
+
+The browser's Web Speech API is not local: in Chrome and Edge it streams
+captured audio to the vendor's recognition service. A dictated consultation
+therefore discloses the patient's **voice** — biometric data under several of
+the regimes in §5 — along with their name and diagnosis, to a processor the
+facility has no agreement with and this project does not control.
+
+This was previously undisclosed, and both this document and SECURITY.md stated
+the opposite. The correction:
+
+- On-device recognition is requested every time, and used where the browser
+  supports it (Chrome 138+ with the language pack). Then nothing leaves and
+  nothing is asked.
+- Otherwise dictation is **off** until an administrator acknowledges it. The
+  acknowledgement is audited (`facility.configure`, `remoteDictation=…`), can
+  be withdrawn, and a reminder stays on screen while it is in force.
+- Typing is unaffected: offline, always available, never leaves the device.
+
+A deployer relying on dictation needs this in their DPIA and, in most of these
+regimes, a lawful basis for the transfer — which is a cross-border one, since
+the recognition service is not in-country (§5.5).
+
+### 3.2 Sync
 
 Device enrolment uses a single-use code that expires in 24 hours, exchanged for
 a bearer token stored as a hash. **Facility scope is a property of the token**;
@@ -151,7 +174,7 @@ a `facilityId` in the request body is ignored entirely rather than validated, so
 there is no comparison to get wrong. Sync is push-then-pull against a
 monotonic cursor. Soft deletes propagate as tombstones.
 
-### 3.2 De-identification levels
+### 3.3 De-identification levels
 
 | Level | What survives | Linkage |
 |---|---|---|
@@ -162,7 +185,7 @@ monotonic cursor. Soft deletes propagate as tombstones.
 Direct identifiers removed at both de-identified levels: given name, family
 name, birth date, phone, address, register number, attachments.
 
-### 3.3 Free-text scrubbing
+### 3.4 Free-text scrubbing
 
 Every free-text field — chief complaint, diagnosis, notes, **and the raw
 provenance text** — is scrubbed against every identifier the roster holds:
@@ -499,8 +522,9 @@ would be dishonest.
 
 ### 7.4 Supply chain
 
-No runtime third-party network calls, so a compromised CDN cannot reach a
-facility. Models are vendored to the deployer's own origin by an explicit
+No runtime third-party network calls **except dictation**, which is disclosed
+and off by default where it is not on-device (§3.4). A compromised CDN cannot
+reach a facility. Models are vendored to the deployer's own origin by an explicit
 script, never fetched from Hugging Face at runtime. `npm audit --omit=dev` is
 clean; the development dependency `@huggingface/transformers` carries advisories
 through Node-only transitive packages that never enter the browser bundle.
