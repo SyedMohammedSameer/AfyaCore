@@ -238,23 +238,29 @@ export function isProtectedSpan(text: string, start: number, end: number): boole
   const inConstruction = EPONYM_BEFORE.test(before) || EPONYM_AFTER.test(after)
   if (inConstruction) return true
 
+  /*
+   * Deliberately NOT word-aware.
+   *
+   * This is asked about whole merged spans as well as single words, and a
+   * "does any word here look protected" test would let one formulary drug
+   * rescue every name merged beside it. Word-level protection is
+   * `redactableRuns`'s job, which applies this same function to one word at a
+   * time and can keep that word while still redacting its neighbours.
+   *
+   * A possessive or a leading preposition is tolerated (`Castleman's`,
+   * `de Spiegel`) because a stem prefix and the construction test between them
+   * already cover those without opening the span up word by word.
+   */
   if (getProtectedTerms().has(slice)) return true
 
-  // Word-aware as well as whole-slice, so `de Spiegel` and `Castleman's` are
-  // caught when a span carries a preposition or a possessive with the name.
-  // Only sound because the guard runs before the merge, where a span is one
-  // entity rather than a run of them — post-merge, one protected word would
-  // rescue every name merged alongside it.
-  const words = slice.split(/[\s'’-]+/).filter(Boolean)
-  for (const word of words) {
-    if (getProtectedTerms().has(word)) return true
-    for (const stem of EPONYM_STEMS) {
-      if (word === stem || word.startsWith(stem)) return true
-    }
-    for (const stem of CONTEXTUAL_EPONYMS) {
-      // Bare match is not enough for these: they are ordinary names too.
-      if ((word === stem || word.startsWith(stem)) && inConstruction) return true
-    }
+  const bare = slice.replace(/^(?:de |d'|du |le |la )/, '')
+  for (const stem of EPONYM_STEMS) {
+    if (bare === stem || bare.startsWith(stem)) return true
+  }
+  for (const stem of CONTEXTUAL_EPONYMS) {
+    // Bare match is not enough for these: they are ordinary names too, and
+    // protecting `Gilbert` on sight keeps the surname beside it.
+    if ((bare === stem || bare.startsWith(stem)) && inConstruction) return true
   }
 
   return false
@@ -311,6 +317,44 @@ export function mergeSpans(entities: NerEntity[], text: string): Array<[number, 
  * Spans are spliced back to front so earlier offsets stay valid as the string
  * shortens, the same technique `scrubFreeText` uses.
  */
+/**
+ * The parts of a span that may be redacted, once protected words are excluded.
+ *
+ * Returns maximal runs of adjacent unprotected words. A run absorbs the
+ * whitespace inside it so that two neighbouring names become one marker rather
+ * than two, which matters: the number of markers leaks how many name parts
+ * there were, the same reason `mergeSpans` exists.
+ */
+function redactableRuns(
+  text: string,
+  start: number,
+  end: number,
+  protect: (text: string, start: number, end: number) => boolean,
+): Array<[number, number]> {
+  const runs: Array<[number, number]> = []
+  let open: [number, number] | null = null
+
+  const wordPattern = /\S+/g
+  const region = text.slice(start, end)
+  for (let m = wordPattern.exec(region); m; m = wordPattern.exec(region)) {
+    const wordStart = start + m.index
+    const wordEnd = wordStart + m[0].length
+
+    if (protect(text, wordStart, wordEnd)) {
+      open = null
+      continue
+    }
+    if (open) {
+      open[1] = wordEnd
+    } else {
+      open = [wordStart, wordEnd]
+      runs.push(open)
+    }
+  }
+
+  return runs
+}
+
 export function applyEntities(
   text: string,
   entities: NerEntity[],
@@ -332,39 +376,54 @@ export function applyEntities(
       e.end <= text.length,
   )
 
-  /*
-   * The guard runs BEFORE the merge, and the ordering is the whole point.
-   *
-   * `mergeSpans` joins anything separated only by whitespace or a hyphen, so a
-   * protected word next to a tagged one is swallowed into a longer span:
-   * `paracétamol` became `paracétamol si fièvre`, and `Spiegel` became
-   * `de Spiegel`. Neither of those matches a formulary entry or an eponym
-   * stem, so a guard applied after merging silently failed on exactly the
-   * terms it was written for — the drug and the eponym both stayed on the
-   * destroyed list while the guard reported itself as working.
-   *
-   * Vetoing candidates first means a protected term is never a candidate, so
-   * it cannot be absorbed, and the merge only ever joins spans that are all
-   * genuinely redactable.
-   */
-  let protectedSpans = 0
-  const keep = candidates.filter((e) => {
-    if (!protect(text, e.start, e.end)) return true
-    protectedSpans++
-    return false
-  })
-
-  const spans = mergeSpans(keep, text)
+  const spans = mergeSpans(candidates, text)
   let out = text
   let redactions = 0
+  let protectedSpans = 0
 
   for (const [start, end] of [...spans].reverse()) {
     // Text already replaced by the deterministic pass is left alone: redacting
     // a redaction marker would double-count and produce "[…][…]".
     const slice = out.slice(start, end)
     if (slice === redacted || slice.trim() === '') continue
-    out = out.slice(0, start) + redacted + out.slice(end)
-    redactions++
+
+    /*
+     * Two levels, because one alone gets a different case wrong.
+     *
+     * Checking the whole merged span and nothing else lets a single protected
+     * word rescue everything merged beside it: dictation drops the comma, so
+     * "paracétamol, Hanta revient" arrives as one span containing a formulary
+     * drug, and the name survives. A guard leaking a name to save a drug.
+     *
+     * Checking each entity before the merge and nothing else is blind to
+     * fragmentation. This is a French model with an English WordPiece
+     * vocabulary, so `hodgkinien` shatters into pieces, and when the pieces
+     * carry different labels `decodeBio` emits them as separate entities.
+     * None of `hod`, `gkin`, `ien` matches an eponym stem; only the rejoined
+     * word does. Guarding before the merge put `lymphome malin non
+     * hodgkinien` back on the destroyed list.
+     *
+     * So: the whole span first, which is what rejoins fragments and matches
+     * multi-word terms and eponymous constructions. Then, if that does not
+     * hold, word by word — which is what keeps an adjacent name redactable.
+     */
+    if (protect(text, start, end)) {
+      protectedSpans++
+      continue
+    }
+
+    const runs = redactableRuns(text, start, end, protect)
+    if (runs.length === 0) {
+      protectedSpans++
+      continue
+    }
+    if (runs.length > 1 || runs[0]![0] !== start || runs[0]![1] !== end) protectedSpans++
+
+    // Back to front, so earlier offsets stay valid as the string shortens.
+    for (const [runStart, runEnd] of [...runs].reverse()) {
+      out = out.slice(0, runStart) + redacted + out.slice(runEnd)
+      redactions++
+    }
   }
 
   return { text: out, redactions, protectedSpans }

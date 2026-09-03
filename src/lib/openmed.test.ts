@@ -601,3 +601,66 @@ describe('the guard must not rescue a real name', () => {
     expect(out).not.toContain('Hanta')
   })
 })
+
+describe('the guard survives WordPiece fragmentation', () => {
+  const span = (text: string, needle: string, label: string): NerEntity => {
+    const start = text.indexOf(needle)
+    return { label, start, end: start + needle.length, score: 0.99 }
+  }
+
+  it('protects an eponym the tokeniser shattered into pieces', () => {
+    // This is a French model with a 30,522-token ENGLISH WordPiece vocabulary,
+    // so `hodgkinien` fragments; when the pieces carry different labels,
+    // decodeBio emits them as separate entities. None of `hod`, `gkin`, `ien`
+    // matches an eponym stem — only the rejoined word does. Guarding each
+    // entity before the merge put `lymphome malin non hodgkinien` straight
+    // back on the destroyed list, which is how this case was found.
+    const text = 'lymphome malin non hodgkinien confirmé'
+    const at = text.indexOf('hodgkinien')
+    const { text: out } = applyEntities(text, [
+      { label: 'LASTNAME', start: at, end: at + 3, score: 0.9 },
+      { label: 'FIRSTNAME', start: at + 3, end: at + 7, score: 0.9 },
+      { label: 'CITY', start: at + 7, end: at + 10, score: 0.9 },
+    ])
+    expect(out).toContain('hodgkinien')
+  })
+
+  it('still redacts a real name that fragmented the same way', () => {
+    // The mirror case: fragmentation must not become a way to survive.
+    const text = 'adressé par Ramanantsoa'
+    const at = text.indexOf('Ramanantsoa')
+    const { text: out } = applyEntities(text, [
+      { label: 'LASTNAME', start: at, end: at + 5, score: 0.9 },
+      { label: 'CITY', start: at + 5, end: at + 11, score: 0.9 },
+    ])
+    expect(out).not.toContain('Ramanantsoa')
+  })
+
+  it('splits a mixed span, keeping the drug and removing the name', () => {
+    const text = 'paracétamol Hanta Ramanantsoa revient'
+    const { text: out } = applyEntities(text, [
+      span(text, 'paracétamol', 'LASTNAME'),
+      span(text, 'Hanta', 'FIRSTNAME'),
+      span(text, 'Ramanantsoa', 'LASTNAME'),
+    ])
+    expect(out).toContain('paracétamol')
+    expect(out).not.toContain('Hanta')
+    expect(out).not.toContain('Ramanantsoa')
+    // Two adjacent names become one marker: the count of markers would
+    // otherwise leak how many name parts there were.
+    expect(out.match(/\[…\]/g)).toHaveLength(1)
+  })
+
+  it('keeps a multi-word drug whose middle word is not protectable alone', () => {
+    // `sels de réhydratation orale` is one formulary entry. Word by word, `de`
+    // is not a drug and is too short to be indexed as a component, so a
+    // word-only guard punches a hole through the middle of a prescription.
+    // This is what the whole-span check is for.
+    const text = 'donner sels de réhydratation orale après chaque selle'
+    const at = text.indexOf('sels')
+    const { text: out } = applyEntities(text, [
+      { label: 'LASTNAME', start: at, end: at + 'sels de réhydratation orale'.length, score: 0.95 },
+    ])
+    expect(out).toContain('sels de réhydratation orale')
+  })
+})
