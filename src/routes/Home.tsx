@@ -103,12 +103,27 @@ export function HomeScreen() {
       */}
       <div className="flex flex-col gap-5 pb-4">
         <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
+          {/*
+            Stacked on a phone, side by side from `sm` up.
+
+            These were always two-up, and at every real phone width the primary
+            label did not fit: a large button is 40px of padding plus an 18px
+            icon plus its gap, which leaves about 105px for "New consultation"
+            in a 175px half. So it wrapped to two lines, next to a
+            vertically-centred icon and a neighbour that did not wrap, and the
+            row read as broken. It survived review because the breakpoint that
+            rescues it, `sm:flex-none`, starts at 640px — every desktop window
+            and no phone.
+
+            Full width is also the better phone target: these are the two things
+            a clinician opens this screen to do.
+          */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Button
               size="lg"
               icon={<CalendarPlus size={18} />}
               onClick={() => navigate('/patients')}
-              className="flex-1 sm:flex-none"
+              className="w-full sm:w-auto"
             >
               {t.newEncounter}
             </Button>
@@ -117,7 +132,7 @@ export function HomeScreen() {
               variant="secondary"
               icon={<UserPlus size={18} />}
               onClick={() => navigate('/patient/new')}
-              className="flex-1 sm:flex-none"
+              className="w-full sm:w-auto"
             >
               {t.newPatient}
             </Button>
