@@ -283,11 +283,36 @@ export async function deidentify(
   const idMap = new Map<string, string>()
   for (const p of patients) idMap.set(p.id, await derivePseudonym(p.id, salt))
 
+  /*
+   * Encounter and prescription ids are pseudonymised too.
+   *
+   * They used to survive verbatim, which quietly defeated the whole
+   * `anonymous` level: patient ids were freshly salted per export, and then
+   * every row carried a stable encounter UUID that joined two "unlinkable"
+   * exports back together in one SQL statement. Re-identification does not
+   * need the patient key if any other key is stable.
+   *
+   * Derived from the same salt as the patient codes, so links *inside* one
+   * export still work — an Observation still points at its Encounter — while
+   * links *between* exports do not.
+   */
+  const encounterIdMap = new Map<string, string>()
+  for (const e of encounters) encounterIdMap.set(e.id, await derivePseudonym(e.id, salt))
+
   // Every identifier held anywhere on the roster, names, villages and register
   // numbers, scrubbed from every record's free text.
   const allTerms = patients.flatMap((p) =>
     [p.familyName, p.givenName, p.address, p.registerNo].filter((v): v is string => Boolean(v)),
   )
+
+  // Prescription ids, pseudonymised from the same salt for the same reason.
+  const prescriptionIdMap = new Map<string, string>()
+  for (const e of encounters) {
+    for (const p of e.prescriptions) {
+      prescriptionIdMap.set(p.id, await derivePseudonym(p.id, salt))
+    }
+  }
+  const prescriptionId = (id: string) => prescriptionIdMap.get(id) ?? id
 
   let freeTextRedactions = 0
   const scrub = (value: string | undefined): string | undefined => {
@@ -315,6 +340,11 @@ export async function deidentify(
       registerNo: undefined,
       searchKey: code.toLowerCase(),
       syncedAt: undefined,
+      // Same reasoning as the encounter rows: exact row timestamps are a join
+      // key and a re-identification vector, and carry nothing clinical.
+      createdAt: generaliseDates ? 0 : p.createdAt,
+      updatedAt: generaliseDates ? 0 : p.updatedAt,
+      deletedAt: undefined,
     }
   })
 
@@ -325,10 +355,38 @@ export async function deidentify(
 
     return {
       ...e,
+      id: encounterIdMap.get(e.id) ?? e.id,
       // An encounter for an unknown patient keeps a placeholder rather than the
       // real id, so an orphan row can never leak a link back to the roster.
       patientId: idMap.get(e.patientId) ?? 'UNKNOWN',
       occurredAt,
+      /*
+       * Row timestamps are dropped, not kept.
+       *
+       * `occurredAt` is generalised to the first of the month at the anonymous
+       * level, and then `createdAt`/`updatedAt` shipped alongside it at
+       * millisecond precision — which re-identifies the exact consultation and
+       * joins two exports on the same value. Generalising one date while
+       * exporting two others is not generalisation.
+       */
+      createdAt: generaliseDates ? occurredAt : e.createdAt,
+      updatedAt: generaliseDates ? occurredAt : e.updatedAt,
+      // Sync and deletion metadata say nothing clinical and everything about
+      // which device held the row and when.
+      deletedAt: undefined,
+      /*
+       * Prescriptions were never touched at all.
+       *
+       * `notes` is free text a clinician types — "donner à sa mère Hanta" —
+       * and it went into every de-identified export, and into the FHIR
+       * dosage line, unscrubbed. The id was stable across exports for the
+       * same reason encounter ids were.
+       */
+      prescriptions: e.prescriptions.map((p) => ({
+        ...p,
+        id: prescriptionId(p.id),
+        notes: scrub(p.notes),
+      })),
       chiefComplaint: scrub(e.chiefComplaint),
       diagnosis: scrub(e.diagnosis),
       notes: scrub(e.notes),
@@ -368,6 +426,8 @@ export async function deidentify(
         'address',
         'registerNo',
         'attachments',
+        'prescription.notes',
+        'rowTimestamps',
       ],
       freeTextRedactions,
       ...(options.country ? { country: options.country } : {}),

@@ -147,7 +147,8 @@ for (const remote of encounters) {
 - **A tamper-evident audit trail**, hash-chained locally and on the server, recording who created,
   amended, merged, deleted or exported what
 - **Trilingual interface**, French, Malagasy and English, switched from the header on any screen
-- **Exports**, FHIR R4 bundle, DHIS2 monthly `dataValueSet`, aggregate CSV, and a raw JSON dump
+- **Exports**, FHIR R4 bundle, DHIS2 monthly `dataValueSet`, aggregate CSV, and a raw JSON dump —
+  all gated on per-patient research consent at de-identified levels
 - **Sync** between the devices at a facility, with a zero-dependency server you can self-host
 - **De-identified export**, identifiers stripped before anything leaves the device, with a stable
   pseudonym so a patient stays trackable across exports without being identifiable
@@ -579,6 +580,15 @@ guard and for the residual 1.7%, which is lowercase common nouns like `lyse` and
 also given names — reported rather than engineered around, because the obvious fix (distrust a name
 label on a lowercase token) is dangerous when dictation output is frequently all-lowercase.
 
+⚠️ **The FHIR bundle has not been through the official validator**, so "standards-compliant" is not
+a claim made here. Two concrete defects found by review and fixed: derived resource ids
+(`<encounter>-<prescription>`) exceeded R4's 64-character limit on identified exports, where the
+underlying ids are real UUIDs — de-identified exports stayed inside it only because pseudonyms are
+eight characters, so the defect was invisible at the levels most often exercised; and every derived
+id was emitted as `urn:uuid:<not-a-uuid>`, which a validator rejects at the bundle level. Running
+`org.hl7.fhir.validator` over identified, pseudonymous and anonymous fixtures is the outstanding
+work before the claim goes back.
+
 **Clinical retention is also measured on real clinical text.** `npm run vendor:e3c` scores
 retention against gold `CLINENTITY` annotations in the [E3C corpus](https://doi.org/10.57771/dey2-g751)
 — real published clinical narrative in French and English, annotated by people with no interest in
@@ -658,7 +668,7 @@ much quieter bug than a wrong one.
 
 | Export | Format | Status |
 |---|---|---|
-| FHIR R4 | `Bundle` of `Patient`, `Encounter`, `Observation` (LOINC + UCUM), `MedicationRequest` | Standards-compliant |
+| FHIR R4 | `Bundle` of `Patient`, `Encounter`, `Observation` (LOINC + UCUM), `MedicationRequest` | Structurally valid; **not validator-checked** |
 | DHIS2 | monthly `dataValueSet`, disaggregated by WHO/IMCI age band and sex | Needs real UIDs |
 | CSV | same aggregate, for facilities still submitting on paper | Ready |
 | JSON | raw local dump | Ready |

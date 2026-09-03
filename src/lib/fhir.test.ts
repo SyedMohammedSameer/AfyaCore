@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toFhirBundle } from './fhir'
+import { fhirId, toFhirBundle } from './fhir'
 import { aggregateMonth, ageBand, classifyDiagnosis, dhis2Period, toDhis2DataValueSet } from './dhis2'
 import type { Encounter, Patient } from '../db/schema'
 
@@ -171,5 +171,65 @@ describe('DHIS2 aggregate', () => {
     expect(out._placeholderMapping).toBe(true)
     expect(out.period).toBe('202608')
     expect(out._readable.length).toBeGreaterThan(0)
+  })
+})
+
+describe('FHIR identifier rules', () => {
+  it('keeps every resource id inside the 64-character limit', async () => {
+    // R4 constrains ids to [A-Za-z0-9\-\.]{1,64}. With real UUIDs on an
+    // identified export, `${encounter.id}-${prescription.id}` was 73
+    // characters. It stayed inside the limit on de-identified exports only
+    // because pseudonyms are eight characters, so the defect was invisible at
+    // the levels most commonly exercised.
+    const p = { ...patient(), id: crypto.randomUUID() }
+    const e = {
+      ...encounter(),
+      id: crypto.randomUUID(),
+      patientId: p.id,
+      vitals: { temperature: 38.5, systolic: 120, diastolic: 80 },
+      prescriptions: [{ id: crypto.randomUUID(), drug: 'paracétamol', dose: '500 mg' }],
+    }
+    const bundle = toFhirBundle([p], [e])
+
+    for (const { resource } of bundle.entry) {
+      expect(String(resource.id).length, `${resource.resourceType} id too long`).toBeLessThanOrEqual(64)
+      expect(String(resource.id)).toMatch(/^[A-Za-z0-9.-]+$/)
+    }
+  })
+
+  it('never labels a non-UUID as urn:uuid', async () => {
+    // A urn:uuid whose payload is not a UUID is malformed, and a validator
+    // rejects the bundle rather than the field.
+    const p = patient()
+    const e = { ...encounter(), vitals: { systolic: 120, diastolic: 80 } }
+    const bundle = toFhirBundle([p], [e])
+
+    for (const { fullUrl } of bundle.entry) {
+      if (!fullUrl.startsWith('urn:uuid:')) continue
+      expect(fullUrl.slice('urn:uuid:'.length)).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      )
+    }
+  })
+
+  it('gives every entry a distinct fullUrl', async () => {
+    const p = patient()
+    const e = {
+      ...encounter(),
+      vitals: { temperature: 38.5, pulse: 92 },
+      prescriptions: [
+        { id: 'rx-1', drug: 'paracétamol' },
+        { id: 'rx-2', drug: 'artéméther' },
+      ],
+    }
+    const urls = toFhirBundle([p], [e]).entry.map((x) => x.fullUrl)
+    expect(new Set(urls).size).toBe(urls.length)
+  })
+
+  it('folds a long id deterministically', async () => {
+    const long = `${'a'.repeat(40)}-${'b'.repeat(40)}`
+    expect(fhirId(long)).toBe(fhirId(long))
+    expect(fhirId(long).length).toBeLessThanOrEqual(64)
+    expect(fhirId(long)).not.toBe(fhirId(`${long}x`))
   })
 })

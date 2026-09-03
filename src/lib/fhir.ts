@@ -126,7 +126,7 @@ function vitalObservation(
   const code = VITAL_CODES[key]
   return {
     resourceType: 'Observation',
-    id: `${e.id}-${key}`,
+    id: fhirId(`${e.id}-${key}`),
     status: 'final',
     category: [
       {
@@ -168,7 +168,7 @@ function bloodPressureObservation(e: Encounter, systolic?: number, diastolic?: n
 
   return {
     resourceType: 'Observation',
-    id: `${e.id}-bp`,
+    id: fhirId(`${e.id}-bp`),
     status: 'final',
     category: [
       {
@@ -189,6 +189,41 @@ function bloodPressureObservation(e: Encounter, systolic?: number, diastolic?: n
   }
 }
 
+/**
+ * A FHIR-legal resource id.
+ *
+ * R4 constrains ids to `[A-Za-z0-9\-\.]{1,64}`
+ * (https://hl7.org/fhir/R4/datatypes.html). Derived ids here are built by
+ * joining a parent id to a discriminator, and with real UUIDs on an
+ * *identified* export that produced 73 characters — two 36-character UUIDs and
+ * a hyphen — which is over the limit and therefore not a valid resource id at
+ * all. De-identified exports stayed inside it only because pseudonyms are
+ * eight characters, so the bug was invisible at exactly the levels most
+ * commonly exercised.
+ *
+ * Over-long ids are folded to a stable 32-character digest of themselves, so
+ * they stay deterministic (the same record produces the same id on every
+ * export) and stay inside the limit. Illegal characters are replaced rather
+ * than stripped, so two different ids cannot collapse onto one.
+ */
+export function fhirId(raw: string): string {
+  const safe = raw.replace(/[^A-Za-z0-9.-]/g, '-')
+  if (safe.length <= 64) return safe
+
+  // FNV-1a, twice with different offsets, for a 128-bit-ish stable digest.
+  // Not cryptographic and does not need to be: this collapses an identifier
+  // that is already in the file into a shorter form of itself.
+  const fold = (seed: number) => {
+    let h = seed
+    for (let i = 0; i < safe.length; i++) {
+      h ^= safe.charCodeAt(i)
+      h = Math.imul(h, 0x01000193) >>> 0
+    }
+    return h.toString(16).padStart(8, '0')
+  }
+  return `${safe.slice(0, 40)}-${fold(0x811c9dc5)}${fold(0x9dc5811c)}`
+}
+
 function medicationRequest(e: Encounter, p: Prescription): FhirResource {
   const dosage: Record<string, unknown> = { text: [p.dose, p.notes].filter(Boolean).join(', ') || undefined }
 
@@ -203,7 +238,7 @@ function medicationRequest(e: Encounter, p: Prescription): FhirResource {
 
   return {
     resourceType: 'MedicationRequest',
-    id: `${e.id}-${p.id}`,
+    id: fhirId(`${e.id}-${p.id}`),
     status: 'active',
     intent: 'order',
     medicationCodeableConcept: { text: p.drug },
@@ -226,8 +261,29 @@ export function toFhirBundle(
   options: { includeDrafts?: boolean } = {},
 ): FhirBundle {
   const entry: BundleEntry[] = []
-  const push = (resource: FhirResource) =>
-    entry.push({ fullUrl: `urn:uuid:${resource.id}`, resource })
+  /*
+   * `urn:uuid:` requires an actual UUID.
+   *
+   * Every derived id here — `<encounter>-bp`, `<encounter>-<prescription>` —
+   * was emitted as `urn:uuid:<not-a-uuid>`, and so was every pseudonymised id,
+   * which is an eight-character code. A `urn:uuid:` URN whose payload is not a
+   * UUID is malformed, and a validator rejects the bundle rather than the
+   * field.
+   *
+   * Collection bundles allow any absolute `fullUrl`, so derived resources get
+   * a URN under our own namespace and only genuine UUIDs keep `urn:uuid:`.
+   * This is honest rather than fully conformant: see the note on the FHIR row
+   * in the README — the bundle has not been run through the official
+   * validator, and until it has, "standards-compliant" is not a claim we make.
+   */
+  const push = (resource: FhirResource) => {
+    const id = String(resource.id)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    entry.push({
+      fullUrl: isUuid ? `urn:uuid:${id}` : `urn:afyacore:${resource.resourceType}:${id}`,
+      resource,
+    })
+  }
 
   for (const p of patients) push(patientResource(p))
 

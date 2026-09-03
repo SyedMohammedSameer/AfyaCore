@@ -321,3 +321,85 @@ describe('consent for secondary use', () => {
     expect(manifest.patientsProcessed).toBe(1)
   })
 })
+
+describe('linkage between exports', () => {
+  const withPrescription = () =>
+    encounter({
+      id: 'enc-1',
+      prescriptions: [
+        {
+          id: 'rx-1',
+          drug: 'paracétamol',
+          dose: '500 mg',
+          // Free text a clinician actually types. This went into every
+          // de-identified export, and into the FHIR dosage line, unscrubbed.
+          notes: 'donner à sa mère RAKOTOARISOA au village Ambohimanga',
+        },
+      ],
+    })
+
+  it('scrubs prescription notes', async () => {
+    const r = await deidentify([patient()], [withPrescription()], { level: 'anonymous' })
+    const notes = r.encounters[0]!.prescriptions[0]!.notes!
+    expect(notes).not.toContain('RAKOTOARISOA')
+    expect(notes).not.toContain('Ambohimanga')
+  })
+
+  it('keeps the drug and the dose, which are the clinical payload', async () => {
+    const r = await deidentify([patient()], [withPrescription()], { level: 'anonymous' })
+    const rx = r.encounters[0]!.prescriptions[0]!
+    expect(rx.drug).toBe('paracétamol')
+    expect(rx.dose).toBe('500 mg')
+  })
+
+  it('does not emit the real encounter or prescription id', async () => {
+    const r = await deidentify([patient()], [withPrescription()], { level: 'anonymous' })
+    expect(r.encounters[0]!.id).not.toBe('enc-1')
+    expect(r.encounters[0]!.prescriptions[0]!.id).not.toBe('rx-1')
+  })
+
+  it('cannot be joined across two anonymous exports on any id', async () => {
+    // The property `anonymous` promises and did not have. Patient ids were
+    // freshly salted per export and then every row carried a stable encounter
+    // UUID, which joins the two back together in one statement.
+    const a = await deidentify([patient()], [withPrescription()], { level: 'anonymous' })
+    const b = await deidentify([patient()], [withPrescription()], { level: 'anonymous' })
+
+    expect(a.patients[0]!.id).not.toBe(b.patients[0]!.id)
+    expect(a.encounters[0]!.id).not.toBe(b.encounters[0]!.id)
+    expect(a.encounters[0]!.prescriptions[0]!.id).not.toBe(b.encounters[0]!.prescriptions[0]!.id)
+  })
+
+  it('does not leak the exact consultation through row timestamps', async () => {
+    // occurredAt was generalised to the first of the month and then createdAt
+    // and updatedAt shipped beside it at millisecond precision, which both
+    // re-identifies the consultation and joins exports on the same value.
+    const e = encounter({ createdAt: 1_755_000_123_456, updatedAt: 1_755_000_987_654 })
+    const r = await deidentify([patient()], [e], { level: 'anonymous' })
+    expect(r.encounters[0]!.createdAt).not.toBe(1_755_000_123_456)
+    expect(r.encounters[0]!.updatedAt).not.toBe(1_755_000_987_654)
+    expect(r.patients[0]!.createdAt).toBe(0)
+  })
+
+  it('keeps links valid inside a single export', async () => {
+    // Unlinkability between exports must not break the join within one:
+    // an Observation still has to point at its Encounter.
+    const r = await deidentify([patient()], [withPrescription()], { level: 'anonymous' })
+    expect(r.encounters[0]!.patientId).toBe(r.patients[0]!.id)
+  })
+
+  it('keeps a pseudonymous export linkable across runs with the same salt', async () => {
+    // The whole point of the level: a facility tracking the same patient over
+    // time must still be able to, and now the encounter must line up too.
+    const a = await deidentify([patient()], [withPrescription()], {
+      level: 'pseudonymous',
+      salt: 'fixed',
+    })
+    const b = await deidentify([patient()], [withPrescription()], {
+      level: 'pseudonymous',
+      salt: 'fixed',
+    })
+    expect(a.patients[0]!.id).toBe(b.patients[0]!.id)
+    expect(a.encounters[0]!.id).toBe(b.encounters[0]!.id)
+  })
+})
