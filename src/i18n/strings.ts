@@ -176,6 +176,12 @@ export interface Strings {
   retention: string
   unconfirmed: string
   unreviewedTranslation: string
+  researchConsent: string
+  researchConsentHint: string
+  consentGranted: string
+  consentRefused: string
+  consentNotAsked: string
+  excludedForConsent: string
   notLegalAdvice: string
   // Optional on-device PII model (OpenMed). An accuracy upgrade over the
   // deterministic scrub, never a replacement for it.
@@ -430,6 +436,12 @@ const fr: Strings = {
   unconfirmed: 'À confirmer',
   unreviewedTranslation:
     'Traduction en {lang} non relue par un locuteur. Vérifiez la posologie avec le patient.',
+  researchConsent: 'Consentement recherche',
+  researchConsentHint: 'Le patient accepte-t-il que son dossier serve à la recherche ?',
+  consentGranted: 'Accordé',
+  consentRefused: 'Refusé',
+  consentNotAsked: 'Non demandé',
+  excludedForConsent: 'patients exclus, sans consentement',
   notLegalAdvice: 'Ces informations sont fournies à titre indicatif et n’ont pas été validées par un juriste de ce pays. Elles ne constituent pas un avis juridique.',
   piiPack: 'Modèle d’anonymisation',
   piiPackHint: 'Repère dans les notes les noms que le registre ne contient pas, par exemple un parent cité en passant. Le nettoyage de base fonctionne sans lui.',
@@ -677,6 +689,12 @@ const mg: Strings = {
   unconfirmed: 'Mbola hamarinina',
   unreviewedTranslation:
     'Tsy mbola nohamarinin’ny mpiteny ny fandikan-teny {lang}. Hamarino amin’ny marary ny dosy.',
+  researchConsent: 'Fanekena fikarohana',
+  researchConsentHint: 'Manaiky ve ny marary hampiasaina amin’ny fikarohana ny antontan-taratasiny?',
+  consentGranted: 'Nekena',
+  consentRefused: 'Nolavina',
+  consentNotAsked: 'Tsy mbola nangatahina',
+  excludedForConsent: 'marary tsy tafiditra, tsy nanaiky',
   notLegalAdvice: 'Torohevitra fotsiny ireto vaovao ireto ary tsy nohamarinin’ny mpahay lalàna ao amin’ity firenena ity.',
   piiPack: 'Modely fanafenana anarana',
   piiPackHint: 'Mahita anarana tsy ao amin’ny rejisitra ao anaty naotra, ohatra havana voatonona. Miasa ihany ny fanadiovana fototra na tsy misy izy.',
@@ -923,6 +941,12 @@ const en: Strings = {
   unconfirmed: 'To confirm',
   unreviewedTranslation:
     'The {lang} translation has not been checked by a speaker. Confirm the dosage with the patient.',
+  researchConsent: 'Research consent',
+  researchConsentHint: 'Has the patient agreed to their record being used for research?',
+  consentGranted: 'Granted',
+  consentRefused: 'Refused',
+  consentNotAsked: 'Not asked',
+  excludedForConsent: 'patients excluded, no consent',
   notLegalAdvice: 'Recorded for guidance and not reviewed by a lawyer in this jurisdiction. This is not legal advice.',
   piiPack: 'De-identification model',
   piiPackHint: 'Finds names in notes that the roster does not hold, such as a relative mentioned in passing. The deterministic scrub works without it.',

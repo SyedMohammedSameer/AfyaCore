@@ -167,6 +167,10 @@ const patient = (over: Partial<Patient> = {}): Patient => ({
   approximateAge: 34,
   address: 'Ambohimanga',
   preferredLang: 'mg',
+  // These exercise the neural pass, not the consent gate. Without it every
+  // patient is excluded before the model is ever reached, which is the gate
+  // behaving correctly and would make these tests silently vacuous.
+  researchConsent: 'granted',
   searchKey: 'rakotoarisoa voahirana',
   createdAt: 0,
   updatedAt: 0,

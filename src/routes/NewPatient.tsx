@@ -8,7 +8,7 @@ import { createPatient, updatePatient } from '../db/repo'
 import { useI18n } from '../i18n'
 import { PATIENT_PACKS, patientLangCodes, type PatientLang } from '../i18n/patient'
 import { useCountryProfile } from '../lib/facility'
-import type { Sex } from '../db/schema'
+import type { ConsentState, Sex } from '../db/schema'
 
 /**
  * Patient registration, and the same form in edit mode.
@@ -44,6 +44,7 @@ export function NewPatient() {
   const [address, setAddress] = useState('')
   const [registerNo, setRegisterNo] = useState('')
   const [preferredLang, setPreferredLang] = useState<PatientLang | ''>('')
+  const [researchConsent, setResearchConsent] = useState<ConsentState>('notAsked')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -62,6 +63,7 @@ export function NewPatient() {
     setAddress(existing.address ?? '')
     setRegisterNo(existing.registerNo ?? '')
     setPreferredLang(existing.preferredLang)
+    setResearchConsent(existing.researchConsent ?? 'notAsked')
     setLoaded(true)
   }, [editing, loaded, existing])
 
@@ -99,6 +101,8 @@ export function NewPatient() {
         address: address.trim() || undefined,
         registerNo: registerNo.trim() || undefined,
         preferredLang: preferredLang || langOptions[0]!,
+        researchConsent,
+        ...(researchConsent === 'notAsked' ? {} : { researchConsentAt: Date.now() }),
       }
 
       if (editing && patientId) {
@@ -201,6 +205,22 @@ export function NewPatient() {
                 </option>
               ))}
             </Select>
+            </Field>
+
+            <Field label={t.researchConsent} hint={t.researchConsentHint}>
+              {/* Three states, not a checkbox. "asked and refused" and "nobody
+                  asked" are different facts about a facility and only one of
+                  them is fixable by asking; a checkbox collapses them and
+                  hides the second. Defaults to notAsked, which behaves as a
+                  refusal at export. */}
+              <Select
+                value={researchConsent}
+                onChange={(e) => setResearchConsent(e.target.value as ConsentState)}
+              >
+                <option value="notAsked">{t.consentNotAsked}</option>
+                <option value="granted">{t.consentGranted}</option>
+                <option value="refused">{t.consentRefused}</option>
+              </Select>
             </Field>
           </Card>
         </div>
