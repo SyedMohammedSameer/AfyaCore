@@ -38,6 +38,7 @@
  */
 import type { ClinicalLang } from './clinicalLocales'
 import type { LangCode } from '../db/schema'
+import type { PatientLang } from '../i18n/patient'
 
 export interface PhoneFormat {
   /** International dialling code, without the plus. */
@@ -111,8 +112,12 @@ export interface CountryProfile {
   clinicalLang: ClinicalLang
   /** Interface languages offered, most preferred first. */
   interfaceLangs: LangCode[]
-  /** Languages a patient instruction sheet can be printed in. */
-  patientLangs: LangCode[]
+  /**
+   * Languages a patient instruction sheet can be printed in, most likely
+   * first. Wider than `interfaceLangs`: a patient language costs five strings
+   * (src/i18n/patient.ts), an interface language costs 232.
+   */
+  patientLangs: PatientLang[]
   phone: PhoneFormat
   /** What a primary care facility is called locally, for labels and prompts. */
   facilityTerm: string
@@ -200,7 +205,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     name: 'Sénégal',
     clinicalLang: 'fr',
     interfaceLangs: ['fr', 'en'],
-    patientLangs: ['fr'],
+    patientLangs: ['wo', 'fr'],
     // Mobiles are written without a trunk zero: 77 123 45 67
     phone: {
       callingCode: '221',
@@ -226,7 +231,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     name: 'Côte d’Ivoire',
     clinicalLang: 'fr',
     interfaceLangs: ['fr', 'en'],
-    patientLangs: ['fr'],
+    patientLangs: ['dyu', 'fr'],
     // Ten digits since the 2021 renumbering: 07 12 34 56 78
     phone: {
       callingCode: '225',
@@ -252,7 +257,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     name: 'République démocratique du Congo',
     clinicalLang: 'fr',
     interfaceLangs: ['fr', 'en'],
-    patientLangs: ['fr'],
+    patientLangs: ['ln', 'sw', 'fr'],
     phone: { callingCode: '243', nsnLength: 9, trunkZero: true, example: '081 234 5678' },
     facilityTerm: 'Centre de santé',
     hmis: 'DHIS2 (SNIS)',
@@ -271,7 +276,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     name: 'Kenya',
     clinicalLang: 'en',
     interfaceLangs: ['en'],
-    patientLangs: ['en'],
+    patientLangs: ['sw', 'en'],
     // 07XX XXX XXX and the newer 01XX range
     phone: { callingCode: '254', nsnLength: 9, trunkZero: true, example: '0712 345 678' },
     facilityTerm: 'Health Centre',
@@ -292,7 +297,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     name: 'Nigeria',
     clinicalLang: 'en',
     interfaceLangs: ['en'],
-    patientLangs: ['en'],
+    patientLangs: ['ha', 'en'],
     // 080X XXX XXXX, ten national digits
     phone: { callingCode: '234', nsnLength: 10, trunkZero: true, example: '0803 123 4567' },
     facilityTerm: 'Primary Health Centre',
@@ -313,7 +318,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     name: 'Ghana',
     clinicalLang: 'en',
     interfaceLangs: ['en'],
-    patientLangs: ['en'],
+    patientLangs: ['tw', 'en'],
     phone: { callingCode: '233', nsnLength: 9, trunkZero: true, example: '024 123 4567' },
     facilityTerm: 'CHPS compound',
     hmis: 'DHIMS2 (DHIS2)',
@@ -333,7 +338,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     name: 'Tanzania',
     clinicalLang: 'en',
     interfaceLangs: ['en'],
-    patientLangs: ['en'],
+    patientLangs: ['sw', 'en'],
     phone: { callingCode: '255', nsnLength: 9, trunkZero: true, example: '0754 123 456' },
     facilityTerm: 'Dispensary',
     hmis: 'DHIS2',
@@ -354,7 +359,7 @@ export const COUNTRY_PROFILES: Record<string, CountryProfile> = {
     name: 'Uganda',
     clinicalLang: 'en',
     interfaceLangs: ['en'],
-    patientLangs: ['en'],
+    patientLangs: ['lg', 'sw', 'en'],
     phone: { callingCode: '256', nsnLength: 9, trunkZero: true, example: '0772 123 456' },
     facilityTerm: 'Health Centre II',
     hmis: 'DHIS2 (HMIS)',

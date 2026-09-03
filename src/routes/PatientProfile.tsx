@@ -3,11 +3,12 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarPlus, ClipboardList, FileText, Languages, MapPin, Merge, Pencil, Phone, Trash2 } from 'lucide-react'
 import { AppShell } from '../components/AppShell'
 import { ActionBar, Avatar, Badge, Button, Card, EmptyState, MoreMenu, SectionTitle, SkeletonRows, cx, riseStyle } from '../components/ui'
+import { patientPack } from '../i18n/patient'
 import { db } from '../db/db'
 import { createDraftEncounter, deletePatient, patientAge, patientEncounters } from '../db/repo'
 import { formatDate, formatVital, hasAnyVital, VITAL_ORDER } from '../lib/format'
 import { vitalSeverity } from '../db/schema'
-import { LANG_LABELS, useI18n } from '../i18n'
+import { useI18n } from '../i18n'
 import type { Encounter } from '../db/schema'
 
 /**
@@ -159,7 +160,7 @@ export function PatientProfile() {
   const details = [
     patient.registerNo && { icon: FileText, text: `${t.registerNo} ${patient.registerNo}` },
     patient.address && { icon: MapPin, text: patient.address },
-    { icon: Languages, text: LANG_LABELS[patient.preferredLang] },
+    { icon: Languages, text: patientPack(patient.preferredLang).name },
   ].filter(Boolean) as { icon: typeof FileText; text: string }[]
 
   return (

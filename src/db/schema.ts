@@ -11,9 +11,17 @@
 /** How a given piece of data got into the record. Drives the review UI. */
 export type CaptureSource = 'manual' | 'voice' | 'photo'
 
+import type { PatientLang } from '../i18n/patient'
+
 export type Sex = 'female' | 'male' | 'unknown'
 
-/** ISO-639-1-ish codes for the languages this deployment cares about. */
+/**
+ * Interface languages: the ones with a full 232-key dictionary behind them.
+ *
+ * Distinct from `PatientLang` (src/i18n/patient.ts), which is the wider set an
+ * instruction sheet can be printed in. Splitting the two is what made adding a
+ * patient language cost five strings instead of a whole app translation.
+ */
 export type LangCode = 'fr' | 'mg' | 'en'
 
 export interface Patient {
@@ -32,7 +40,8 @@ export interface Patient {
   /** Free text: village, fokontany, commune. */
   address?: string
   /** Language to speak/print patient instructions in. */
-  preferredLang: LangCode
+  /** The language this patient's instruction sheet prints in. */
+  preferredLang: PatientLang
   /**
    * Denormalised, accent-stripped, lowercased name + register number.
    * Malagasy names are long and inconsistently accented on paper cards, so
