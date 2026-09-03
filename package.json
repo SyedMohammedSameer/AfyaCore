@@ -23,6 +23,7 @@
     "vendor:openmed": "node scripts/vendor-openmed.mjs",
     "vendor:e3c": "node scripts/vendor-e3c.mjs",
     "screenshots": "node scripts/screenshots.mjs",
+    "smoke": "node scripts/smoke.mjs",
     "sync": "node server/sync-server.mjs",
     "admin": "node server/cli.mjs"
   },
