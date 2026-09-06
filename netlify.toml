@@ -5,9 +5,85 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# ---------------------------------------------------------------------------
+# Redirects
+#
+# Netlify serves a real file when one exists and only falls through to these
+# rules when none does, so a single `/*` catch-all quietly turns every missing
+# file into a 200 and a page of HTML. For a route that is what we want. For a
+# JavaScript module it is a production outage with a confusing error:
+#
+#   Failed to load module script: Expected a JavaScript-or-Wasm module script
+#   but the server responded with a MIME type of "text/html".
+#
+# That is what a browser says when it asked for `/assets/NewPatient-<hash>.js`,
+# the hash no longer exists because a deploy replaced it, and the catch-all
+# handed back index.html instead of admitting the file was gone.
+#
+# So the asset directories 404 honestly. A 404 is a fact the app can act on;
+# a 200 of HTML is a lie it cannot distinguish from a page.
+# ---------------------------------------------------------------------------
+
+[[redirects]]
+  from = "/assets/*"
+  to = "/assets/:splat"
+  status = 404
+
+[[redirects]]
+  from = "/models/*"
+  to = "/models/:splat"
+  status = 404
+
+[[redirects]]
+  from = "/ocr/*"
+  to = "/ocr/:splat"
+  status = 404
+
+[[redirects]]
+  from = "/ort/*"
+  to = "/ort/:splat"
+  status = 404
+
 # React Router owns client-side navigation. Without this, opening a patient
 # route directly on the demo URL would return a Netlify 404 instead of the app.
+# Declared last: Netlify takes the first matching rule, so the asset rules
+# above win for the paths they name.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# ---------------------------------------------------------------------------
+# Caching
+#
+# The shell must never be cached, and the assets it names always should be.
+#
+# Asset filenames carry a content hash, so a given URL's bytes can never
+# change and a year of immutable caching is free. `index.html` and `sw.js` are
+# the opposite: they are the only files that say which hashes are current, and
+# a stale copy of either is precisely the state that asks for chunks the
+# server has already deleted. This is the other half of the outage above.
+# ---------------------------------------------------------------------------
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# The vendored models are content-addressed by directory rather than filename,
+# so they are revalidated rather than pinned. They are large and rarely change,
+# and a facility that has them cached should not refetch 80 MB to be told so.
+[[headers]]
+  for = "/models/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"

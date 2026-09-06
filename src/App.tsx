@@ -5,6 +5,44 @@ import { SkeletonRows } from './components/ui'
 import { LockScreen } from './components/LockScreen'
 import { HomeScreen } from './routes/Home'
 import { SessionProvider, useSession } from './lib/session'
+import {
+  isChunkLoadError,
+  markChunkLoadSucceeded,
+  recoverFromStaleChunk,
+} from './lib/chunkRecovery'
+
+/**
+ * `lazy`, plus a way back from a deploy that deleted this chunk.
+ *
+ * Hashed filenames mean a deploy renames every chunk, and a browser holding
+ * the previous shell then asks for one that is gone. Unhandled that is a white
+ * screen on the first navigation after every release, which on a phone in a
+ * health post is indistinguishable from the app being broken.
+ *
+ * See `lib/chunkRecovery.ts` for why this clears the precache rather than
+ * simply reloading, and why it only ever tries once.
+ */
+type RouteLoader = Parameters<typeof lazy>[0]
+
+function lazyRoute(load: RouteLoader): ReturnType<typeof lazy> {
+  return lazy(() =>
+    load().then(
+      (module) => {
+        markChunkLoadSucceeded()
+        return module
+      },
+      async (error: unknown) => {
+        if (isChunkLoadError(error) && (await recoverFromStaleChunk())) {
+          // The page is being replaced. Never resolving leaves the route
+          // suspended for the moment it takes, which is the honest state:
+          // there is nothing to render and an error would flash and vanish.
+          return new Promise<never>(() => {})
+        }
+        throw error
+      },
+    ),
+  )
+}
 
 /**
  * Every route except the home screen is split out.
@@ -14,22 +52,22 @@ import { SessionProvider, useSession } from './lib/session'
  * 2G connection the difference is felt on every cold install, which for this
  * deployment is the only install that matters.
  */
-const Roster = lazy(() => import('./routes/Roster').then((m) => ({ default: m.Roster })))
-const NewPatient = lazy(() => import('./routes/NewPatient').then((m) => ({ default: m.NewPatient })))
-const MergePatient = lazy(() =>
+const Roster = lazyRoute(() => import('./routes/Roster').then((m) => ({ default: m.Roster })))
+const NewPatient = lazyRoute(() => import('./routes/NewPatient').then((m) => ({ default: m.NewPatient })))
+const MergePatient = lazyRoute(() =>
   import('./routes/MergePatient').then((m) => ({ default: m.MergePatient })),
 )
-const PatientProfile = lazy(() =>
+const PatientProfile = lazyRoute(() =>
   import('./routes/PatientProfile').then((m) => ({ default: m.PatientProfile })),
 )
-const EncounterCapture = lazy(() =>
+const EncounterCapture = lazyRoute(() =>
   import('./routes/Encounter').then((m) => ({ default: m.EncounterCapture })),
 )
-const Review = lazy(() => import('./routes/Review').then((m) => ({ default: m.Review })))
-const Instructions = lazy(() =>
+const Review = lazyRoute(() => import('./routes/Review').then((m) => ({ default: m.Review })))
+const Instructions = lazyRoute(() =>
   import('./routes/Instructions').then((m) => ({ default: m.Instructions })),
 )
-const Settings = lazy(() => import('./routes/Settings').then((m) => ({ default: m.Settings })))
+const Settings = lazyRoute(() => import('./routes/Settings').then((m) => ({ default: m.Settings })))
 
 function RouteFallback() {
   return (
