@@ -5,7 +5,7 @@ import { ChevronRight, Search, UserPlus, Users, X } from 'lucide-react'
 import { AppShell } from '../components/AppShell'
 import { Avatar, Badge, Button, EmptyState, Input, SkeletonRows, cx, riseStyle } from '../components/ui'
 import { liveEncounters, livePatientCount, patientAge, searchPatients } from '../db/repo'
-import { formatDate } from '../lib/format'
+import { formatDateCompact } from '../lib/format'
 import { useI18n } from '../i18n'
 import type { Patient } from '../db/schema'
 
@@ -144,7 +144,7 @@ export function Roster() {
             const meta = [
               age !== undefined ? `${age} ${t.years}` : null,
               p.sex === 'female' ? t.female : p.sex === 'male' ? t.male : null,
-              a?.lastVisit ? `${t.lastSeen} ${formatDate(a.lastVisit, lang)}` : t.never,
+              a?.lastVisit ? `${t.lastSeen} ${formatDateCompact(a.lastVisit, lang)}` : t.never,
             ]
               .filter(Boolean)
               .join(' · ')

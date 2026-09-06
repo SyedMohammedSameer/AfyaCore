@@ -23,6 +23,28 @@ export function formatDate(ts: number, lang: LangCode): string {
   })
 }
 
+/**
+ * A date for a dense list, where the year is usually noise.
+ *
+ * The roster puts age, sex and last visit on one line, and the full date
+ * pushed the longest of them past the edge: a patient row read "Last seen
+ * 31 Aug 20…", truncating the one part a clinician might have needed. The
+ * year is the least useful component of a recent visit and the first thing
+ * to drop, so it is kept only when the visit was not this year — which is
+ * exactly when it carries information.
+ *
+ * `now` is a parameter so this is testable without freezing the clock.
+ */
+export function formatDateCompact(ts: number, lang: LangCode, now = Date.now()): string {
+  const date = new Date(ts)
+  const sameYear = date.getFullYear() === new Date(now).getFullYear()
+  return date.toLocaleDateString(LOCALES[lang], {
+    day: '2-digit',
+    month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  })
+}
+
 export function formatDateTime(ts: number, lang: LangCode): string {
   return new Date(ts).toLocaleString(LOCALES[lang], {
     day: '2-digit',
