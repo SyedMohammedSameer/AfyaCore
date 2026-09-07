@@ -1,0 +1,215 @@
+% ML4H 2026 Demo Track — spec sheet body.
+%
+% Paste into the ML4H 2026 LaTeX template with \mlhtrack{demo}.
+% Single blind: do NOT anonymise. Max 2 pages excluding references.
+
+\title{AfyaCore: On-Device Speech-to-Structured Clinical Records for
+Health Facilities Without Reliable Connectivity}
+
+% \author{Mohammed Sameer Syed}  % set in the template's author block
+
+\begin{abstract}
+AfyaCore is an offline-first progressive web application that turns spoken
+consultations into structured clinical records at primary-care facilities in
+sub-Saharan Africa. Speech recognition (Whisper base, 72.6M parameters) and
+clinical de-identification (OpenMed PII, 33M parameters) both run on the
+clinician's own phone; no audio and no patient record reaches a network unless
+the facility explicitly configures sync. The system is a functional end-to-end
+application --- capture, structuring, human review, encrypted local storage,
+patient-facing output, and FHIR R4 / DHIS2 export --- validated technically but
+not yet evaluated with clinicians. We report what is measured and what is not.
+\end{abstract}
+
+\section{Introduction}
+
+Primary-care facilities across sub-Saharan Africa record consultations on paper.
+The record is written once, is difficult to retrieve at the next visit, and
+reaches national reporting systems, if at all, as a hand-tallied monthly
+aggregate. Digitisation efforts routinely fail on three constraints that are
+properties of the setting rather than of the software: intermittent or absent
+connectivity, low-end Android hardware, and clinical staff who cannot spend a
+consultation typing.
+
+\textbf{Intended use.} AfyaCore is a clinical data-capture tool for use by
+qualified clinical staff during or immediately after a consultation. It records
+what the clinician says; it does not diagnose, triage, or recommend treatment.
+Vital-sign colouring is a fixed published threshold table, not a model output.
+
+\textbf{Intended users and population.} Nurses, midwives and clinical officers
+at health posts and health centres. The patient population is general
+primary care, including antenatal care and paediatrics.
+
+\textbf{Principles of operation.} The clinician dictates the consultation in
+French or English. On-device automatic speech recognition produces a transcript;
+a deterministic clinical extractor parses vital signs, diagnosis and
+prescriptions out of that transcript into typed fields. Every extracted field is
+shown to the clinician with its provenance and confidence, and nothing
+machine-derived is committed until a human confirms it.
+
+\textbf{Conditions of use.} The device is assumed to be shared, offline for long
+periods, and at risk of loss. The design follows from those three assumptions
+rather than from a feature list.
+
+\section{Method}
+
+\textbf{Architecture.} A single-page progressive web application (React 19,
+TypeScript, IndexedDB via Dexie) with an optional self-hosted synchronisation
+server. The initial blocking load is 143\,kB gzipped; the application shell is
+precached by a service worker and the app is fully functional with the network
+disabled. There is no cloud dependency in the clinical path.
+
+\textbf{Speech recognition.} OpenAI Whisper \texttt{base} (multilingual, 72.6M
+parameters, Apache-2.0) \cite{radford2022whisper}, exported to ONNX and executed
+in a Web Worker through \texttt{transformers.js} with the WebAssembly backend,
+quantised to int8 (81\,MB). The model is not bundled: it is downloaded once from
+the facility's own origin and cached by the service worker. When it is absent,
+the application falls back to the browser's Web Speech API, which transmits
+audio to the browser vendor --- and in that configuration dictation is disabled
+behind an explicit administrator acknowledgement rather than silently degraded.
+
+\textbf{Clinical extraction.} The transcript is parsed by a deterministic,
+locale-aware rule system rather than a language model. This is a deliberate
+choice: the failure mode of a generative extractor is a plausible wrong number
+in a clinical field, and at this level of care there is no downstream check that
+would catch it. Every extracted value carries a plausibility range; values
+outside it are dropped rather than recorded. Median extraction latency is
+0.26--0.40\,ms.
+
+\textbf{De-identification.} Exports pass through a two-stage scrub. A
+deterministic stage matches every identifier the device holds for that patient.
+A second, optional neural stage (OpenMed PII French Clinical, 33M parameters,
+Apache-2.0 \cite{openmed2025}, 70\,MB, also on-device) finds identifiers the
+roster has never seen --- a relative or a referring clinician mentioned in
+passing --- which exact matching cannot reach by construction.
+
+\textbf{Encryption at rest.} Patient, encounter, attachment and audit stores are
+AES-GCM ciphertext under a 256-bit data key, wrapped per staff account by
+PBKDF2-SHA256 (600{,}000 iterations) over that clinician's PIN. The unwrapped key
+exists in memory only for the duration of a session.
+
+\textbf{Development and data.} The extractor and scrubber are developed against
+a synthetic corpus written for the purpose. Clinical-content retention is
+additionally scored against gold \texttt{CLINENTITY} annotations in the E3C
+corpus \cite{magnini2021e3c} --- real published clinical narrative in French and
+English, annotated by people with no interest in this system's performance.
+
+\section{Results}
+
+\textbf{State of the tool.} A functional, feature-complete end-to-end system at
+version 0.0.2, deployed as a public web application and open-sourced under MIT.
+It has \emph{not} been piloted in a facility and no clinician has yet used it in
+practice. We state this plainly because the evidence below is technical
+validation, which is what this stage of maturity supports.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lrr}
+\toprule
+& French & English \\
+\midrule
+Extraction P / R / F1 & 100\% & 100\% \\
+Cases & 12 & 10 \\
+Median latency & 0.26\,ms & 0.40\,ms \\
+\bottomrule
+\end{tabular}
+\caption{Clinical extraction, synthetic corpus.}
+\end{table}
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lrr}
+\toprule
+De-identification & determ. & +\,neural \\
+\midrule
+Identifiers \emph{on} roster removed & 100\% & 100\% \\
+Identifiers \emph{off} roster removed & 0\% & 40\% \\
+Clinical retained, real French (n=1258) & 100\% & 98.3\% \\
+Clinical retained, real English (n=1014) & 100\% & 99.3\% \\
+\bottomrule
+\end{tabular}
+\caption{De-identification. Off-roster recall is 0\% by construction for exact
+matching; it is the number the 70\,MB model has to move.}
+\end{table}
+
+The system carries 555 automated tests, a twelve-step offline walk that drives
+the production build through a real browser with the network disabled, and
+schema-migration tests that open a database with a year of records in it. The
+evaluation harness runs in continuous integration and fails the build when an
+identifier the roster holds survives a scrub, or when clinical content is
+destroyed; accuracy numbers are reported but never gate a build.
+
+\textbf{Reach.} Nine country profiles (Madagascar, Senegal, C\^ote d'Ivoire, DRC,
+Kenya, Nigeria, Ghana, Tanzania, Uganda) carry the governing data-protection
+statute, supervisory authority, phone-number formats and national reporting
+system. Patient instruction sheets print in ten languages including Kiswahili,
+Wolof, Hausa and Malagasy.
+
+\section{Discussion}
+
+\textbf{The evaluation harness found what review did not.} It caught that
+\texttt{centim\`etres} begins with \texttt{cent}, a French number word, so
+\emph{``taille quatre-vingt-quinze centim\`etres''} parsed as $95 \times 100$,
+failed the plausibility check, and silently dropped every height dictated in
+French. A missing field is a far quieter bug than a wrong one, and no amount of
+code review had surfaced it.
+
+\textbf{The neural scrub is weakest where the tool is aimed.} Moving off-roster
+recall from 0\% to 40\% is real and nowhere near solved. All three identifiers it
+missed were Malagasy (\emph{Ramanantsoa}, \emph{Manjakandriana}, \emph{Solofo}):
+it is a French model with an English WordPiece vocabulary, so Malagasy proper
+nouns fragment heavily. We report this rather than select a corpus that hides it.
+
+\textbf{A PII model will eat a diagnosis.} On real French clinical text the
+model cost 2.4\% of gold clinical entities before a guard was added --- the worst
+losses being \emph{lymphome malin non hodgkinien}, \emph{hernie de Spiegel} and
+\emph{Henoch-Sch\"onlein purpura}, because Hodgkin, Spiegel, Henoch and
+Sch\"onlein are surnames. The model is right to flag them; the result is a record
+missing its diagnosis. This was unfindable on a corpus we wrote ourselves: a
+``must keep'' list can only contain terms somebody thought of, and nobody thinks
+of eponyms until a model eats one. It is the strongest argument we have for
+scoring retention on external annotated text.
+
+\textbf{An external review found five release blockers}, each of which was a case
+where behaviour and documentation had diverged and the documentation was the
+flattering one --- most seriously, dictation streaming audio to the browser
+vendor while the security documentation claimed no third-party runtime call.
+Every one now has a regression test named after the failure. The lesson we would
+generalise: for a tool whose entire proposition is privacy, the claims in the
+documentation need tests as much as the code does.
+
+\textbf{What we would do differently, and next.} The system was built to a
+technical standard before it was put in front of a clinician, which is the wrong
+order: the highest-value next step is a usability evaluation at a single
+facility, and several design decisions we defended on principle should be
+settled by watching someone use it. Eight of the ten patient-language
+translations are unreviewed by a speaker in the relevant health system and must
+be before any deployment. The FHIR bundle has not been through the official
+validator, so ``standards-compliant'' is not a claim we make. Encryption at rest
+covers the device but not the synchronisation server.
+
+\textbf{In-person demonstration.} The app installs from a URL on any modern
+phone and runs entirely offline with a synthetic demo workspace, so the full
+system --- including on-device dictation --- can be demonstrated on attendees'
+own devices with no network and no real patient data.
+
+% ---------------------------------------------------------------------------
+% References do not count against the 2-page limit.
+% ---------------------------------------------------------------------------
+\bibliography{refs}
+
+% refs.bib entries:
+%
+% @article{radford2022whisper,
+%   title={Robust Speech Recognition via Large-Scale Weak Supervision},
+%   author={Radford, Alec and Kim, Jong Wook and Xu, Tao and Brockman, Greg
+%           and McLeavey, Christine and Sutskever, Ilya},
+%   journal={arXiv preprint arXiv:2212.04356}, year={2022}}
+%
+% @article{openmed2025,
+%   title={OpenMed NER: Open-Source Clinical Named Entity Recognition},
+%   journal={arXiv preprint arXiv:2508.01630}, year={2025}}
+%
+% @inproceedings{magnini2021e3c,
+%   title={The E3C Project: European Clinical Case Corpus},
+%   author={Magnini, Bernardo and others},
+%   booktitle={SEPLN}, year={2021}, doi={10.57771/dey2-g751}}
