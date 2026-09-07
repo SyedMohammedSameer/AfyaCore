@@ -5,8 +5,8 @@ import { AppShell } from '../components/AppShell'
 import { Avatar, Badge, Button, EmptyState, SectionTitle, SkeletonRows, riseStyle } from '../components/ui'
 import { db } from '../db/db'
 import { seedDemoData } from '../db/seed'
-import { liveEncounters, livePatientCount, patientAge } from '../db/repo'
-import { DATE_LOCALES, formatDate } from '../lib/format'
+import { liveEncounters, livePatientCount } from '../db/repo'
+import { DATE_LOCALES, formatDate, formatAge } from '../lib/format'
 import { useI18n } from '../i18n'
 import type { Encounter, Patient } from '../db/schema'
 
@@ -210,7 +210,7 @@ export function HomeScreen() {
                 <div className="surface-card overflow-hidden rounded-card p-1.5">
                   <ul className="divide-y divide-line/70">
                     {data.recent.map(({ patient, lastVisit }, index) => {
-                      const age = patientAge(patient)
+                      const age = formatAge(patient, t)
                       return (
                         <li key={patient.id} className="animate-rise" style={riseStyle(index)}>
                           <Link
@@ -221,7 +221,7 @@ export function HomeScreen() {
                             <span className="min-w-0 flex-1">
                               <span className="block truncate font-extrabold text-ink">{patient.familyName} {patient.givenName}</span>
                               <span className="mt-0.5 block truncate text-sm text-ink-3">
-                                {[age !== undefined ? `${age} ${t.years}` : null, lastVisit ? Date.now() - lastVisit < DAY ? t.today : `${t.lastSeen} ${formatDate(lastVisit, lang)}` : t.never].filter(Boolean).join(' · ')}
+                                {[age, lastVisit ? Date.now() - lastVisit < DAY ? t.today : `${t.lastSeen} ${formatDate(lastVisit, lang)}` : t.never].filter(Boolean).join(' · ')}
                               </span>
                             </span>
                             <ArrowUpRight size={18} className="shrink-0 text-ink-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand-600" />

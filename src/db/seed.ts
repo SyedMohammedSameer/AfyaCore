@@ -36,6 +36,49 @@ export async function seedDemoData(): Promise<void> {
     phone: '032 98 765 43', preferredLang: 'fr', researchConsent: 'refused',
   })
 
+  /*
+   * An under-five, with a birth date and a year of weights.
+   *
+   * The only patient here carrying a real `birthDate` rather than an
+   * approximate age, because a z-score needs the age in days and every other
+   * demo record is an adult for whom nobody would have one. Four visits, not
+   * one: the last weight on its own is a moderately underweight toddler, which
+   * is a number. The four together are a child who grew normally to ten months
+   * and has gained 300 g since, which is a decision. Drawing that difference is
+   * the entire reason the chart exists.
+   */
+  const birth = new Date(now - 550 * day)
+  const tiana = await createPatient({
+    familyName: 'RASOANAIVO', givenName: 'Tiana', sex: 'female',
+    birthDate: birth.toISOString().slice(0, 10), birthDatePrecision: 'day',
+    address: 'Anjozorobe', registerNo: '2045', preferredLang: 'mg',
+    phone: '033 45 678 90', researchConsent: 'granted',
+  })
+
+  const wellChild: [number, string, string, number, number, string?][] = [
+    [367, 'pesée mensuelle', 'croissance normale', 7.0, 65.0],
+    [245, 'pesée mensuelle', 'croissance normale', 7.6, 70.0],
+    [124, 'diarrhée depuis deux jours', 'diarrhée aiguë sans déshydratation', 7.8, 74.5, 'SRO'],
+    [2, 'pesée, appétit diminué depuis un mois', 'insuffisance pondérale modérée', 7.9, 78.0],
+  ]
+  for (const [daysAgo, chiefComplaint, diagnosis, weight, height, drug] of wellChild) {
+    const visit = await createDraftEncounter(tiana)
+    await patchEncounter(visit, {
+      occurredAt: now - daysAgo * day,
+      chiefComplaint,
+      diagnosis,
+      vitals: { weight, height },
+      prescriptions: drug
+        ? [{ id: newId(), drug, dose: 'un sachet par selle liquide', durationDays: 3 }]
+        : [],
+      notes:
+        daysAgo === 2
+          ? 'Cassure de la courbe depuis dix mois. Orientée vers le programme nutritionnel, revoir dans deux semaines.'
+          : undefined,
+    })
+    await finaliseEncounter(visit)
+  }
+
   await createPatient({
     familyName: 'RANDRIAMBOLOLONA', givenName: 'Miora', sex: 'female',
     approximateAge: 22, address: 'Ambohimanga', registerNo: '2044', preferredLang: 'mg',

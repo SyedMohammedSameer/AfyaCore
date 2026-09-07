@@ -6,6 +6,7 @@ import { useSession } from '../lib/session'
 import { COUNTRY_PROFILES, countryCodes } from '../lib/countries'
 import { getFacilityCountry, setFacilityCountry, useCountryProfile } from '../lib/facility'
 import { recordAudit } from '../lib/audit'
+import { formatYears } from '../lib/format'
 
 /**
  * Where this facility is, and what that implies.
@@ -103,7 +104,7 @@ export function CountryPanel() {
 
           <dt className="text-ink-3">{t.retention}</dt>
           <dd className="font-medium text-ink">
-            {law.retentionYears ? `${law.retentionYears} ${t.years}` : t.unconfirmed}
+            {law.retentionYears ? formatYears(law.retentionYears, t) : t.unconfirmed}
           </dd>
         </dl>
 

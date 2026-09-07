@@ -40,7 +40,10 @@ export interface Strings {
   male: string
   unknown: string
   age: string
-  years: string
+  unitYear: string
+  unitYears: string
+  unitMonth: string
+  unitMonths: string
   birthDate: string
   birthDateHint: string
   approximateAge: string
@@ -191,6 +194,21 @@ export interface Strings {
   retentionConfirm: string
   retentionDone: string
   retentionServerNote: string
+  // WHO growth standards. A clinical decision aid, so the wording names the
+  // finding rather than softening it.
+  growthHeading: string
+  growthWeightForAge: string
+  growthHeightForAge: string
+  growthWeightForHeight: string
+  growthAxisAge: string
+  growthMeasurements: string
+  growthCaption: string
+  growthSevereLow: string
+  growthModerateLow: string
+  growthWatchLow: string
+  growthNormal: string
+  growthHigh: string
+  growthNeedsMeasurements: string
   // Possible duplicate registration. Suggests, never blocks.
   duplicateHeading: string
   duplicateLikely: string
@@ -338,7 +356,10 @@ const fr: Strings = {
   male: 'Homme',
   unknown: 'Non précisé',
   age: 'Âge',
-  years: 'ans',
+  unitYear: 'an',
+  unitYears: 'ans',
+  unitMonth: 'mois',
+  unitMonths: 'mois',
   birthDate: 'Date de naissance',
   birthDateHint: 'Laissez vide si inconnue',
   approximateAge: 'Âge approximatif',
@@ -487,6 +508,19 @@ const fr: Strings = {
   retentionDone: '{n} consultations supprimées.',
   retentionServerNote:
     'Cet appareil ne supprime que sa propre copie. Purgez le serveur séparément avec « npm run admin retention:purge ».',
+  growthHeading: 'Courbe de croissance (OMS)',
+  growthWeightForAge: 'Poids pour l’âge',
+  growthHeightForAge: 'Taille pour l’âge',
+  growthWeightForHeight: 'Poids pour la taille',
+  growthAxisAge: 'Âge en mois',
+  growthMeasurements: 'mesures',
+  growthCaption: 'Médiane OMS, ±2 et ±3 écarts-types. Sous −3 : référer.',
+  growthSevereLow: 'Sévère (z < −3)',
+  growthModerateLow: 'Modéré (z < −2)',
+  growthWatchLow: 'À surveiller (z < −1)',
+  growthNormal: 'Normal',
+  growthHigh: 'Élevé (z > 2)',
+  growthNeedsMeasurements: 'Enregistrez le poids et la taille pour tracer la courbe.',
   duplicateHeading: 'Déjà dans le registre ?',
   duplicateLikely: 'Très probablement la même personne',
   duplicatePossible: 'Peut-être la même personne',
@@ -625,7 +659,10 @@ const mg: Strings = {
   male: 'Lehilahy',
   unknown: 'Tsy fantatra',
   age: 'Taona',
-  years: 'taona',
+  unitYear: 'taona',
+  unitYears: 'taona',
+  unitMonth: 'volana',
+  unitMonths: 'volana',
   birthDate: 'Daty nahaterahana',
   birthDateHint: 'Avelao foana raha tsy fantatra',
   approximateAge: 'Taona manodidina',
@@ -774,6 +811,19 @@ const mg: Strings = {
   retentionDone: 'Voafafa ny fitsidihana {n}.',
   retentionServerNote:
     'Ity fitaovana ity ihany no voafafa. Fafao mitokana ny serivera amin’ny « npm run admin retention:purge ».',
+  growthHeading: 'Sary fitomboana (OMS)',
+  growthWeightForAge: 'Lanja araka ny taona',
+  growthHeightForAge: 'Halavana araka ny taona',
+  growthWeightForHeight: 'Lanja araka ny halavana',
+  growthAxisAge: 'Taona amin’ny volana',
+  growthMeasurements: 'fandrefesana',
+  growthCaption: 'Salan’isa OMS, ±2 sy ±3. Ambanin’ny −3: alefaso any amin’ny mpitsabo.',
+  growthSevereLow: 'Mafy (z < −3)',
+  growthModerateLow: 'Antonony (z < −2)',
+  growthWatchLow: 'Hojerena (z < −1)',
+  growthNormal: 'Ara-dalàna',
+  growthHigh: 'Avo (z > 2)',
+  growthNeedsMeasurements: 'Soraty ny lanja sy ny halavana mba hisian’ny sary.',
   duplicateHeading: 'Efa ao amin’ny rejisitra ve?',
   duplicateLikely: 'Azo inoana fa olona iray ihany',
   duplicatePossible: 'Mety ho olona iray ihany',
@@ -911,7 +961,10 @@ const en: Strings = {
   male: 'Male',
   unknown: 'Not specified',
   age: 'Age',
-  years: 'yrs',
+  unitYear: 'yr',
+  unitYears: 'yrs',
+  unitMonth: 'month',
+  unitMonths: 'months',
   birthDate: 'Date of birth',
   birthDateHint: 'Leave blank if unknown',
   approximateAge: 'Approximate age',
@@ -1060,6 +1113,19 @@ const en: Strings = {
   retentionDone: '{n} consultations deleted.',
   retentionServerNote:
     'This device deletes only its own copy. Purge the server separately with “npm run admin retention:purge”.',
+  growthHeading: 'Growth chart (WHO)',
+  growthWeightForAge: 'Weight for age',
+  growthHeightForAge: 'Height for age',
+  growthWeightForHeight: 'Weight for height',
+  growthAxisAge: 'Age in months',
+  growthMeasurements: 'measurements',
+  growthCaption: 'WHO median, ±2 and ±3 standard deviations. Below −3: refer.',
+  growthSevereLow: 'Severe (z < −3)',
+  growthModerateLow: 'Moderate (z < −2)',
+  growthWatchLow: 'Watch (z < −1)',
+  growthNormal: 'Normal',
+  growthHigh: 'High (z > 2)',
+  growthNeedsMeasurements: 'Record weight and height to plot the curve.',
   duplicateHeading: 'Already in the register?',
   duplicateLikely: 'Very likely the same person',
   duplicatePossible: 'Possibly the same person',

@@ -4,8 +4,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { ChevronRight, Search, UserPlus, Users, X } from 'lucide-react'
 import { AppShell } from '../components/AppShell'
 import { Avatar, Badge, Button, EmptyState, Input, SkeletonRows, cx, riseStyle } from '../components/ui'
-import { liveEncounters, livePatientCount, patientAge, searchPatients } from '../db/repo'
-import { formatDateCompact } from '../lib/format'
+import { liveEncounters, livePatientCount, searchPatients } from '../db/repo'
+import { formatDateCompact, formatAge } from '../lib/format'
 import { useI18n } from '../i18n'
 import type { Patient } from '../db/schema'
 
@@ -140,9 +140,9 @@ export function Roster() {
         <ul className="flex flex-col gap-2 pb-28">
           {visible.map((p, i) => {
             const a = annotations.get(p.id)
-            const age = patientAge(p)
+            const age = formatAge(p, t)
             const meta = [
-              age !== undefined ? `${age} ${t.years}` : null,
+              age,
               p.sex === 'female' ? t.female : p.sex === 'male' ? t.male : null,
               a?.lastVisit ? `${t.lastSeen} ${formatDateCompact(a.lastVisit, lang)}` : t.never,
             ]

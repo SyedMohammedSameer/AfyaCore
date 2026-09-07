@@ -10,6 +10,7 @@ import {
   setRetentionYears,
   type RetentionStatus,
 } from '../lib/retention'
+import { formatYears } from '../lib/format'
 
 /**
  * How long this facility keeps records, and destroying what is past it.
@@ -71,7 +72,7 @@ export function RetentionPanel() {
             <option value="">{t.unconfirmed}</option>
             {[3, 5, 7, 10, 15, 20, 25].map((y) => (
               <option key={y} value={y}>
-                {y} {t.years}
+                {formatYears(y, t)}
               </option>
             ))}
           </Select>
