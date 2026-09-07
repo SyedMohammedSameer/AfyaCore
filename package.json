@@ -28,7 +28,8 @@
     "demo:preview": "node scripts/demo-preview.mjs",
     "smoke": "node scripts/smoke.mjs",
     "sync": "node server/sync-server.mjs",
-    "admin": "node server/cli.mjs"
+    "admin": "node server/cli.mjs",
+    "record:demo": "node scripts/record-demo.mjs"
   },
   "dependencies": {
     "dexie": "^4.4.4",
