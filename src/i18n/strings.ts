@@ -191,6 +191,19 @@ export interface Strings {
   retentionConfirm: string
   retentionDone: string
   retentionServerNote: string
+  // Possible duplicate registration. Suggests, never blocks.
+  duplicateHeading: string
+  duplicateLikely: string
+  duplicatePossible: string
+  duplicateOpen: string
+  duplicateDismiss: string
+  duplicateSameRegisterNo: string
+  duplicateSamePhone: string
+  duplicateSameName: string
+  duplicateSimilarName: string
+  duplicateSwappedName: string
+  duplicateSameAge: string
+  duplicateSameVillage: string
   dictationRemoteDisclosure: string
   dictationAcknowledge: string
   dictationRemoteActive: string
@@ -474,6 +487,18 @@ const fr: Strings = {
   retentionDone: '{n} consultations supprimées.',
   retentionServerNote:
     'Cet appareil ne supprime que sa propre copie. Purgez le serveur séparément avec « npm run admin retention:purge ».',
+  duplicateHeading: 'Déjà dans le registre ?',
+  duplicateLikely: 'Très probablement la même personne',
+  duplicatePossible: 'Peut-être la même personne',
+  duplicateOpen: 'Ouvrir ce dossier',
+  duplicateDismiss: 'Ce n’est pas la même personne, continuer',
+  duplicateSameRegisterNo: 'même numéro de registre',
+  duplicateSamePhone: 'même téléphone',
+  duplicateSameName: 'même nom',
+  duplicateSimilarName: 'nom très proche',
+  duplicateSwappedName: 'nom et prénom inversés',
+  duplicateSameAge: 'même âge',
+  duplicateSameVillage: 'même village',
   dictationRemoteDisclosure:
     'La dictée de ce navigateur envoie l’audio à un service de reconnaissance externe : la voix du patient, son nom et son diagnostic quittent l’appareil. La saisie manuelle fonctionne hors ligne et ne quitte jamais l’appareil.',
   dictationAcknowledge: 'J’ai compris, activer la dictée',
@@ -749,6 +774,18 @@ const mg: Strings = {
   retentionDone: 'Voafafa ny fitsidihana {n}.',
   retentionServerNote:
     'Ity fitaovana ity ihany no voafafa. Fafao mitokana ny serivera amin’ny « npm run admin retention:purge ».',
+  duplicateHeading: 'Efa ao amin’ny rejisitra ve?',
+  duplicateLikely: 'Azo inoana fa olona iray ihany',
+  duplicatePossible: 'Mety ho olona iray ihany',
+  duplicateOpen: 'Sokafy io rakitra io',
+  duplicateDismiss: 'Tsy olona iray izy ireo, tohizo',
+  duplicateSameRegisterNo: 'laharana rejisitra mitovy',
+  duplicateSamePhone: 'telefaonina mitovy',
+  duplicateSameName: 'anarana mitovy',
+  duplicateSimilarName: 'anarana mitovitovy',
+  duplicateSwappedName: 'nifamadika ny anarana',
+  duplicateSameAge: 'taona mitovy',
+  duplicateSameVillage: 'tanàna mitovy',
   dictationRemoteDisclosure:
     'Mandefa ny feo any amin’ny serivisy ivelany ity fandikana feo ity: mivoaka ny fitaovana ny feon’ny marary, ny anarany sy ny aretiny. Mandeha tsy misy aterineto ny fanoratana an-tanana ary tsy mivoaka mihitsy.',
   dictationAcknowledge: 'Azoko, alefaso ny fandikana feo',
@@ -1023,6 +1060,18 @@ const en: Strings = {
   retentionDone: '{n} consultations deleted.',
   retentionServerNote:
     'This device deletes only its own copy. Purge the server separately with “npm run admin retention:purge”.',
+  duplicateHeading: 'Already in the register?',
+  duplicateLikely: 'Very likely the same person',
+  duplicatePossible: 'Possibly the same person',
+  duplicateOpen: 'Open this record',
+  duplicateDismiss: 'Not the same person, continue',
+  duplicateSameRegisterNo: 'same register number',
+  duplicateSamePhone: 'same phone',
+  duplicateSameName: 'same name',
+  duplicateSimilarName: 'very similar name',
+  duplicateSwappedName: 'given and family name swapped',
+  duplicateSameAge: 'same age',
+  duplicateSameVillage: 'same village',
   dictationRemoteDisclosure:
     'This browser’s dictation sends audio to an external recognition service: the patient’s voice, name and diagnosis leave the device. Typing works offline and never leaves the device.',
   dictationAcknowledge: 'Understood, enable dictation',
