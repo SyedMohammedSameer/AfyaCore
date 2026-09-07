@@ -27,6 +27,14 @@
  * Regenerate it whenever `docs/demo.mp4` changes. The sample points are read
  * out of `video/src/Demo.tsx` at run time, so adding or reordering a beat
  * needs no change here.
+ *
+ * ## Why sharp rather than ffmpeg for the last step
+ *
+ * The ffmpeg builds on this machine come from Playwright and Remotion, and
+ * neither carries a webp encoder — the frames are written as PNGs and joined
+ * here instead. `sharp` is therefore a declared devDependency rather than a
+ * borrowed one: it arrived transitively through `@huggingface/transformers`
+ * and this script would have broken silently on any release that dropped it.
  */
 import { spawn } from 'node:child_process'
 import { stat, access, mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
