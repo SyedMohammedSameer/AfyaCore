@@ -6,8 +6,9 @@
  * replaced.
  */
 import 'fake-indexeddb/auto'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '../db/db'
+import { openTestVault } from '../test/vault'
 
 const modeFor = vi.fn<(lang: string) => Promise<'on-device' | 'remote'>>()
 vi.mock('./speech', () => ({
@@ -37,6 +38,11 @@ const { dictationState, dictationAllowed, dictationLeavesDevice, acknowledgeRemo
  * different code path.
  */
 const noPack = { findPack: async () => null }
+
+// Every clinical table refuses to be written while the vault is locked, so a
+// suite that writes one has to open it. See src/db/encryption.test.ts, where
+// that refusal is the thing being asserted.
+beforeAll(() => openTestVault())
 
 beforeEach(async () => {
   await db.delete()

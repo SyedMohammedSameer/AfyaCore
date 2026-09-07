@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, ShieldAlert, ShieldCheck, UserPlus, UserX } from 'lucide-react'
+import { CheckCircle2, KeyRound, ShieldAlert, ShieldCheck, UserPlus, UserX } from 'lucide-react'
 import { Button, Card, Field, Input, SectionTitle, Select, cx } from './ui'
 import { useI18n } from '../i18n'
 import { useSession } from '../lib/session'
 import {
   activeClinicians,
   checkPinPolicy,
-  createClinician,
   disableClinician,
+  setPin as setAccountPin,
   getIdleTimeoutMs,
   setIdleTimeoutMs,
 } from '../lib/identity'
 import { recordAudit, verifyAuditChain, recentAudit, type ChainVerification } from '../lib/audit'
 import { formatDateTime } from '../lib/format'
 import type { AuditEntry, Clinician, Role } from '../db/schema'
+import { enrolClinician } from '../lib/unlock'
+import { wrappedAccountIds } from '../lib/vault'
 
 /**
  * Staff accounts, the automatic lock, and the audit trail.
@@ -59,8 +61,24 @@ function StaffList() {
   const [role, setRole] = useState<Role>('clinician')
   const [pin, setPin] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [keyHolders, setKeyHolders] = useState<Set<string>>(new Set())
+  const [resetting, setResetting] = useState<string | null>(null)
+  const [newPin, setNewPin] = useState('')
 
-  const refresh = () => activeClinicians().then(setStaff)
+  /*
+   * Which accounts can actually open the records.
+   *
+   * An account without a copy of the data key signs in and then reads nothing.
+   * That state is invisible from the account list — the person appears fully
+   * set up — and the only person who can fix it is somebody who already holds
+   * the key. So it is shown here, where the fix is: setting their PIN passes
+   * the key along.
+   */
+  const refresh = async () => {
+    const [rows, keyed] = await Promise.all([activeClinicians(), wrappedAccountIds()])
+    setStaff(rows)
+    setKeyHolders(new Set(keyed))
+  }
   useEffect(() => {
     void refresh()
   }, [])
@@ -71,7 +89,10 @@ function StaffList() {
     if (!policy.ok) return setError(t.pinPolicy[policy.reason!])
     if (!name.trim()) return setError(t.nameRequired)
 
-    const id = await createClinician({ name, role, pin })
+    // `enrolClinician` rather than `createClinician`: an account without a
+    // wrapped copy of the data key signs in and then cannot read a single
+    // record. The two have to be created together.
+    const id = await enrolClinician({ name, role, pin })
     await recordAudit({
       action: 'account.create',
       subjectType: 'account',
@@ -81,6 +102,31 @@ function StaffList() {
     setName('')
     setPin('')
     setAdding(false)
+    await refresh()
+  }
+
+  /**
+   * Set somebody else's PIN.
+   *
+   * The recovery path for a forgotten PIN, and the only way an account that
+   * has no copy of the data key ever gets one — `setPin` rewraps the key under
+   * the new PIN, which it can do because the administrator doing it is signed
+   * in and therefore holds it. There is deliberately no path that does this
+   * without somebody who can already read the records being present.
+   */
+  async function resetPin(target: Clinician) {
+    setError(null)
+    const policy = checkPinPolicy(newPin)
+    if (!policy.ok) return setError(t.pinPolicy[policy.reason!])
+
+    await setAccountPin(target.id, newPin)
+    await recordAudit({
+      action: 'account.pin',
+      subjectType: 'account',
+      subjectId: target.id,
+    })
+    setNewPin('')
+    setResetting(null)
     await refresh()
   }
 
@@ -112,10 +158,8 @@ function StaffList() {
         {staff.map((c) => {
           const lastAdmin = c.role === 'admin' && admins === 1
           return (
-            <div
-              key={c.id}
-              className="flex items-center justify-between gap-2 rounded-field bg-white/50 p-2.5"
-            >
+            <div key={c.id} className="rounded-field bg-white/50 p-2.5">
+             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate font-semibold text-ink">
                   {c.name}
@@ -125,16 +169,56 @@ function StaffList() {
                   {c.role === 'admin' ? t.roleAdmin : t.roleClinician}
                   {c.lastSignInAt && ` · ${formatDateTime(c.lastSignInAt, lang)}`}
                 </p>
+                {!keyHolders.has(c.id) && (
+                  <p className="mt-1 flex items-start gap-1 text-xs font-medium text-warn-700">
+                    <KeyRound size={13} className="mt-0.5 shrink-0" />
+                    {t.staffNoKey}
+                  </p>
+                )}
               </div>
-              <Button
-                variant="ghost"
-                icon={<UserX size={18} />}
-                disabled={c.id === me?.id || lastAdmin}
-                title={lastAdmin ? t.lastAdmin : undefined}
-                onClick={() => disable(c)}
-              >
-                <span className="sr-only">{t.disableAccount}</span>
-              </Button>
+              <span className="flex shrink-0 items-center">
+                <Button
+                  variant="ghost"
+                  icon={<KeyRound size={18} />}
+                  onClick={() => {
+                    setNewPin('')
+                    setError(null)
+                    setResetting((current) => (current === c.id ? null : c.id))
+                  }}
+                >
+                  {/* Named with the account, because the submit button inside
+                      the form this opens carries the same words. */}
+                  <span className="sr-only">{t.setPinFor.replace('{name}', c.name)}</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  icon={<UserX size={18} />}
+                  disabled={c.id === me?.id || lastAdmin}
+                  title={lastAdmin ? t.lastAdmin : undefined}
+                  onClick={() => disable(c)}
+                >
+                  <span className="sr-only">{t.disableAccount}</span>
+                </Button>
+              </span>
+             </div>
+
+              {resetting === c.id && (
+                <div className="mt-2 flex flex-col gap-2 border-t border-line pt-2">
+                  <Field label={t.setPinFor.replace('{name}', c.name)} hint={t.pinHint}>
+                    <Input
+                      type="password"
+                      inputMode="numeric"
+                      autoFocus
+                      value={newPin}
+                      onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                    />
+                  </Field>
+                  {error && <p className="text-sm font-medium text-danger-700">{error}</p>}
+                  <Button full onClick={() => resetPin(c)}>
+                    {t.setPin}
+                  </Button>
+                </div>
+              )}
             </div>
           )
         })}

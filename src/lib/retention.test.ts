@@ -6,11 +6,12 @@
  * consultations, so every precondition is worth a named test.
  */
 import 'fake-indexeddb/auto'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { db } from '../db/db'
 import { purgeExpired, retentionCutoff, retentionStatus, setRetentionYears } from './retention'
 import type { Encounter, Patient } from '../db/schema'
 import { setCurrentActor } from './audit'
+import { openTestVault } from '../test/vault'
 
 const YEAR = 365.2425 * 86_400_000
 const NOW = Date.UTC(2026, 8, 3)
@@ -38,6 +39,11 @@ const encounter = (over: Partial<Encounter> & { id: string; patientId: string })
   updatedAt: 0,
   ...over,
 })
+
+// Every clinical table refuses to be written while the vault is locked, so a
+// suite that writes one has to open it. See src/db/encryption.test.ts, where
+// that refusal is the thing being asserted.
+beforeAll(() => openTestVault())
 
 beforeEach(async () => {
   // Service boundaries now enforce the permission matrix, so a test that

@@ -21,6 +21,32 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { db } from './db'
 import { deidentify } from '../lib/deidentify'
 import { setCurrentActor } from '../lib/audit'
+import { encryptExistingRows } from './encryption'
+import { livePatientCount } from './repo'
+import { lockVault, openTestVault } from '../test/vault'
+
+/**
+ * A stored row exactly as it sits on disk, bypassing Dexie's middleware.
+ *
+ * The whole claim of encryption at rest is about what is in the file, and a
+ * read through Dexie cannot see it: the middleware decrypts on the way out, so
+ * every assertion would pass whether anything was encrypted or not.
+ */
+async function rawRow(store: string, key: string): Promise<Record<string, unknown>> {
+  const raw = new Dexie('afyacore')
+  raw.version(db.verno).stores({})
+  await raw.open()
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = raw.backendDB().transaction(store, 'readonly')
+      const request = tx.objectStore(store).get(key)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  } finally {
+    raw.close()
+  }
+}
 
 const V1_STORES = {
   patients: 'id, familyName, givenName, registerNo, updatedAt, syncedAt, searchKey',
@@ -95,7 +121,7 @@ describe('upgrading a device that has real data on it', () => {
     await seedLegacy(1, V1_STORES)
     await db.open()
 
-    expect(db.verno).toBe(3)
+    expect(db.verno).toBe(4)
     expect(await db.patients.count()).toBe(2)
     expect(await db.encounters.count()).toBe(1)
     expect((await db.settings.get('facility.country'))!.value).toBe('MG')
@@ -130,6 +156,9 @@ describe('upgrading a device that has real data on it', () => {
 
     expect(await db.clinicians.count()).toBe(0)
     expect(await db.audit.count()).toBe(0)
+    // The audit table is encrypted, so writing to it needs an open vault —
+    // which is the state a device is in whenever anything is auditable.
+    await openTestVault()
     await db.audit.add({
       id: 'a1',
       seq: 1,
@@ -141,19 +170,95 @@ describe('upgrading a device that has real data on it', () => {
     expect(await db.audit.count()).toBe(1)
   })
 
-  it('makes the deletedAt index usable on rows written before it existed', async () => {
-    // v1 rows have no deletedAt at all. Dexie indexes only rows where the key
-    // is present, so a query that relied on the index would silently skip
-    // every legacy record — which is why the app filters in code instead.
+  it('counts live records when legacy rows have no deletedAt at all', async () => {
+    // v1 rows have no `deletedAt` key, and Dexie indexes only rows where a key
+    // is present, so every legacy record is absent from that index. The live
+    // count is computed as a subtraction against it — precisely so that
+    // absence means "not deleted", which is what it means.
+    await seedLegacy(1, V1_STORES)
+    await db.open()
+    await openTestVault()
+
+    expect(await livePatientCount()).toBe(2)
+
+    await db.patients.update('p1', { deletedAt: Date.now() })
+    expect(await livePatientCount()).toBe(1)
+  })
+})
+
+/**
+ * The upgrade that turns a facility's plaintext database into an encrypted one.
+ *
+ * This is the migration with the most to lose. It runs against a phone that
+ * has a year of consultations on it, it rewrites every clinical row, and a
+ * device whose battery dies halfway through must open again afterwards rather
+ * than presenting a half-readable database.
+ */
+describe('switching an existing device to encrypted storage', () => {
+  it('reads plaintext rows before the switch, and ciphertext after', async () => {
     await seedLegacy(1, V1_STORES)
     await db.open()
 
-    const live = await db.patients.filter((p) => p.deletedAt === undefined).toArray()
-    expect(live).toHaveLength(2)
+    // Legacy rows are readable with no key at all: reads are lenient, which is
+    // what lets the conversion be incremental rather than one transaction over
+    // the whole database.
+    expect((await db.patients.get('p1'))!.familyName).toBe('RAKOTOARISOA')
 
-    await db.patients.update('p1', { deletedAt: Date.now() })
-    const after = await db.patients.filter((p) => p.deletedAt === undefined).toArray()
-    expect(after).toHaveLength(1)
+    await openTestVault()
+    await encryptExistingRows(db)
+
+    // Through Dexie the record is unchanged...
+    const patient = (await db.patients.get('p1'))!
+    expect(patient.familyName).toBe('RAKOTOARISOA')
+    expect(patient.searchKey).toContain('rakotoarisoa')
+
+    // ...and underneath it, the name is gone from the stored row.
+    const raw = await rawRow('patients', 'p1')
+    expect(Object.keys(raw)).toContain('__enc')
+    expect(JSON.stringify(raw)).not.toContain('RAKOTOARISOA')
+    expect(JSON.stringify(raw)).not.toContain('rakotoarisoa')
+    // The index fields that survive are the ones PLANS declares, and no others.
+    expect(Object.keys(raw).filter((k) => k !== '__enc').sort()).toEqual(['id', 'updatedAt'])
+  })
+
+  it('locks the records away when the vault closes', async () => {
+    await seedLegacy(1, V1_STORES)
+    await db.open()
+    await openTestVault()
+    await encryptExistingRows(db)
+
+    lockVault()
+    await expect(db.patients.get('p1')).rejects.toThrow(/vault is locked/)
+    await expect(db.patients.toArray()).rejects.toThrow(/vault is locked/)
+
+    await openTestVault()
+    expect((await db.patients.get('p1'))!.familyName).toBe('RAKOTOARISOA')
+  })
+
+  it('resumes after an interrupted pass rather than corrupting the row', async () => {
+    // The phone that dies mid-conversion. Running it again has to be safe, and
+    // a row that was already converted must not be double-encrypted.
+    await seedLegacy(1, V1_STORES)
+    await db.open()
+    await openTestVault()
+
+    await encryptExistingRows(db)
+    await encryptExistingRows(db)
+
+    expect((await db.patients.get('p1'))!.familyName).toBe('RAKOTOARISOA')
+    expect((await db.encounters.get('e1'))!.diagnosis).toBe('paludisme simple')
+  })
+
+  it('leaves the settings table readable, because the key wraps live in it', async () => {
+    // A chicken-and-egg check: if settings were encrypted there would be
+    // nowhere to keep the wrapped key that decrypts everything else.
+    await seedLegacy(1, V1_STORES)
+    await db.open()
+    await openTestVault()
+    await encryptExistingRows(db)
+
+    expect((await db.settings.get('facility.country'))!.value).toBe('MG')
+    expect(await rawRow('settings', 'facility.country')).not.toHaveProperty('__enc')
   })
 })
 

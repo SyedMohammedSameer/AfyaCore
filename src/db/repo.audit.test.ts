@@ -8,7 +8,7 @@
  * table typechecks perfectly and throws the moment a clinician deletes a
  * patient. `fake-indexeddb` is the smallest thing that catches that.
  */
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import 'fake-indexeddb/auto'
 import { db } from './db'
 import {
@@ -22,6 +22,7 @@ import {
   patchEncounter,
 } from './repo'
 import { setCurrentActor, verifyAuditChain, recentAudit } from '../lib/audit'
+import { openTestVault } from '../test/vault'
 
 
 async function newPatient(familyName = 'Rakotoarisoa') {
@@ -34,6 +35,11 @@ async function newPatient(familyName = 'Rakotoarisoa') {
 }
 
 const actions = async () => (await recentAudit()).map((e) => e.action)
+
+// Every clinical table refuses to be written while the vault is locked, so a
+// suite that writes one has to open it. See src/db/encryption.test.ts, where
+// that refusal is the thing being asserted.
+beforeAll(() => openTestVault())
 
 beforeEach(async () => {
   await db.delete()

@@ -5,7 +5,7 @@ import { AppShell } from '../components/AppShell'
 import { Avatar, Badge, Button, EmptyState, SectionTitle, SkeletonRows, riseStyle } from '../components/ui'
 import { db } from '../db/db'
 import { seedDemoData } from '../db/seed'
-import { liveEncounters, livePatientCount } from '../db/repo'
+import { liveEncounters, livePatientCount, searchPatients } from '../db/repo'
 import { DATE_LOCALES, formatDate, formatAge } from '../lib/format'
 import { useI18n } from '../i18n'
 import type { Encounter, Patient } from '../db/schema'
@@ -61,12 +61,11 @@ export function HomeScreen() {
       .slice(0, 3)
     const drafts = await Promise.all(draftRows.map(async (e) => ({ ...e, patient: await db.patients.get(e.patientId) })))
 
-    const patients = await db.patients
-      .orderBy('updatedAt')
-      .reverse()
-      .filter((p) => p.deletedAt === undefined)
-      .limit(5)
-      .toArray()
+    // `searchPatients` with an empty query, rather than a Dexie `.filter()`
+    // chain: a predicate on a collection makes Dexie read through a cursor,
+    // and an encrypted table cannot be. It also pages by index instead of
+    // decrypting the whole register to show five names.
+    const patients = await searchPatients('', 5)
     const lastVisitBy = new Map<string, number>()
     for (const e of finals) {
       const previous = lastVisitBy.get(e.patientId)

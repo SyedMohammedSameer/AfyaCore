@@ -61,7 +61,7 @@ software does not know the difference; the deployer must.
 
 ## 2. Data inventory
 
-### 2.1 On the device (IndexedDB, unencrypted)
+### 2.1 On the device (IndexedDB, AES-GCM encrypted at rest)
 
 | Store | Contents | Category |
 |---|---|---|
@@ -70,7 +70,32 @@ software does not know the difference; the deployer must.
 | `attachments` | Photographs of paper records, as blobs, plus any OCR-extracted text | Special category (health), unredactable |
 | `clinicians` | Staff name, role, PBKDF2-SHA256 PIN hash (600 000 iterations), sign-in times | Identifying (staff) |
 | `audit` | Hash-chained log of who did what to which record, including `patient.view` | Identifying (staff + patient linkage) |
-| `settings` | Facility country, sync server URL, device token, export salt, idle timeout | Configuration and secrets |
+| `settings` | Facility country, sync server URL, device token, export salt, idle timeout, **the data key wrapped once per account** | Configuration and secrets |
+
+`patients`, `encounters`, `attachments` and `audit` are stored as AES-GCM
+ciphertext under a single random 256-bit data key. What stays readable in each
+of those stores is the row's primary key, the foreign keys linking rows to each
+other (`patientId`, `encounterId`), the timestamps (`occurredAt`, `updatedAt`,
+`syncedAt`, `deletedAt`, `createdAt`, `at`), and the two low-cardinality
+enumerations `status` and `action`. All of those are either random identifiers
+or metadata; every name, number, address, complaint, diagnosis, vital,
+prescription, transcript and photograph is inside the ciphertext. The trade is
+explicit: without those indexes the sync badge, the retention purge and the
+roster's first page would each require decrypting the whole register.
+
+The metadata that remains is **shape**: how many consultations this facility
+runs, on which days, and how far behind sync it is. That is disclosed here
+rather than described as "encrypted at rest" and left at that.
+
+`clinicians` and `settings` are deliberately **not** encrypted. The sign-in
+screen has to list staff names before anybody has typed a PIN, so there is no
+key available to read them with, and the wrapped data key itself has to live
+somewhere readable or nothing else could be opened. Staff names and the facility
+configuration are therefore in the clear; the PIN hashes were already hashes.
+
+The data key is unwrapped by PBKDF2-SHA256 over the clinician's PIN (600 000
+iterations, per-account salt, AES-KW) and held **in memory only** for the length
+of a session. Sign-out, the idle timeout and closing the tab all discard it.
 
 The **provenance** field deserves its own line. It stores the raw text a
 clinician dictated or a photo produced, verbatim, so that a low-confidence
@@ -104,7 +129,7 @@ flowchart TB
   subgraph device["Clinician's device — trust boundary 1"]
     cap["Capture: type, dictate, photograph"]
     ext["Deterministic extraction (offline, µs)"]
-    idb[("IndexedDB — unencrypted")]
+    idb[("IndexedDB — AES-GCM, key wrapped by PIN")]
     aud[("Local hash-chained audit log")]
     cap --> ext --> idb
     idb --> aud
@@ -250,11 +275,11 @@ these are ours for a rural outpatient facility with shared devices.
 
 | # | Risk | L | I | Mitigation in code | Residual |
 |---|---|---|---|---|---|
-| R1 | **Lost or stolen device is read** | High | High | PIN gate (PBKDF2, 600k iterations), 5-attempt lockout for 5 min, 15-min idle timeout | **High.** No encryption at rest (§6.1). An attacker with the device and time reads IndexedDB directly, without ever meeting the PIN screen. Relies entirely on OS full-disk encryption. |
+| R1 | **Lost or stolen device is read** | High | High | Every clinical store is AES-GCM at rest under a 256-bit data key, wrapped per account by PBKDF2-SHA256 over the PIN (600k iterations, AES-KW) and held in memory only; PIN gate, 5-attempt lockout for 5 min, 15-min idle timeout | **Medium.** Reading IndexedDB directly now yields ciphertext, so the attack is an offline search of the PIN space rather than a file copy. A 4-digit PIN at 600k iterations is hours of work on commodity hardware; 6 digits is months. Staff names and facility settings stay in the clear (§2.1). OS full-disk encryption still worth having. |
 | R2 | **Identifier leaks into a de-identified export via free text** | Med | High | Deterministic scrub over all roster identifiers, incl. provenance; phone patterns per country; over-inclusive by design | **Medium.** Off-roster names survive (measured 0% recall). The neural pass is unmeasured. |
 | R3 | **Photograph of a paper register leaks** | Med | High | Attachments excluded from sync and from every de-identified export | Low, and deliberately achieved by refusing the feature rather than by redacting it |
 | R4 | **Another facility's data is readable** | Low | High | Facility scope derived from the bearer token; body-supplied ids ignored; tested | Low |
-| R5 | **Server disk is copied** | Med | High | Tokens and enrolment codes stored as hashes | **High.** Clinical records are plain text in SQLite. Relies on the deployer's disk encryption. |
+| R5 | **Server disk is copied** | Med | High | Tokens and enrolment codes stored as hashes | **High.** Unchanged: clinical records are plain text in SQLite. The device-side encryption does not extend here, because the server has no PIN to derive a key from and holding a key beside the database it opens would be theatre. Relies on the deployer's disk encryption. |
 | R6 | **Traffic intercepted** | Med | High | TLS supported via `AFYACORE_TLS_CERT`/`KEY`; the server warns on boot when running plain HTTP | **Deployer's.** Plain HTTP is the default and that is a real hazard on a shared network. |
 | R7 | **Audit trail altered to hide access** | Low | Med | Hash chain on device and server; `cli.mjs audit:verify` reports the first break | **Medium.** A chain makes tampering detectable, not impossible: an administrator with filesystem access can rewrite the whole chain. Anchoring the head hash off-box is manual. |
 | R8 | **Staff member browses records with no clinical reason** | Med | Med | `patient.view` is audited; roles restrict export, deletion, staff management, **enforced at service boundaries** (`requirePermission`) rather than in components alone | Medium. Detection only for reads, and only if someone reads the log. |
@@ -267,9 +292,10 @@ these are ours for a rural outpatient facility with shared devices.
 
 ### 4.4 The four risks that block a real deployment
 
-R10, R11, R12 and R1 are not "hardening"; they are the difference between a
+R10, R11, R12 and R5 are not "hardening"; they are the difference between a
 demo and a lawful deployment. They are open, they are tracked in the repository,
-and this document exists partly so they cannot be quietly forgotten:
+and this document exists partly so they cannot be quietly forgotten. R1 has since
+been closed on the device side and is listed last for what remains of it:
 
 - **R12 — consent and lawful basis.** No consent is recorded anywhere. A
   deployer relying on consent has no evidence of it; a deployer relying on a
@@ -283,8 +309,14 @@ and this document exists partly so they cannot be quietly forgotten:
   device believes is gone — and **wrong for a data-subject erasure request**,
   which wants the clinical content gone from both sides. Reconciling the two
   needs a real purge that propagates, not a change of flag.
-- **R1/R5 — encryption at rest.** Explicitly out of scope for this milestone,
-  and stated as a limitation rather than deferred silently.
+- **R5 — encryption at rest on the server.** Still open, and the harder half:
+  a server has no PIN to derive a key from, so the key would have to sit beside
+  the database it opens. Full-disk encryption on the host is the honest answer
+  until there is a key-management story worth the name.
+- **R1 — encryption at rest on the device.** Closed. Every clinical store is
+  AES-GCM under a key that only a PIN unwraps, and the key is gone the moment
+  the session ends. What it does not do is make a 4-digit PIN strong, and §2.1
+  records the metadata the indexes still leak rather than claiming otherwise.
 
 ---
 
@@ -383,10 +415,21 @@ tokens, facility scoping from the token, origin allow-listing, rate limiting,
 PIN-gated sessions with lockout and idle timeout, role-based permissions, and
 hash-chained audit logs on both sides. See [SECURITY.md](../SECURITY.md).
 
-Not implemented: **encryption at rest**, on the device or the server. This is a
-deliberate scope decision for this milestone, not an oversight, and it is the
-largest single gap in the document. Both stores rely on OS-level disk
-encryption.
+Also implemented: **encryption at rest on the device.** `patients`,
+`encounters`, `attachments` and `audit` are AES-GCM ciphertext under one random
+256-bit data key, wrapped per account by PBKDF2-SHA256 over the clinician's PIN
+(600 000 iterations, AES-KW) and held in memory for the length of a session
+only. The primary key of each row is bound into the ciphertext as additional
+authenticated data, so an envelope moved onto another patient's row fails to
+open rather than impersonating that record. §2.1 lists what stays readable and
+why.
+
+Not implemented: **encryption at rest on the server.** SQLite is plain text and
+relies on OS-level disk encryption. This is the remaining half of the gap and
+the harder one, because a server has no PIN: any key it could use to open the
+database at boot would have to be stored where the database is, and calling
+that encryption at rest would be misleading. Recorded as R5 rather than solved
+badly.
 
 ### 6.2 Lawful basis and consent — **partially implemented**
 
@@ -591,7 +634,7 @@ check any of them.
 - [ ] Country row reviewed by local counsel; `counselReviewed` set
 - [ ] Sync server behind TLS (`AFYACORE_TLS_CERT`/`KEY`, or a terminating proxy)
 - [ ] `allowedOrigins` set to the facility's own origin, never `*`
-- [ ] Full-disk encryption enabled on every device and on the server
+- [ ] Full-disk encryption enabled on every device and on the server (still required: it covers the server, which the app does not encrypt, and the staff names and settings the device leaves readable)
 - [ ] Device screen lock enforced independently of the app's PIN
 - [ ] Breach procedure written, with a named person and a route to the regulator
 - [ ] Audit chain head recorded off-box on a schedule

@@ -66,11 +66,43 @@ export async function updatePatient(id: string, changes: Partial<NewPatientInput
 export async function searchPatients(query: string, limit = 50): Promise<Patient[]> {
   const q = normalise(query)
   const live = (p: Patient) => p.deletedAt === undefined
-  const collection = q
-    ? db.patients.filter((p) => live(p) && p.searchKey.includes(q))
-    : db.patients.orderBy('updatedAt').reverse().filter(live)
-  const rows = await collection.limit(limit).toArray()
-  return q ? rows.sort((a, b) => b.updatedAt - a.updatedAt) : rows
+
+  if (!q) {
+    /*
+     * The empty query is the roster's first paint, so it must not cost a
+     * decrypt per patient in the register.
+     *
+     * `updatedAt` and `deletedAt` are both plaintext indexes, so the most
+     * recently touched ids and the tombstoned ids can be read without
+     * decrypting anything at all. Only the page that is actually about to be
+     * drawn is fetched, which makes this O(limit) rather than O(register).
+     */
+    const [ordered, tombstoned] = await Promise.all([
+      db.patients.orderBy('updatedAt').reverse().primaryKeys(),
+      db.patients.where('deletedAt').aboveOrEqual(0).primaryKeys(),
+    ])
+    const dead = new Set(tombstoned)
+    const wanted = ordered.filter((id) => !dead.has(id)).slice(0, limit)
+    const rows = await db.patients.bulkGet(wanted)
+    return rows.filter((p): p is Patient => p !== undefined)
+  }
+
+  /*
+   * A typed search does have to decrypt the register, and there is no trick
+   * that avoids it: the text being searched is the ciphertext's whole point,
+   * and an index over it would be a plaintext copy of every patient's name
+   * sitting next to their encrypted record. That index is what schema v4
+   * removed, and this is the bill for it.
+   *
+   * It is one pass of AES-GCM over a few thousand small records, which is tens
+   * of milliseconds on the hardware this targets — paid while somebody types,
+   * not while the app opens.
+   */
+  const rows = await db.patients.toArray()
+  return rows
+    .filter((p) => live(p) && p.searchKey.includes(q))
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, limit)
 }
 
 export async function createDraftEncounter(patientId: string): Promise<string> {
@@ -411,12 +443,29 @@ export async function livePatients(): Promise<Patient[]> {
   return rows.filter((p) => p.deletedAt === undefined)
 }
 
+/*
+ * Live counts by subtraction against the tombstone index.
+ *
+ * Both of these are `useLiveQuery` on the home screen and re-run on every
+ * write. A JS predicate would stream — and therefore decrypt — every record in
+ * the database to produce a number on a dashboard tile. `deletedAt` is a
+ * plaintext index and a row without one is absent from it, so the live count
+ * is the total minus the size of that index, and nothing is decrypted.
+ */
 export async function livePatientCount(): Promise<number> {
-  return db.patients.filter((p) => p.deletedAt === undefined).count()
+  const [total, deleted] = await Promise.all([
+    db.patients.count(),
+    db.patients.where('deletedAt').aboveOrEqual(0).count(),
+  ])
+  return total - deleted
 }
 
 export async function liveEncounterCount(): Promise<number> {
-  return db.encounters.filter((e) => e.deletedAt === undefined).count()
+  const [total, deleted] = await Promise.all([
+    db.encounters.count(),
+    db.encounters.where('deletedAt').aboveOrEqual(0).count(),
+  ])
+  return total - deleted
 }
 
 /** Age in years, tolerating the several ways a birth date may be unknown. */

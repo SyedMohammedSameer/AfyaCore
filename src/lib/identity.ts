@@ -165,10 +165,22 @@ export async function createClinician(input: NewClinicianInput): Promise<string>
   return clinician.id
 }
 
+/**
+ * Set an account's PIN, and rewrap their copy of the data key under it.
+ *
+ * The two have to move together. A PIN changed without the rewrap would sign
+ * in and then fail to open a single record; a rewrap without the PIN change
+ * would leave the old PIN opening the vault. `rewrapFor` needs an unlocked
+ * vault, which is what makes this the mechanism by which a key is handed to
+ * somebody who has none — an administrator who can read the records sets the
+ * PIN, and the act of setting it passes the key along.
+ */
 export async function setPin(clinicianId: string, pin: string): Promise<void> {
   const policy = checkPinPolicy(pin)
   if (!policy.ok) throw new Error(`weak_pin:${policy.reason}`)
+  const { isVaultEnabled, rewrapFor } = await import('./vault')
   await db.clinicians.update(clinicianId, { pinHash: await hashPin(pin) })
+  if (await isVaultEnabled()) await rewrapFor(clinicianId, pin)
 }
 
 export async function activeClinicians(): Promise<Clinician[]> {
@@ -184,6 +196,11 @@ export async function activeClinicians(): Promise<Clinician[]> {
  */
 export async function disableClinician(id: string): Promise<void> {
   await db.clinicians.update(id, { disabledAt: Date.now() })
+  // And take away their copy of the data key. Leaving it would mean a disabled
+  // account's PIN still decrypts the database for anyone who can reach the
+  // IndexedDB file, which is the case the disabling was for.
+  const { revokeWrap } = await import('./vault')
+  await revokeWrap(id)
 }
 
 /** True before anyone has been enrolled: the first-run account setup case. */
