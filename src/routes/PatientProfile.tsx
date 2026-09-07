@@ -5,10 +5,11 @@ import { AppShell } from '../components/AppShell'
 import { ActionBar, Avatar, Badge, Button, Card, EmptyState, MoreMenu, SectionTitle, SkeletonRows, cx, riseStyle } from '../components/ui'
 import { patientPack } from '../i18n/patient'
 import { db } from '../db/db'
-import { createDraftEncounter, deletePatient, patientAge, patientEncounters } from '../db/repo'
-import { formatDate, formatVital, hasAnyVital, VITAL_ORDER } from '../lib/format'
+import { createDraftEncounter, deletePatient, patientEncounters } from '../db/repo'
+import { formatDate, formatVital, hasAnyVital, VITAL_ORDER, formatAge } from '../lib/format'
 import { vitalSeverity } from '../db/schema'
 import { useI18n } from '../i18n'
+import { GrowthPanel } from '../components/GrowthPanel'
 import type { Encounter } from '../db/schema'
 
 /**
@@ -130,7 +131,7 @@ export function PatientProfile() {
     )
   }
 
-  const age = patientAge(patient)
+  const age = formatAge(patient, t)
   const sexLabel = patient.sex === 'female' ? t.female : patient.sex === 'male' ? t.male : t.unknown
 
   async function startEncounter() {
@@ -199,7 +200,7 @@ export function PatientProfile() {
               {patient.familyName} {patient.givenName}
             </p>
             <p className="numeric mt-0.5 text-sm text-ink-3">
-              {[age !== undefined ? `${age} ${t.years}` : null, sexLabel].filter(Boolean).join(' · ')}
+              {[age, sexLabel].filter(Boolean).join(' · ')}
             </p>
             {patient.phone && (
               <a
@@ -223,6 +224,11 @@ export function PatientProfile() {
             ))}
           </Card>
         )}
+
+        {/* Above the consultation history: for a child under five this is the
+            thing a clinician came to the profile to see, and it renders
+            nothing at all for everybody else. */}
+        {patient && <GrowthPanel patient={patient} encounters={encounters ?? []} />}
 
         <section>
           <SectionTitle>

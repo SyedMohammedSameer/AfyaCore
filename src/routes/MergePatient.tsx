@@ -5,8 +5,9 @@ import { Merge, Search } from 'lucide-react'
 import { AppShell } from '../components/AppShell'
 import { Avatar, Card, EmptyState, Input, SectionTitle, SkeletonRows, riseStyle } from '../components/ui'
 import { db } from '../db/db'
-import { mergePatients, patientAge, searchPatients } from '../db/repo'
+import { mergePatients, searchPatients } from '../db/repo'
 import { useI18n } from '../i18n'
+import { formatAge } from '../lib/format'
 
 /**
  * Fold a duplicate registration into this patient's record.
@@ -91,7 +92,7 @@ export function MergePatient() {
           ) : (
             <ul className="flex flex-col gap-2">
               {candidates.map((p, index) => {
-                const age = patientAge(p)
+                const age = formatAge(p, t)
                 const name = `${p.familyName} ${p.givenName}`.trim()
                 return (
                   <li key={p.id} className="animate-rise" style={riseStyle(index)}>
@@ -105,7 +106,7 @@ export function MergePatient() {
                         <span className="block truncate font-extrabold text-ink">{name}</span>
                         <span className="mt-0.5 block truncate text-sm text-ink-3">
                           {[
-                            age !== undefined ? `${age} ${t.years}` : null,
+                            age,
                             p.registerNo ? `${t.registerNo} ${p.registerNo}` : null,
                             p.address,
                           ]

@@ -1,4 +1,4 @@
-import type { LangCode, Prescription, Vitals, VitalKey } from '../db/schema'
+import type { LangCode, Patient, Prescription, Vitals, VitalKey } from '../db/schema'
 import { patientPack, type PatientLang } from '../i18n/patient'
 import { VITAL_RANGES } from '../db/schema'
 import type { Strings } from '../i18n/strings'
@@ -43,6 +43,43 @@ export function formatDateCompact(ts: number, lang: LangCode, now = Date.now()):
     month: 'short',
     ...(sameYear ? {} : { year: 'numeric' }),
   })
+}
+
+/**
+ * A patient's age, in the unit that says something about them.
+ *
+ * Two problems with the `${years} ${t.years}` this replaces. It read "1 yrs",
+ * because English pluralises and a template string does not. And for the
+ * patients this app most needs to get right it was close to uninformative: an
+ * under-two rounded to whole years is "1", which covers a child who can barely
+ * sit up and one who is running, and every clinical threshold between them.
+ *
+ * So: months up to two years, then years. Months only when a real birth date is
+ * known — an `approximateAge` of 1 is a guess in years and reporting it as "12
+ * months" would invent a precision nobody gave.
+ */
+export function formatAge(
+  patient: Pick<Patient, 'birthDate' | 'approximateAge'>,
+  t: Strings,
+  now = Date.now(),
+): string | undefined {
+  if (patient.birthDate) {
+    const born = new Date(patient.birthDate).getTime()
+    if (Number.isFinite(born) && born <= now) {
+      const months = Math.floor((now - born) / (30.4369 * 86_400_000))
+      if (months < 24) return `${months} ${months === 1 ? t.unitMonth : t.unitMonths}`
+      const years = Math.floor((now - born) / 31_556_952_000)
+      return `${years} ${years === 1 ? t.unitYear : t.unitYears}`
+    }
+  }
+  const approx = patient.approximateAge
+  if (approx === undefined) return undefined
+  return `${approx} ${approx === 1 ? t.unitYear : t.unitYears}`
+}
+
+/** Whole years with the right ending, for the settings screens. */
+export function formatYears(years: number, t: Strings): string {
+  return `${years} ${years === 1 ? t.unitYear : t.unitYears}`
 }
 
 export function formatDateTime(ts: number, lang: LangCode): string {
