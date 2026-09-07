@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { AppShell } from '../components/AppShell'
 import { ActionBar, Button, Card, Field, Input, Select, SkeletonRows } from '../components/ui'
 import { db } from '../db/db'
 import { createPatient, updatePatient } from '../db/repo'
+import { DuplicateWarning } from '../components/DuplicateWarning'
+import { findDuplicates } from '../lib/duplicates'
 import { useI18n } from '../i18n'
 import { PATIENT_PACKS, patientLangCodes, type PatientLang } from '../i18n/patient'
 import { useCountryProfile } from '../lib/facility'
@@ -46,6 +48,40 @@ export function NewPatient() {
   const [preferredLang, setPreferredLang] = useState<PatientLang | ''>('')
   const [researchConsent, setResearchConsent] = useState<ConsentState>('notAsked')
   const [error, setError] = useState('')
+
+  /*
+   * Existing patients who might be this one.
+   *
+   * Recomputed from the live table rather than a snapshot, so a patient added
+   * on another device between opening the form and saving it is still caught.
+   * The whole register is walked in memory: a health post holds thousands of
+   * rows, not millions, and doing it here rather than through an index is what
+   * lets a swapped name or a misspelling match at all.
+   *
+   * Suppressed entirely while editing. Every field would match the record
+   * being edited, and warning someone that a patient is a duplicate of
+   * themselves is how a useful warning becomes noise.
+   */
+  const allPatients = useLiveQuery(() => (editing ? [] : db.patients.toArray()), [editing], [])
+  const duplicates = useMemo(
+    () =>
+      editing
+        ? []
+        : findDuplicates(
+            {
+              givenName,
+              familyName,
+              sex: sex === 'unknown' ? undefined : sex,
+              phone,
+              registerNo,
+              address,
+              approximateAge: Number.parseInt(approximateAge, 10) || undefined,
+              birthDate: birthDate || undefined,
+            },
+            allPatients ?? [],
+          ),
+    [editing, givenName, familyName, sex, phone, registerNo, address, approximateAge, birthDate, allPatients],
+  )
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
@@ -129,6 +165,11 @@ export function NewPatient() {
   return (
     <AppShell title={editing ? t.editPatient : t.newPatient} showBack>
       <div className="flex max-w-3xl flex-col gap-4 pb-4">
+        {/* Above the form, not beside the save button: it is information for
+            the person filling this in, and it is only useful before they
+            finish rather than as an objection at the end. */}
+        <DuplicateWarning matches={duplicates} />
+
         <Card className="relative overflow-hidden p-5 sm:p-6">
           <div className="pointer-events-none absolute -top-16 -right-12 size-40 rounded-full bg-brand-100/80 blur-2xl" />
           <div className="relative grid gap-4 sm:grid-cols-2">
