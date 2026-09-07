@@ -1,9 +1,9 @@
 import { Link } from 'react-router'
-import { UserSearch } from 'lucide-react'
+import { ArrowRight, UserSearch } from 'lucide-react'
 import { Card, cx } from './ui'
 import { useI18n } from '../i18n'
 import type { DuplicateMatch, DuplicateReason } from '../lib/duplicates'
-import { ageOf } from '../lib/duplicates'
+import { formatAge } from '../lib/format'
 
 /**
  * "This might already be in the register."
@@ -50,41 +50,50 @@ export function DuplicateWarning({ matches }: { matches: DuplicateMatch[] }) {
 
       <ul className="flex flex-col gap-2">
         {matches.map((match) => {
-          const age = ageOf(match.patient)
+          const age = formatAge(match.patient, t)
           return (
             <li key={match.patient.id}>
+              {/*
+                One left-aligned stack, not a row.
+
+                This was a text block beside a right-hand "Open this record"
+                label, and the label was centred against three lines of
+                wrapping text, so it floated in the middle of the card with
+                nothing to align to while the reason wrapped around it. Reading
+                order here is name, then age, then why it matched, then what to
+                do about it, and each of those is a full-width line.
+              */}
               <Link
                 to={`/patient/${match.patient.id}`}
-                className="surface-card press flex items-center gap-3 rounded-field p-3"
+                className="surface-card press block rounded-field p-3"
               >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold text-ink">
-                    <span className="font-extrabold">{match.patient.familyName}</span>{' '}
-                    {match.patient.givenName}
-                  </p>
-                  <p className="mt-0.5 text-sm text-ink-3">
-                    {[
-                      age !== undefined ? `${age} ${t.years}` : null,
-                      match.patient.registerNo ? `${t.registerNo} ${match.patient.registerNo}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                  {/* The evidence, not a verdict. */}
-                  <p
-                    className={cx(
-                      'mt-1 text-[0.8125rem] font-medium',
-                      match.confidence === 'likely' ? 'text-warn-700' : 'text-ink-3',
-                    )}
-                  >
-                    {match.confidence === 'likely' ? t.duplicateLikely : t.duplicatePossible}
-                    {': '}
-                    {match.reasons.map((reason) => t[REASON_KEYS[reason]]).join(', ')}
-                  </p>
-                </div>
-                <span className="shrink-0 text-sm font-semibold text-brand-700">
+                <p className="truncate text-base font-semibold text-ink">
+                  <span className="font-extrabold">{match.patient.familyName}</span>{' '}
+                  {match.patient.givenName}
+                </p>
+                <p className="mt-0.5 text-sm text-ink-3">
+                  {[
+                    age,
+                    match.patient.registerNo ? `${t.registerNo} ${match.patient.registerNo}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                {/* The evidence, not a verdict. */}
+                <p
+                  className={cx(
+                    'mt-1.5 text-[0.8125rem] leading-snug font-medium',
+                    match.confidence === 'likely' ? 'text-warn-700' : 'text-ink-3',
+                  )}
+                >
+                  {match.confidence === 'likely' ? t.duplicateLikely : t.duplicatePossible}
+                  {': '}
+                  {match.reasons.map((reason) => t[REASON_KEYS[reason]]).join(', ')}
+                </p>
+                <p className="mt-2 flex items-center gap-1 text-sm font-semibold text-brand-700">
                   {t.duplicateOpen}
-                </span>
+                  <ArrowRight size={15} className="shrink-0" />
+                </p>
               </Link>
             </li>
           )
