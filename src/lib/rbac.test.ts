@@ -12,7 +12,7 @@
  * cannot is the whole control.
  */
 import 'fake-indexeddb/auto'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { db } from '../db/db'
 import { setCurrentActor } from './audit'
 import { PermissionError, can, requirePermission } from './identity'
@@ -22,6 +22,7 @@ import { deletePatient } from '../db/repo'
 import { setSyncSettings, unenrolDevice } from './sync'
 import { clearAllData } from '../db/seed'
 import type { Patient } from '../db/schema'
+import { openTestVault } from '../test/vault'
 
 const patient = (): Patient => ({
   id: 'p1',
@@ -34,6 +35,11 @@ const patient = (): Patient => ({
   createdAt: 0,
   updatedAt: 0,
 })
+
+// Every clinical table refuses to be written while the vault is locked, so a
+// suite that writes one has to open it. See src/db/encryption.test.ts, where
+// that refusal is the thing being asserted.
+beforeAll(() => openTestVault())
 
 beforeEach(async () => {
   await db.delete()

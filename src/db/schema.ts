@@ -222,6 +222,9 @@ export type AuditAction =
   | 'sync'
   | 'account.create'
   | 'account.disable'
+  // Setting somebody else's PIN also hands them the key to the records, so it
+  // is an access grant and not merely a credential change.
+  | 'account.pin'
   | 'device.enrol'
   | 'device.unenrol'
   | 'facility.configure'

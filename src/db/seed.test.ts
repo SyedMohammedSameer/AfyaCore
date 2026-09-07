@@ -8,7 +8,7 @@
  * patient was six years old, so the chart could not appear in a demo at all.
  * Nothing in the type system connects those two facts. This does.
  */
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import 'fake-indexeddb/auto'
 import { db } from './db'
 import { seedDemoData } from './seed'
@@ -16,10 +16,16 @@ import { setCurrentActor } from '../lib/audit'
 import { ageDaysAt } from '../components/GrowthPanel'
 import { assess, MAX_AGE_DAYS, type GrowthIndicator } from '../lib/growth'
 import { WHO_GROWTH, type GrowthStandard } from '../data/whoGrowth'
+import { openTestVault } from '../test/vault'
 
 setCurrentActor('test-admin', 'admin')
 
 const STANDARDS = WHO_GROWTH as unknown as Record<GrowthIndicator, GrowthStandard>
+
+// Every clinical table refuses to be written while the vault is locked, so a
+// suite that writes one has to open it. See src/db/encryption.test.ts, where
+// that refusal is the thing being asserted.
+beforeAll(() => openTestVault())
 
 beforeEach(async () => {
   await db.patients.clear()

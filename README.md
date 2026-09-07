@@ -19,7 +19,8 @@
 </p>
 
 > **Status: pilot candidate, `0.0.2`.** Not yet validated with a facility or an NGO, and no clinician
-> has used it. Records are stored unencrypted on the device, and on-device speech recognition ships
+> has used it. Records are encrypted at rest on the device but not on the sync server, and on-device
+> speech recognition ships
 > but its accuracy on clinical French has not been measured by us. An external review in September 2026
 > found five release blockers — dictation sending audio off-device while the docs claimed otherwise,
 > rejected sync records silently marked as synced, "anonymous" exports that were still linkable,
@@ -409,9 +410,30 @@ identity is a gate in front of the whole app rather than a guard on each screen.
 - **Five wrong attempts** locks the device for five minutes, and 0000, 1111 and 1234 are refused at
   the point they are chosen, which is what makes five attempts a real limit.
 
-Stated plainly: **a 4-digit PIN is not what protects the records** from someone who takes the phone
-away and has time. Device encryption is. What the PIN does is bind attribution and stop the casual
-case. `SECURITY.md` says the same thing in the same words.
+### The records are encrypted with it
+
+Every clinical row on the device is AES-GCM ciphertext. One random 256-bit data key encrypts the
+patient, encounter, attachment and audit tables; each member of staff holds their own copy of it,
+wrapped under a key derived from their PIN with 600,000 rounds of PBKDF2. The key exists in memory
+for the length of a session and nowhere else, so signing out, the idle timeout and closing the tab
+all drop it, and the phone goes back to holding ciphertext.
+
+Adding a colleague wraps the key again rather than re-encrypting the database, changing a PIN
+rewrites one wrap, and disabling an account deletes theirs — so a departure takes effect that
+evening rather than at the next sync. An account with no wrap signs in and reads nothing, and is
+told so; the only way it gets a key is somebody who already holds one setting its PIN, which is a
+property rather than an inconvenience.
+
+Ids and timestamps stay in the clear, because the sync badge, the retention purge and the roster's
+first page all have to work without decrypting the register. That leaks shape — how many
+consultations, on which days, how far behind sync — and nothing else. The four indexes that made
+patient names searchable on disk are gone, and the roster's search decrypts in memory to pay for it.
+
+Stated plainly: **a 4-digit PIN is still the weak link.** 600k PBKDF2 rounds put an offline search
+of 10,000 candidates in the hours, not the years; six digits moves it to months. Encryption at rest
+raises the floor from "anyone who can read the file" to "anyone who can guess the PIN", and full-disk
+encryption is still worth having under it. What the PIN does beyond that is bind attribution and
+stop the casual case. `docs/COMPLIANCE.md` says the same thing in the same words.
 
 Every write is appended to a hash-chained audit log, on the device and again on the server. Entries
 name a record id and a field list, never clinical content: an audit log that quotes the note it
@@ -750,9 +772,11 @@ much quieter bug than a wrong one.
 - ⚠️ **The audit chain detects tampering, it does not prevent it.** A hash chain makes an edited or
   deleted entry visible, but anyone who can rewrite the whole chain leaves no trace. Recording the
   head hash off the device is the mitigation, and it is manual.
-- ⚠️ **Records are not encrypted at rest.** IndexedDB on the device and SQLite on the server are both
-  plain text, so an unlocked phone or the server's filesystem gives up the roster. Device encryption
-  is the only thing protecting them today.
+- ⚠️ **The server is not encrypted at rest.** The device is: IndexedDB holds AES-GCM ciphertext
+  under a PIN-wrapped key. SQLite on the sync server is still plain text, so the server's filesystem
+  gives up every record a facility has pushed, and the deployer's disk encryption is the only thing
+  under it. The device half also inherits the strength of a 4-to-12 digit PIN, which is real but
+  finite: 600k PBKDF2 rounds make an offline search of a 4-digit PIN a matter of hours.
 - ⚠️ **Erasure is still a tombstone.** `deletePatient` destroys the attachment photographs but leaves
   the patient and encounter rows as tombstones on both the device and the server — correct for sync
   convergence, wrong for a data-subject erasure request, which wants the clinical content gone from

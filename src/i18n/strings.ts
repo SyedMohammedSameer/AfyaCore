@@ -138,6 +138,10 @@ export interface Strings {
   pinMismatch: string
   pinWrong: string
   pinLockedOut: string
+  pinNoKey: string
+  staffNoKey: string
+  setPin: string
+  setPinFor: string
   attemptsRemaining: string
   pinPolicy: Record<'too_short' | 'too_long' | 'not_numeric' | 'sequential' | 'repeated', string>
   createAccount: string
@@ -447,6 +451,11 @@ const fr: Strings = {
   pinMismatch: 'Les deux codes ne correspondent pas.',
   pinWrong: 'Code incorrect.',
   pinLockedOut: 'Trop de tentatives. Appareil bloqué pendant',
+  pinNoKey:
+    'Code correct, mais ce compte n’a pas la clé des dossiers de cet appareil. Un administrateur doit redéfinir votre code ici.',
+  staffNoKey: 'Sans clé : redéfinissez son code pour lui donner accès aux dossiers.',
+  setPin: 'Redéfinir le code',
+  setPinFor: 'Nouveau code pour {name}',
   attemptsRemaining: 'essai(s) restant(s).',
   pinPolicy: {
     too_short: 'Le code doit comporter au moins 4 chiffres.',
@@ -750,6 +759,11 @@ const mg: Strings = {
   pinMismatch: 'Tsy mitovy ny kaody roa.',
   pinWrong: 'Diso ny kaody.',
   pinLockedOut: 'Betsaka loatra ny fanandramana. Voahidy ny finday mandritra ny',
+  pinNoKey:
+    'Marina ny kaody, fa tsy manana ny lakilen’ny rakitra amin’ity finday ity ity kaonty ity. Mila mpitantana hanova ny kaodinao eto.',
+  staffNoKey: 'Tsy manana lakile: ovay ny kaodiny mba hahazoany miditra amin’ny rakitra.',
+  setPin: 'Ovay ny kaody',
+  setPinFor: 'Kaody vaovao ho an’i {name}',
   attemptsRemaining: 'fanandramana sisa.',
   pinPolicy: {
     too_short: 'Tsy maintsy isa 4 farafahakeliny ny kaody.',
@@ -1052,6 +1066,11 @@ const en: Strings = {
   pinMismatch: 'The two PINs do not match.',
   pinWrong: 'Wrong PIN.',
   pinLockedOut: 'Too many attempts. Device locked for',
+  pinNoKey:
+    'PIN is correct, but this account has no key to the records on this device. An administrator must set your PIN here.',
+  staffNoKey: 'No key: set their PIN to give them access to the records.',
+  setPin: 'Set PIN',
+  setPinFor: 'New PIN for {name}',
   attemptsRemaining: 'attempt(s) left.',
   pinPolicy: {
     too_short: 'The PIN must be at least 4 digits.',

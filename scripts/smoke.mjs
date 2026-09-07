@@ -151,6 +151,19 @@ async function main() {
   const page = await browser.newPage()
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true })
 
+  /*
+   * Uncaught exceptions in the page fail the walk.
+   *
+   * Added after encryption at rest: a `.filter()` on an encrypted table throws
+   * `CursorUnsupportedError`, and React swallowed it into an empty list. The
+   * home screen rendered with no recent patients and every assertion here
+   * still passed. A screen that silently shows nothing is precisely the
+   * failure this walk exists to catch, so page errors are now collected and
+   * reported at the end rather than going to a console nobody reads.
+   */
+  const pageErrors = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+
   console.log(`AfyaCore offline smoke walk against ${BASE}\n`)
 
   try {
@@ -168,7 +181,10 @@ async function main() {
         await inputs[i].type(values[i])
       }
       await clickText(page, 'button', /create account/)
-      assert((await page.$('main')) !== null, 'did not reach the app')
+      // Waits rather than asserts immediately: creating the first account now
+      // also creates this device's data key, and wrapping it is 600k rounds of
+      // PBKDF2 — deliberately close to a second on the hardware this targets.
+      await waitForShell(page, 'did not reach the app')
     })
 
     await step('registers a service worker', async () => {
@@ -278,6 +294,9 @@ async function main() {
       await page.reload({ waitUntil: 'networkidle2' })
       await settle(page)
       assert((await page.$('[data-lock]')) !== null || (await page.$('main')) !== null, 'app broken after reconnect')
+    })
+    await step('threw nothing at the page along the way', async () => {
+      assert(pageErrors.length === 0, `uncaught in page: ${pageErrors.join(' | ')}`)
     })
   } catch {
     /* the failing step has already been recorded */

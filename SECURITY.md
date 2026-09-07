@@ -27,13 +27,25 @@ stops being true.
 | Gap | Impact | Status |
 |---|---|---|
 | **The audit chain is single-server** | A hash chain makes tampering detectable, not impossible. An administrator with filesystem access can rewrite the whole chain. | Mitigate by recording the head hash off-box; anchoring is not automated. |
-| **No encryption at rest** | Records sit in IndexedDB and in the server's SQLite file in plain text. Anyone with the unlocked device or the server's filesystem can read them | Relies on device and disk encryption |
+| **No encryption at rest on the server** | The device is encrypted; the server is not. Records sit in the server's SQLite file in plain text, so its filesystem gives up every record a facility has pushed. A server has no PIN to derive a key from, and a key stored beside the database it opens would not be protection. | Relies on the deployer's disk encryption |
+| **A PIN is a small key space** | Device encryption is only as strong as the PIN that wraps it. 600 000 PBKDF2 rounds put an offline search of a 4-digit PIN in the hours and a 6-digit one in the months — real cost, not an impossibility. | Choose 6 digits or more; full-disk encryption underneath still helps |
+| **Staff names and settings stay readable on the device** | The sign-in screen lists accounts before anyone has typed a PIN, so there is no key available to read them with, and the wrapped data key has to live somewhere readable. Clinical records are encrypted; who works at the facility is not. | Accepted and documented, see `docs/COMPLIANCE.md` §2.1 |
 | **No transport security by default** | The sync server speaks plain HTTP unless `AFYACORE_TLS_CERT`/`AFYACORE_TLS_KEY` are set. Put it behind a TLS-terminating reverse proxy, or set those. | Deployer's responsibility, and the server says so on boot |
 | **Deleting a confirmed consultation changes figures already reported** | A monthly aggregate re-exported after a deletion will not match what was submitted | Warned in the UI, not enforced |
 
 ## What the app does protect
 
 These are implemented and tested, and are the parts you can rely on:
+
+- **Clinical records are encrypted at rest on the device.** Patients,
+  consultations, photographs and the audit log are AES-GCM ciphertext under one
+  random 256-bit key. Each account holds that key wrapped under their own PIN
+  (PBKDF2-SHA256, 600 000 iterations, AES-KW); the unwrapped key lives in memory
+  for the length of a session and is dropped on sign-out, on the idle timeout
+  and when the tab closes. A phone found on a desk holds ciphertext. Disabling
+  an account deletes its wrap, so a departure takes effect immediately rather
+  than at the next sync, and an account with no wrap is refused with an
+  explanation rather than being told its PIN is wrong.
 
 - **Records never leave the device without an explicit action.** There is no
   telemetry, no analytics and no crash reporting. Outbound requests are: the

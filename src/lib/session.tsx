@@ -11,6 +11,7 @@ import {
 import type { Clinician, Role } from '../db/schema'
 import { recordAudit, setCurrentActor } from './audit'
 import { can, getIdleTimeoutMs, type Permission } from './identity'
+import { lockVault } from './vault'
 
 /**
  * Who is signed in on this device, and for how much longer.
@@ -78,6 +79,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setClinician(null)
       setCurrentActor(undefined)
       if (current) {
+        // Record the sign-out *before* dropping the key: the audit table is
+        // encrypted too, so an entry written after the vault closes cannot be
+        // written at all, and the last thing the log would show is the
+        // sign-in it never ended.
         await recordAudit({
           actorId: current.id,
           action: 'signout',
@@ -86,6 +91,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           detail: reason,
         })
       }
+      /*
+       * The records close with the session.
+       *
+       * This is what makes the lock screen more than a curtain: after this
+       * line the data key exists nowhere, and the phone holds AES-GCM
+       * ciphertext until somebody types a PIN. The idle timeout below calls
+       * the same function, so a device left on a desk closes itself.
+       */
+      lockVault()
     },
     [clinician],
   )

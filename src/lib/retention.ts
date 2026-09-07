@@ -116,7 +116,12 @@ export async function retentionStatus(now = Date.now()): Promise<RetentionStatus
   if (years === null) return { years: null, source, eligible: 0, blockedUnsynced: 0 }
 
   const cutoff = retentionCutoff(years, now)
-  const old = await db.encounters.filter((e) => e.occurredAt < cutoff && e.status === 'final').toArray()
+  // By index, then by predicate. `occurredAt` is plaintext, so seeking on it
+  // narrows the set before anything is decrypted; filtering on `status` after
+  // the fetch decrypts only the records old enough to be candidates rather
+  // than the whole history.
+  const aged = await db.encounters.where('occurredAt').below(cutoff).toArray()
+  const old = aged.filter((e) => e.status === 'final')
 
   return {
     years,
@@ -152,9 +157,10 @@ export async function purgeExpired(now = Date.now()): Promise<PurgeResult> {
   const result: PurgeResult = { encounters: 0, attachments: 0, patients: 0 }
 
   await db.transaction('rw', db.encounters, db.attachments, db.patients, db.audit, async () => {
-    const doomed = await db.encounters
-      .filter((e) => e.occurredAt < cutoff && e.status === 'final' && e.syncedAt !== undefined)
-      .toArray()
+    // Same shape as `retentionStatus`: seek on the plaintext `occurredAt`
+    // index, then apply the clinical conditions in JS on the decrypted rows.
+    const aged = await db.encounters.where('occurredAt').below(cutoff).toArray()
+    const doomed = aged.filter((e) => e.status === 'final' && e.syncedAt !== undefined)
 
     const touchedPatients = new Set<string>()
     for (const encounter of doomed) {

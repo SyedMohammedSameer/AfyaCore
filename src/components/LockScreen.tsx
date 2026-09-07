@@ -7,12 +7,11 @@ import { useSession } from '../lib/session'
 import {
   activeClinicians,
   checkPinPolicy,
-  createClinician,
   lockoutState,
   needsFirstAccount,
-  signIn as attemptSignIn,
   type LockoutState,
 } from '../lib/identity'
+import { enrolClinician, unlockDevice } from '../lib/unlock'
 import { recordAudit } from '../lib/audit'
 import { db } from '../db/db'
 import type { Clinician } from '../db/schema'
@@ -92,7 +91,7 @@ function FirstAccountForm({ onCreated }: { onCreated: () => void }) {
 
     setBusy(true)
     try {
-      const id = await createClinician({ name, role: 'admin', pin })
+      const id = await enrolClinician({ name, role: 'admin', pin })
       await recordAudit({
         actorId: id,
         action: 'account.create',
@@ -184,13 +183,29 @@ function SignInForm() {
     setBusy(true)
     setError(null)
     try {
-      const result = await attemptSignIn(selected, pin)
+      const result = await unlockDevice(selected, pin)
       setLockout(result.lockout)
       if (result.ok && result.clinician) {
         await signIn(result.clinician)
         return
       }
       setPin('')
+
+      /*
+       * A right PIN with no key is not a wrong PIN, and must not read like one.
+       *
+       * The account exists, the PIN is correct, and the records on this device
+       * were encrypted before this person had an account — or their copy of the
+       * key was revoked. Telling them "wrong PIN" would send them to try their
+       * other PINs until the device locks them out over something they cannot
+       * fix. What fixes it is an administrator setting their PIN here, which is
+       * what the message says.
+       */
+      if (result.reason === 'no_key') {
+        setError(t.pinNoKey)
+        return
+      }
+
       // Logged with the account that was *attempted*, which is what makes a
       // pattern of failures against one person's account visible at all.
       await recordAudit({

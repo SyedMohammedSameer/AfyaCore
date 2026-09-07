@@ -10,7 +10,7 @@
  * (via `fake-indexeddb`), because the properties worth checking here are about
  * what ends up in the local store.
  */
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import 'fake-indexeddb/auto'
 import { db } from '../db/db'
 import {
@@ -23,6 +23,7 @@ import {
 } from './sync'
 import type { Encounter, Patient } from '../db/schema'
 import { setCurrentActor } from './audit'
+import { openTestVault } from '../test/vault'
 
 const SERVER = 'https://sync.example.org'
 
@@ -67,6 +68,11 @@ const encounter = (over: Partial<Encounter> = {}): Encounter => ({
 })
 
 const emptyPull = { cursor: 0, pushed: 0, conflicts: [], changes: { patients: [], encounters: [] } }
+
+// Every clinical table refuses to be written while the vault is locked, so a
+// suite that writes one has to open it. See src/db/encryption.test.ts, where
+// that refusal is the thing being asserted.
+beforeAll(() => openTestVault())
 
 beforeEach(async () => {
   // Service boundaries now enforce the permission matrix, so a test that
