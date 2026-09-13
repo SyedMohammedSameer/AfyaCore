@@ -78,6 +78,8 @@ export interface StudioStrings {
   flagLine: string
   /** Composed with {caught}, {wrong}, {flagged} and {produced}. */
   flagBody: string
+  /** Re-run the check for an installed speech model. */
+  recheck: string
 }
 
 export interface Strings {
@@ -497,7 +499,8 @@ const fr: Strings = {
     "sourceHint": "Dépliez un champ pour consulter la phrase exacte utilisée par l’extracteur.",
     "confidence": "Confiance",
     "flagLine": "Ce que l’application avait signalé :",
-    "flagBody": "{caught} des {wrong} valeurs erronées portaient la mention « À vérifier », sur {flagged} champs signalés parmi les {produced} produits. Le seuil est mesuré, pas choisi : voir npm run eval:asr."
+    "flagBody": "{caught} des {wrong} valeurs erronées portaient la mention « À vérifier », sur {flagged} champs signalés parmi les {produced} produits. Le seuil est mesuré, pas choisi : voir npm run eval:asr.",
+    "recheck": "Vérifier à nouveau"
 },
   appName: 'AfyaCore',
   patients: 'Patients',
@@ -895,7 +898,8 @@ const mg: Strings = {
     "sourceHint": "Sokafy ny saha hijerena ny fehezanteny nampiasain’ny mpamaky.",
     "confidence": "Fatokisana",
     "flagLine": "Izay nomarihin’ny rindrambaiko:",
-    "flagBody": "{caught} amin’ny {wrong} sanda diso no nanana marika « Hamarino », tamin’ny {flagged} saha voamarika amin’ny {produced} novokarina. Nomarinina ny fetra, tsy nofidiana fotsiny: jereo npm run eval:asr."
+    "flagBody": "{caught} amin’ny {wrong} sanda diso no nanana marika « Hamarino », tamin’ny {flagged} saha voamarika amin’ny {produced} novokarina. Nomarinina ny fetra, tsy nofidiana fotsiny: jereo npm run eval:asr.",
+    "recheck": "Hamarino indray"
 },
   appName: 'AfyaCore',
   patients: 'Marary',
@@ -1292,7 +1296,8 @@ const en: Strings = {
     "sourceHint": "Expand a field to inspect the exact phrase used by the extractor.",
     "confidence": "Confidence",
     "flagLine": "What the app had flagged:",
-    "flagBody": "{caught} of the {wrong} wrong values carried a Check this label, across {flagged} flagged fields of the {produced} produced. The threshold is measured, not chosen: see npm run eval:asr."
+    "flagBody": "{caught} of the {wrong} wrong values carried a Check this label, across {flagged} flagged fields of the {produced} produced. The threshold is measured, not chosen: see npm run eval:asr.",
+    "recheck": "Check again"
 },
   appName: 'AfyaCore',
   patients: 'Patients',

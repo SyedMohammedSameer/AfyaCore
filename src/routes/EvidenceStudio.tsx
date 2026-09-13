@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowRight, Check, ChevronDown, Cpu, Download, FlaskConical, Play, RotateCcw, ShieldCheck, Square, Waves, Wifi, WifiOff } from 'lucide-react'
 import { AppShell, useOnline } from '../components/AppShell'
 import { Button, Card, Field, Select, TextArea, cx } from '../components/ui'
@@ -81,11 +81,42 @@ export function EvidenceStudio() {
   const audioCase = caseIndex === 0
   const clinicalLocale = CLINICAL_LOCALES[locale]
 
-  useEffect(() => {
-    let mounted = true
-    void installedPack().then((found) => { if (mounted) { setPack(found); setProbing(false) } })
-    return () => { mounted = false; generation.current++; recogniser.current?.dispose() }
+  /*
+   * Whether a speech pack is installed, asked again whenever the answer could
+   * have changed rather than once at mount.
+   *
+   * It used to run once. A tab opened while a deploy was still building saw no
+   * pack, and went on saying so after the deploy that ships the model had
+   * finished, with the button disabled, until somebody thought to reload. Now
+   * the check reruns when the tab comes back into view, when the window regains
+   * focus, and on demand, so the screen recovers the moment the pack is there.
+   * The manifest it reads is NetworkFirst in the service worker, so a recheck
+   * really does ask the server.
+   */
+  const mounted = useRef(true)
+  const probe = useCallback(() => {
+    setProbing(true)
+    void installedPack().then((found) => {
+      if (!mounted.current) return
+      setPack(found)
+      setProbing(false)
+    })
   }, [])
+
+  useEffect(() => {
+    mounted.current = true
+    probe()
+    const onVisible = () => { if (document.visibilityState === 'visible') probe() }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', probe)
+    return () => {
+      mounted.current = false
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', probe)
+      generation.current++
+      recogniser.current?.dispose()
+    }
+  }, [probe])
 
   const extraction = useMemo(() => extractClinical(edited, clinicalLocale), [edited, clinicalLocale])
   const rows = useMemo(() => compareEvidence(caseData.expect, extraction), [caseData, extraction])
@@ -188,7 +219,12 @@ export function EvidenceStudio() {
             </div>
             <div className="rounded-field border border-line bg-sunken p-4"><div className="mb-3 flex items-center gap-2 text-xs font-semibold text-brand-700">{audioCase ? <Waves size={16} /> : <FlaskConical size={16} />}{audioCase ? s.audio : s.text}</div>{audioCase && <audio key={locale} controls preload="none" src={sampleUrl(locale)} className="mb-3 w-full" aria-label={s.reference} />}<p className="text-xs leading-relaxed text-ink-3">{audioCase ? s.audioHint : s.textHint}</p></div>
             <details open className="studio-reference"><summary className="cursor-pointer text-xs font-semibold text-ink-3">{s.reference}</summary><p className="mt-3 text-sm leading-7 text-ink-2">{caseData.text}</p></details>
-            {audioCase && !pack && !probing && <p role="status" className="text-sm text-warn-700">{s.noModel}</p>}
+            {audioCase && !pack && !probing && (
+              <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-warn-700">
+                <p className="min-w-0 flex-1">{s.noModel}</p>
+                <Button variant="secondary" icon={<RotateCcw size={14} />} onClick={probe}>{s.recheck}</Button>
+              </div>
+            )}
             <Button full icon={busy ? <Square size={16} /> : <Play size={16} />} disabled={!busy && audioCase && (probing || !pack)} onClick={busy ? cancel : () => void execute()}>{busy ? s.cancel : audioCase ? s.run : s.runText}</Button>
             <p className="flex items-center gap-2 text-xs text-ink-3"><Cpu size={13} />{audioCase ? `${s.model}: ${pack ?? '—'} · WASM` : s.text}</p>
           </Card>
