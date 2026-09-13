@@ -70,3 +70,8 @@ SPEED=1 NARRATION=1 node video/render.mjs out/afyacore-ml4h.mp4
   three minutes of the demonstration.
 - [ ] Bring the phone with the models already placed on a local origin: a conference network
   will not carry 150 MB of model files in the five minutes before a slot.
+- [ ] Open the deployed URL once from a device that has never seen it and press **Run local
+  speech model**. Netlify now builds with `npm run build:deploy`, so the deployment ships the
+  speech pack and a reviewer following the link runs the model rather than reading that they
+  could have. If the hub was unreachable during that build the Studio will say the pack is
+  missing, which is the one failure worth catching before a reviewer does.

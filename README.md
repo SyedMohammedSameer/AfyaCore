@@ -657,6 +657,24 @@ npm run build      # vendor OCR assets + typecheck + production build
 npm run preview    # serve the production build
 ```
 
+### The public demo carries the speech model; a facility's deployment need not
+
+`npm run build` deliberately leaves the speech and de-identification models out.
+A facility places them on its own origin once with `npm run vendor:whisper`, which is the right
+default: they are large, they are optional, and a build that fetches 78 MB from a model hub is a
+build that fails wherever the hub is blocked, which includes the connections this project exists
+for.
+
+A public demonstration wants the opposite. Somebody opening the deployed URL and pressing **Run
+local speech model** should watch the model run, not read a note explaining that it could have. So
+Netlify builds with `npm run build:deploy`, which fetches the pack first and then builds. It is
+best effort: if the hub is unreachable the build continues without it, the Studio says the pack is
+missing and keeps its text-only cases working, and the site still deploys.
+
+The bill for that, stated so the next person can weigh it: about 113 MB added to the deploy, a
+slower build because Netlify does not persist `.cache/`, and roughly 100 MB of bandwidth for each
+visitor who actually runs a case, once, since the service worker keeps it afterwards.
+
 `npm run build` runs `scripts/vendor-ocr.mjs` first, which copies the Tesseract runtime out of
 `node_modules` and fetches the French model into `public/ocr/`. Those files are ~7 MB and are **not
 committed**, they are regenerated at build time, and the fetched model is cached in `.cache/`.

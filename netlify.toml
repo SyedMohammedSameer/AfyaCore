@@ -1,5 +1,26 @@
 [build]
-  command = "npm run build"
+  # `build:deploy`, not `build`: it fetches the on-device speech model before
+  # bundling, so the deployed Evidence Studio can actually run inference.
+  #
+  # The model is not in the repository. It is ~78 MB of ONNX weights plus the
+  # 35 MB ONNX Runtime core, both gitignored, and a facility is expected to
+  # place them on its own origin with `npm run vendor:whisper`. That is the
+  # right default for a deployment and the wrong one for a public demo, where
+  # a reviewer opening this URL and pressing "Run local speech model" should
+  # see the model run rather than a note explaining that it could have.
+  #
+  # Deliberately best effort. If the Hub is unreachable the download fails,
+  # the build continues without the pack, and the Studio says so and keeps its
+  # text-only cases working. A demo that degrades is better than a site that
+  # does not deploy.
+  #
+  # Costs, so the next person can weigh them: about 113 MB added to the
+  # deploy, a slower build because Netlify does not persist `.cache/`, and
+  # roughly 100 MB of bandwidth for each visitor who actually runs a case,
+  # once, since the service worker keeps it afterwards. Add
+  # `node scripts/vendor-openmed.mjs ||` alongside it to ship the 70 MB
+  # de-identification model too; the deterministic scrub works without it.
+  command = "npm run build:deploy"
   publish = "dist"
 
 [build.environment]
@@ -42,6 +63,14 @@
 [[redirects]]
   from = "/ort/*"
   to = "/ort/:splat"
+  status = 404
+
+# The Evidence Studio's synthetic recordings, for the same reason. A missing
+# clip falling through to the catch-all hands `decodeAudioData` a page of HTML,
+# which it reports as a decode failure rather than a missing file.
+[[redirects]]
+  from = "/samples/*"
+  to = "/samples/:splat"
   status = 404
 
 # React Router owns client-side navigation. Without this, opening a patient

@@ -79,6 +79,12 @@ may change.
   caught at the point of entry rather than merged later.
 - **A recorded demonstration walk-through**, driven through the running app
   rather than composited from stills.
+- **The deployed demo ships the speech model.** Netlify builds with
+  `npm run build:deploy`, which fetches the pack before bundling, so a reviewer
+  opening the public URL and pressing the Studio's button watches the model run
+  instead of reading that it could have. Best effort: an unreachable hub leaves
+  the pack out, the Studio says so, and the site still deploys. A facility's own
+  build is unchanged and still places the models itself.
 - **An evidence workspace** (`/studio`). A reviewer picks a synthetic case,
   runs the vendored speech model on the device, and sees the transcript, the
   fields it produced, which of them match the reference, and what the app had

@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "vite",
     "build": "node scripts/vendor-ocr.mjs && tsc --noEmit && vite build",
+    "build:deploy": "node scripts/vendor-whisper.mjs || echo 'speech pack unavailable; deploying without it' ; npm run build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
