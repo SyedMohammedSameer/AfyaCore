@@ -56,6 +56,6 @@ npm run smoke:ml
 npm run screenshots
 ```
 
-Use the **production preview** for the ML demonstration. The current Vite development server blocks a dynamically imported public ONNX runtime module; the production build serves it correctly. Open `/studio`, run both languages while connected, then test the disconnected reload. A network indicator alone does not establish that no traffic occurred.
+Use the **production preview** for the ML demonstration, because it is what a facility deploys and what the offline walk exercises. *Resolved:* the dev server no longer blocks the models. It used to route ONNX Runtime's runtime `import()` of its WebAssembly core through the module pipeline, refuse it for living in `public/`, and put a full-screen error over the Studio's only button; `vite.config.ts` now serves `/ort/` directly in dev. Open `/studio`, run both languages while connected, then test the disconnected reload. A network indicator alone does not establish that no traffic occurred.
 
 `npm run samples:studio` regenerates the two new WAV inputs on macOS with Thomas and Daniel, at 170 words/minute. The sample manifest records reference text, case IDs and SHA-256 hashes. Existing sample recordings used in clinical capture are preserved.

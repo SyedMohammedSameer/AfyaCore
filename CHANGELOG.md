@@ -26,6 +26,12 @@ may change.
   same button then found that this runtime rewrites the quantised decoder
   into MatMulNBits at session creation and cannot read the vendored graph's
   layout; the session now keeps the graph's own DequantizeLinear nodes.
+- **No on-device model would run on the dev server.** ONNX Runtime locates its
+  WebAssembly core with a runtime `import()`, and Vite's dev server routed that
+  into `public/`, refused it on principle, and put a full-screen error over the
+  Evidence Studio's only button. It was written down as a known limitation of
+  the development server; it is a five-line middleware, and `npm run dev` now
+  runs the models.
 - **The speech worker was precached on every install.** A worker is bundled as
   its own graph, so it carried a second 545 KiB copy of transformers.js that
   the precache exclusion for the first copy did not match. It is fetched on

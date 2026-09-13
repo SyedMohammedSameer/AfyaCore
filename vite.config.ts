@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+import { extname, join } from 'node:path'
 import { defineConfig, type PluginOption } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -38,9 +40,64 @@ function excludeOnnxWasm(): PluginOption {
   }
 }
 
+/**
+ * Serve the vendored ONNX Runtime straight from `public/` during development.
+ *
+ * ONNX Runtime locates its WebAssembly core at runtime with a bare
+ * `import('/ort/ort-wasm-simd-threaded.asyncify.mjs')`. In a production build
+ * that is an ordinary request for a static file and it works. The dev server
+ * routes it through Vite's module pipeline instead, which resolves it into
+ * `public/`, refuses on principle, and answers with:
+ *
+ *   Failed to load url /ort/ort-wasm-simd-threaded.asyncify.mjs ... This file
+ *   is in /public and will be copied as-is during build ... and therefore
+ *   should not be imported from source code.
+ *
+ * So every on-device model failed on `npm run dev` and worked on
+ * `npm run preview`, which is a miserable thing to discover by pressing the
+ * only button on the Evidence Studio during a rehearsal. It was written down
+ * as a known limitation; it is a five-line middleware.
+ *
+ * Registered in the body of `configureServer` rather than in a returned
+ * function, which is what puts it ahead of Vite's own middlewares, so the
+ * request is answered before anything tries to transform it. Dev only: the
+ * build already copies these files verbatim.
+ */
+function serveVendoredRuntime(): PluginOption {
+  const TYPES: Record<string, string> = {
+    '.mjs': 'text/javascript',
+    '.js': 'text/javascript',
+    '.wasm': 'application/wasm',
+  }
+
+  return {
+    name: 'afyacore:serve-vendored-runtime',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split('?')[0]
+        if (!url?.startsWith('/ort/')) return next()
+        const file = join(process.cwd(), 'public', url)
+        // Never serve outside public/ort, whatever the request path claims.
+        if (!file.startsWith(join(process.cwd(), 'public', 'ort'))) return next()
+        readFile(file).then(
+          (body) => {
+            res.setHeader('Content-Type', TYPES[extname(file)] ?? 'application/octet-stream')
+            res.end(body)
+          },
+          // Not vendored on this machine. Falling through gives the app the
+          // 404 it already knows how to report.
+          () => next(),
+        )
+      })
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
     excludeOnnxWasm(),
+    serveVendoredRuntime(),
     react(),
     tailwindcss(),
     VitePWA({

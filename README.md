@@ -644,7 +644,7 @@ requested on launch so a phone low on space cannot silently evict a week of cons
 
 ```bash
 npm install
-npm run dev        # dev server
+npm run dev        # dev server, models included
 npm run sync       # sync server on :8787
 npm run admin      # server administration: facilities, enrolment codes, devices, audit
 npm test           # extraction, merge, FHIR, de-identification, auth and audit suites
