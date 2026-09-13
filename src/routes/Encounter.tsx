@@ -231,7 +231,7 @@ export function EncounterCapture() {
         <Button
           full
           icon={<Check size={20} />}
-          onClick={() => navigate(`/patient/${patientId}/encounter/${encounterId}/review`)}
+          onClick={() => navigate(`/patient/${patientId}/encounter/${encounterId}/review${isDraft ? "" : "?amend=1"}`)}
         >
           {isDraft ? t.review : t.saveCorrection}
         </Button>

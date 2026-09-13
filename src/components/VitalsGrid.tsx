@@ -1,5 +1,6 @@
 import { Activity, Camera, Gauge, Keyboard, Mic, Ruler, Scale, Thermometer, Wind } from 'lucide-react'
 import {
+  UNCERTAIN_BELOW,
   VITAL_RANGES,
   vitalSeverity,
   type CaptureSource,
@@ -42,7 +43,7 @@ export function ProvenanceChip({ provenance }: { provenance: FieldProvenance | u
 
   const Icon = SOURCE_ICON[provenance.source]
   const label = provenance.source === 'voice' ? t.sourceVoice : t.sourcePhoto
-  const uncertain = (provenance.confidence ?? 1) < 0.8
+  const uncertain = (provenance.confidence ?? 1) < UNCERTAIN_BELOW
 
   return (
     <span

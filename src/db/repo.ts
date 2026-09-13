@@ -1,7 +1,8 @@
 import { db } from './db'
 import { newId } from '../lib/id'
 import { requirePermission } from '../lib/identity'
-import { recordAudit } from '../lib/audit'
+import { getCurrentActor, recordAudit } from '../lib/audit'
+import { fieldSignature, machineFields, pendingReviews } from '../lib/fieldReview'
 import type { ConsentState, Encounter, FieldProvenance, Patient, Prescription, Vitals } from './schema'
 
 /** Strip diacritics and case so "Rakotoarisoa" and "RAKOTOÀRISOA" match. */
@@ -152,27 +153,65 @@ export async function patchEncounter(id: string, patch: EncounterPatch): Promise
   await db.transaction('rw', db.encounters, async () => {
     const existing = await db.encounters.get(id)
     if (!existing) throw new Error(`Encounter ${id} not found`)
-    await db.encounters.update(id, {
+    const next: Encounter = {
+      ...existing,
       ...patch,
       vitals: patch.vitals ? { ...existing.vitals, ...patch.vitals } : existing.vitals,
       provenance: patch.provenance ? { ...existing.provenance, ...patch.provenance } : existing.provenance,
+      updatedAt: Date.now(),
+      syncedAt: undefined,
+    }
+    // Status is deliberately left alone. A confirmed record being corrected
+    // stays confirmed (safety property 5 in the README); what a new machine
+    // value does is fall out of `fieldReviews`, so the review screen asks for
+    // it to be ticked again before the correction is saved.
+    await db.encounters.put(next)
+  })
+}
+
+/** Compare what the reviewer saw with the current row, in one transaction. */
+export async function reviewEncounterField(id: string, key: string, signature: string): Promise<void> {
+  const by = getCurrentActor()
+  if (!by) throw new Error('review-signin-required')
+  await db.transaction('rw', db.encounters, async () => {
+    const existing = await db.encounters.get(id)
+    if (!existing || existing.deletedAt !== undefined) throw new Error('review-record-missing')
+    if (!machineFields(existing).includes(key) || fieldSignature(existing, key) !== signature) {
+      throw new Error('review-field-changed')
+    }
+    await db.encounters.update(id, {
+      fieldReviews: { ...existing.fieldReviews, [key]: { signature, at: Date.now(), by } },
       updatedAt: Date.now(),
       syncedAt: undefined,
     })
   })
 }
 
-/** Promote a draft to a permanent record. The only place `status` becomes final. */
+/**
+ * Promote a draft to a permanent record, or save a correction to one.
+ *
+ * The only place `status` becomes final, and the gate that makes per-field
+ * review real: a record with a machine-entered value nobody has ticked is
+ * refused with `review-required`, whatever screen asked. The review UI
+ * disables its button first, but a disabled button is not a rule.
+ */
 export async function finaliseEncounter(id: string): Promise<void> {
-  const existing = await db.encounters.get(id)
-  await db.encounters.update(id, { status: 'final', updatedAt: Date.now(), syncedAt: undefined })
-  // Amending an already-final record is a different act from confirming a draft
-  // for the first time, and a reviewer asking "was this changed after it was
-  // signed off" needs the two to be distinguishable.
-  await recordAudit({
-    action: existing?.status === 'final' ? 'encounter.amend' : 'encounter.finalise',
-    subjectType: 'encounter',
-    subjectId: id,
+  await db.transaction('rw', db.encounters, db.audit, async () => {
+    const existing = await db.encounters.get(id)
+    if (!existing || existing.deletedAt !== undefined) throw new Error('review-record-missing')
+    if (pendingReviews(existing).length > 0) throw new Error('review-required')
+    await db.encounters.update(id, { status: 'final', updatedAt: Date.now(), syncedAt: undefined })
+    // Amending an already-final record is a different act from confirming a
+    // draft for the first time, and a reviewer asking "was this changed after
+    // it was signed off" needs the two to be distinguishable.
+    await recordAudit({
+      action: existing.status === 'final' ? 'encounter.amend' : 'encounter.finalise',
+      subjectType: 'encounter',
+      subjectId: id,
+      // A count, never a value. How many machine-entered fields were ticked
+      // is governance; what they held is the clinical record.
+      detail: `machineFieldsReviewed=${machineFields(existing).length}`,
+    })
   })
 }
 

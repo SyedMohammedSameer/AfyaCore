@@ -41,6 +41,21 @@ async function load(pack: string): Promise<Transcriber> {
     // fp16 graphs in these repos are the WebGPU path.
     dtype: 'q8',
     device: 'wasm',
+    session_options: {
+      /*
+       * Found by pressing the button on the production build. The ONNX
+       * Runtime build this transformers.js pins rewrites quantised
+       * MatMul nodes into MatMulNBits at session creation, and the vendored
+       * decoder graph is quantised in the older layout that rewrite does
+       * not understand: "TransposeDQWeightsForMatMulNBits: missing required
+       * scale for model.decoder.embed_tokens". The decoder then never
+       * opens, on every phone, while the panel says the model is installed.
+       * Leaving the graph's own DequantizeLinear and MatMul in place, which
+       * is what this switch does, costs some speed on a large matmul and
+       * gains a model that loads.
+       */
+      extra: { session: { disable_quant_qdq: '1' } },
+    },
   })
   return pipe as unknown as Transcriber
 }

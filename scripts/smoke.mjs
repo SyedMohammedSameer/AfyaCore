@@ -32,6 +32,7 @@ import puppeteer from 'puppeteer-core'
 import { findChrome, LAUNCH_ARGS } from './find-chrome.mjs'
 
 const BASE = process.env.AFYACORE_URL ?? 'http://localhost:4173'
+const WITH_ML = process.argv.includes('--with-ml')
 
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -140,6 +141,16 @@ async function visit(page, path, waitUntil = 'networkidle2') {
   await unlockIfNeeded(page)
 }
 
+async function runStudio(page, language) {
+  await page.select('main select', language)
+  await clickText(page, 'button', /^run local speech model$/)
+  await page.waitForSelector('textarea[aria-label="Reviewed transcript"]', { timeout: 120_000 })
+  const transcript = await page.$eval('textarea[aria-label="Reviewed transcript"]', (el) => el.value)
+  assert(transcript.trim().length > 20, 'model returned no usable transcript')
+  assert((await textOf(page)).includes('Download session JSON'), 'no measured result was rendered')
+  return transcript
+}
+
 async function main() {
   const executablePath = await findChrome()
   const browser = await puppeteer.launch({
@@ -204,6 +215,14 @@ async function main() {
       await sleep(800)
     })
 
+    const transcripts = {}
+    if (WITH_ML) {
+      await step('runs real French and English speech inference while online', async () => {
+        await visit(page, '/studio')
+        for (const lang of ['fr', 'en']) transcripts[lang] = await runStudio(page, lang)
+      })
+    }
+
     /* ---------------------------------------------------------------- *
      * Everything below runs with the network off.
      * ---------------------------------------------------------------- */
@@ -235,6 +254,16 @@ async function main() {
       await clickText(page, 'button', /^unlock$/)
       await waitForShell(page, 'could not unlock offline')
     })
+
+    if (WITH_ML) {
+      await step('recreates the speech worker and transcribes both cases after an offline reload', async () => {
+        await visit(page, '/studio', 'domcontentloaded')
+        for (const lang of ['fr', 'en']) {
+          const transcript = await runStudio(page, lang)
+          assert(transcript === transcripts[lang], `${lang}: offline model output differs from online output`)
+        }
+      })
+    }
 
     await step('opens the roster offline and sees the demo patients', async () => {
       await visit(page, '/patients', 'domcontentloaded')

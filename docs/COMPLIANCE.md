@@ -103,6 +103,14 @@ extraction can be traced back to what was actually said. It is therefore the
 single richest source of stray identifiers in the record, and the
 de-identifier scrubs it explicitly (§3.3).
 
+The **fieldReviews** field on an encounter, added with per-field review, holds
+for each machine-entered value the reviewing clinician's id, a time, and a
+snapshot of the value and its raw text as they stood when ticked. That is a
+second verbatim copy of the dictation and a staff-to-record linkage, on the
+device only. It is stripped from every de-identified export before the
+scrub runs (`deidentify()` sets it to `undefined`), and it travels to the sync
+server inside the record like the rest of the encounter (§2.2).
+
 ### 2.2 On the sync server (SQLite, unencrypted)
 
 `records` (patients and encounters, as JSON bodies, scoped by `facility_id`),

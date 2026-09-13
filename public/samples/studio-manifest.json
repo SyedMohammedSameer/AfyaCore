@@ -1,0 +1,23 @@
+{
+  "kind": "synthetic-tts",
+  "generator": "macOS say",
+  "rate": 170,
+  "samples": [
+    {
+      "locale": "fr",
+      "voice": "Thomas",
+      "caseId": "fr-01-basic",
+      "reference": "Motif fièvre depuis trois jours. Température trente-huit virgule cinq, pouls quatre-vingt-douze, tension douze sur huit. Diagnostic paludisme simple. Paracétamol 500 mg trois fois par jour pendant cinq jours.",
+      "file": "studio-fr.wav",
+      "sha256": "607ad7156dc3a020fc2e33e0e69a9d8ddf20f9d872015d39fc32f46b162d0baa"
+    },
+    {
+      "locale": "en",
+      "voice": "Daniel",
+      "caseId": "en-01-basic",
+      "reference": "Presenting complaint fever for three days. Temperature thirty-eight point five, pulse ninety-two, blood pressure 120 over 80. Diagnosis uncomplicated malaria. Paracetamol 500 mg tds for 5/7.",
+      "file": "studio-en.wav",
+      "sha256": "36a5f0a25db05ef13ee6fb982955fbde569709fa3c89e2f5e47c94cde36ecc53"
+    }
+  ]
+}

@@ -1,16 +1,17 @@
 import { Link, useNavigate, useParams } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { CalendarPlus, ClipboardList, FileText, Languages, MapPin, Merge, Pencil, Phone, Trash2 } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, CalendarPlus, ClipboardList, FileText, Languages, MapPin, Merge, Minus, Pencil, Phone, Trash2 } from 'lucide-react'
+import { Sparkline } from '../components/charts'
 import { AppShell } from '../components/AppShell'
 import { ActionBar, Avatar, Badge, Button, Card, EmptyState, MoreMenu, SectionTitle, SkeletonRows, cx, riseStyle } from '../components/ui'
 import { patientPack } from '../i18n/patient'
 import { db } from '../db/db'
 import { createDraftEncounter, deletePatient, patientEncounters } from '../db/repo'
-import { formatDate, formatVital, hasAnyVital, VITAL_ORDER, formatAge } from '../lib/format'
+import { formatDate, formatVital, hasAnyVital, VITAL_ORDER, formatAge, vitalLabel } from '../lib/format'
 import { vitalSeverity } from '../db/schema'
 import { useI18n } from '../i18n'
 import { GrowthPanel } from '../components/GrowthPanel'
-import type { Encounter } from '../db/schema'
+import type { Encounter, VitalKey } from '../db/schema'
 
 /**
  * One visit on the patient's timeline.
@@ -104,6 +105,76 @@ function TimelineEntry({
         )}
       </Link>
     </li>
+  )
+}
+
+/** Vitals worth a line, in the order a clinician asks about them at a follow-up. */
+const TREND_VITALS: VitalKey[] = ['weight', 'systolic', 'diastolic', 'temperature', 'pulse', 'oxygenSaturation']
+
+/**
+ * How each vital has moved across confirmed visits.
+ *
+ * The timeline answers "what happened last time"; this answers "which way is
+ * it going", which for a child's weight or an adult's blood pressure is the
+ * question the follow-up exists to ask. Drawn only for a vital with at least
+ * two readings, from confirmed visits only, oldest to newest. The colour of
+ * the latest reading follows the same threshold table as everywhere else;
+ * the direction arrow is arithmetic and says nothing about whether the
+ * change is good.
+ */
+function Trends({ encounters }: { encounters: Encounter[] }) {
+  const { t } = useI18n()
+  const ordered = encounters.filter((e) => e.status === 'final').sort((a, b) => a.occurredAt - b.occurredAt)
+  const series = TREND_VITALS.map((key) => ({
+    key,
+    values: ordered.map((e) => e.vitals[key]).filter((v): v is number => v !== undefined),
+  })).filter((s) => s.values.length >= 2)
+
+  if (series.length === 0) return null
+
+  return (
+    <section>
+      <SectionTitle>
+        {t.trends}
+        <span className="ml-1.5 font-medium normal-case tracking-normal text-ink-4">
+          · {ordered.length} {t.visits}
+        </span>
+      </SectionTitle>
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+        {series.map(({ key, values }) => {
+          const last = values[values.length - 1]!
+          const previous = values[values.length - 2]!
+          const delta = last - previous
+          const severity = vitalSeverity(key, last)
+          const tone =
+            severity === 'urgent' ? 'text-danger-600' : severity === 'watch' ? 'text-warn-700' : 'text-brand-700'
+          const Arrow = delta > 0 ? ArrowUpRight : delta < 0 ? ArrowDownRight : Minus
+          return (
+            <Card key={key} className="flex flex-col gap-1.5 px-3.5 py-3">
+              <span className="truncate text-[0.6875rem] font-semibold tracking-[0.06em] text-ink-3 uppercase">
+                {vitalLabel(key, t)}
+              </span>
+              <span className="flex items-baseline justify-between gap-2">
+                <span className={cx('numeric text-xl leading-none font-semibold tracking-[-0.02em]', tone)}>
+                  {formatVital(key, last)}
+                </span>
+                <span className="numeric inline-flex items-center gap-0.5 text-xs font-semibold text-ink-3">
+                  <Arrow size={13} />
+                  {delta === 0 ? '0' : `${delta > 0 ? '+' : ''}${Number(delta.toFixed(1))}`}
+                </span>
+              </span>
+              <Sparkline
+                values={values}
+                width={140}
+                height={32}
+                className={cx('w-full', tone)}
+                label={`${vitalLabel(key, t)}: ${values.map((v) => formatVital(key, v)).join(', ')}`}
+              />
+            </Card>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -229,6 +300,11 @@ export function PatientProfile() {
             thing a clinician came to the profile to see, and it renders
             nothing at all for everybody else. */}
         {patient && <GrowthPanel patient={patient} encounters={encounters ?? []} />}
+
+        {/* Then the rest of the vitals as trend lines. The growth panel answers
+            "is this child growing" against WHO's tables; this answers "which
+            way is everything else going", for every patient of any age. */}
+        {encounters && encounters.length > 1 && <Trends encounters={encounters} />}
 
         <section>
           <SectionTitle>

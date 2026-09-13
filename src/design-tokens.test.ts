@@ -19,10 +19,14 @@
  * reason this codebase writes them out in full in a lookup object.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const SRC = new URL('.', import.meta.url).pathname
+// `fileURLToPath`, not `.pathname`: a URL percent-encodes, so a checkout in
+// a directory whose name contains a space resolves to `Code%20Repos` and the
+// read fails with ENOENT on a path that plainly exists.
+const SRC = dirname(fileURLToPath(import.meta.url))
 const CSS = readFileSync(join(SRC, 'index.css'), 'utf8')
 
 /** `--color-brand-600: …` in the theme block. */

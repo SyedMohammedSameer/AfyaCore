@@ -18,9 +18,14 @@ import { theme } from './theme'
  */
 const ROWS: { label: string; value: string; detail: string }[] = [
   {
-    label: 'Dictation to structured fields',
+    label: 'Fields recovered from speech',
+    value: '91%',
+    detail: 'English, on the device; 67% in French, up from 36% before the rules learnt what the recogniser writes',
+  },
+  {
+    label: 'Wrong values the app flags for a second look',
     value: '100%',
-    detail: 'precision and recall, French and English',
+    detail: 'English; 91% in French, up from 20% once we measured the threshold instead of assuming it',
   },
   {
     label: 'Patient identifiers removed on export',
@@ -31,11 +36,6 @@ const ROWS: { label: string; value: string; detail: string }[] = [
     label: 'Clinical content preserved',
     value: '98.3%',
     detail: '1,258 expert-annotated entities in real clinical French',
-  },
-  {
-    label: 'Time to parse a consultation',
-    value: '0.05 ms',
-    detail: 'on the device, with no network',
   },
 ]
 
@@ -118,10 +118,10 @@ export const Numbers: React.FC = () => {
             opacity: interpolate(frame, [70, 92], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
           }}
         >
-          The de-identifier knows that{' '}
-          <span style={{ color: theme.ink, fontWeight: 600 }}>Hodgkin</span> is a diagnosis and{' '}
-          <span style={{ color: theme.ink, fontWeight: 600 }}>Rakoto</span> is a patient, so a
-          research export keeps the medicine and loses the person.
+Two of these numbers moved because the evaluation found the app wrong about
+          itself: the rules had never met a real transcript, and the{' '}
+          <span style={{ color: theme.ink, fontWeight: 600 }}>Check this</span> flag could not fire
+          on a diagnosis, which is the field a recogniser mangles most.
         </div>
       </div>
     </AbsoluteFill>

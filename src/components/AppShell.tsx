@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { Activity, ArrowLeft, Cloud, CloudOff, HardDrive, Home, SlidersHorizontal, Users } from 'lucide-react'
+import { Activity, ArrowLeft, Cloud, CloudOff, FlaskConical, HardDrive, Home, SlidersHorizontal, Users } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { pendingSyncCount } from '../db/db'
 import { getSyncSettings, isEnrolled } from '../lib/sync'
@@ -78,6 +78,7 @@ export function SyncStatus({ onDark = false }: { onDark?: boolean }) {
 const TABS = [
   { to: '/', icon: Home, key: 'home' as const },
   { to: '/patients', icon: Users, key: 'patients' as const },
+  { to: '/studio', icon: FlaskConical, key: 'studio' as const },
   { to: '/reports', icon: SlidersHorizontal, key: 'reports' as const },
 ]
 
@@ -93,7 +94,7 @@ function BrandMark({ small = false }: { small?: boolean }) {
 function Navigation({ desktop = false }: { desktop?: boolean }) {
   const { t } = useI18n()
   const { pathname } = useLocation()
-  const labels = { home: t.today, patients: t.patients, reports: t.settings }
+  const labels = { home: t.today, patients: t.patients, reports: t.settings, studio: t.studio.title }
 
   return (
     <ul className={cx(desktop ? 'flex flex-col gap-1.5' : 'flex items-center justify-around')}>
@@ -107,11 +108,11 @@ function Navigation({ desktop = false }: { desktop?: boolean }) {
               className={cx(
                 'press press-active flex items-center font-bold',
                 desktop
-                  ? 'gap-3 rounded-2xl px-3.5 py-3 text-sm'
+                  ? 'gap-3 rounded-xl px-3.5 py-3 text-sm'
                   : 'mx-auto flex-col gap-1 rounded-2xl py-2 text-[0.65rem] tracking-wide',
                 active
                   ? desktop
-                    ? 'bg-brand-gradient text-white shadow-lift ring-1 ring-white/20'
+                    ? 'bg-brand-50 text-brand-800'
                     : 'text-brand-800'
                   : 'text-ink-3 hover:bg-white/50 hover:text-ink',
               )}
@@ -131,13 +132,13 @@ function Navigation({ desktop = false }: { desktop?: boolean }) {
 function DesktopRail() {
   const { t } = useI18n()
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[17rem] p-4 lg:block">
-      <div className="surface-card flex h-full flex-col rounded-[2rem] p-3">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[15rem] border-r border-line bg-surface lg:block">
+      <div className="flex h-full flex-col px-4 py-6">
         <Link to="/" className="press flex items-center gap-3 rounded-2xl px-2.5 py-3 hover:bg-white/45">
           <BrandMark />
           <span>
             <span className="block text-lg font-extrabold tracking-[-0.05em] text-ink">AfyaCore</span>
-            <span className="block text-[0.64rem] font-bold tracking-[0.13em] text-brand-700 uppercase">Clinical workspace</span>
+            <span className="block text-[0.64rem] font-semibold tracking-[0.09em] text-ink-3 uppercase">{t.studio.workspace}</span>
           </span>
         </Link>
 
@@ -209,7 +210,7 @@ export function AppShell({
     <div className="relative min-h-dvh overflow-x-hidden">
       <DesktopRail />
 
-      <div className="relative flex min-h-dvh flex-col lg:pl-[18rem]">
+      <div className="relative flex min-h-dvh flex-col lg:pl-[15rem]">
         {/*
           One header treatment, not two.
 
@@ -220,7 +221,7 @@ export function AppShell({
           size rather than from a coloured slab.
         */}
         <header className="pt-safe sticky top-0 z-20 border-b border-line bg-surface">
-          <div className="relative mx-auto flex w-full max-w-5xl items-center gap-2 px-3 py-3 sm:px-5">
+          <div className="relative mx-auto flex w-full max-w-6xl items-center gap-2 px-3 py-4 sm:px-6">
             {showBack ? (
               <button
                 onClick={() => navigate(-1)}
@@ -261,7 +262,7 @@ export function AppShell({
 
         <main
           className={cx(
-            'relative mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 sm:px-5',
+            'relative mx-auto flex w-full max-w-6xl flex-1 flex-col px-3 sm:px-6',
             // The hero used to pull `main` up under itself so cards tucked into
             // its rounded bottom edge. That also swallowed whatever came first,
             // and what comes first is a section heading, not a card.

@@ -12,7 +12,76 @@ import type { LangCode } from '../db/schema'
  * a native speaker. They must be before any real deployment; wrong dosage
  * wording is a safety issue, not a polish issue. Tracked in README.md.
  */
+export interface StudioStrings {
+  title: string
+  subtitle: string
+  tag: string
+  intro: string
+  description: string
+  synthetic: string
+  input: string
+  output: string
+  review: string
+  locale: string
+  case: string
+  run: string
+  runText: string
+  cancel: string
+  running: string
+  idle: string
+  idleHint: string
+  noModel: string
+  audioHint: string
+  textHint: string
+  reference: string
+  raw: string
+  edited: string
+  editHint: string
+  reset: string
+  expected: string
+  actual: string
+  field: string
+  source: string
+  match: string
+  wrong: string
+  missing: string
+  extra: string
+  all: string
+  issues: string
+  agreement: string
+  wordError: string
+  elapsed: string
+  after: string
+  before: string
+  baseline: string
+  empty: string
+  noIssues: string
+  download: string
+  limit: string
+  method: string
+  methodText: string
+  error: string
+  homeTitle: string
+  homeHint: string
+  homeLink: string
+  workspace: string
+  audio: string
+  text: string
+  online: string
+  offline: string
+  model: string
+  notRun: string
+  reviewCount: string
+  sourceHint: string
+  /** The app's own uncertainty flag, shown against the verdict. */
+  confidence: string
+  flagLine: string
+  /** Composed with {caught}, {wrong}, {flagged} and {produced}. */
+  flagBody: string
+}
+
 export interface Strings {
+  studio: StudioStrings
   appName: string
   // Navigation & shell
   patients: string
@@ -189,6 +258,8 @@ export interface Strings {
   consentRefused: string
   consentNotAsked: string
   excludedForConsent: string
+  /** Composed as "<n> <withheldPendingReview>". */
+  withheldPendingReview: string
   retentionHint: string
   retentionYears: string
   retentionUnset: string
@@ -290,6 +361,32 @@ export interface Strings {
   amend: string
   amendNotice: string
   saveCorrection: string
+  // Per-field review of machine-entered values. See src/lib/fieldReview.ts.
+  machineFields: string
+  machineFieldsHint: string
+  /** Composed as "<done>/<total> <checkedCount>". */
+  checkedCount: string
+  tickField: string
+  tickedField: string
+  reviewRequired: string
+  reviewChanged: string
+  allChecked: string
+  // Sample dictation, for demonstrations where a microphone is not usable.
+  playSample: string
+  sampleHint: string
+  transcribing: string
+  extractionPreview: string
+  // Facility overview on the home screen. See src/lib/surveillance.ts.
+  thisWeek: string
+  facilityOverview: string
+  last14Days: string
+  aboveBaseline: string
+  baselineHint: string
+  noSignal: string
+  // Patient trends across visits.
+  trends: string
+  noTrendYet: string
+  visits: string
   deleteRecord: string
   deleteRecordConfirm: string
   // Instructions
@@ -337,6 +434,71 @@ export interface Strings {
 }
 
 const fr: Strings = {
+  studio: {
+    "title": "Atelier de preuve",
+    "subtitle": "Suivre les données, de la voix aux champs structurés.",
+    "tag": "ESPACE DE RECHERCHE",
+    "intro": "Écouter. Examiner. Corriger.",
+    "description": "Transcrivez une consultation fictive avec le modèle local. Voyez les champs conservés, les omissions et les effets de la relecture.",
+    "synthetic": "Cas fictifs uniquement · aucun dossier patient",
+    "input": "01 / Source",
+    "output": "02 / Sortie du modèle",
+    "review": "03 / Comparaison des champs",
+    "locale": "Langue de documentation",
+    "case": "Cas de test",
+    "run": "Lancer le modèle vocal local",
+    "runText": "Extraire le texte uniquement",
+    "cancel": "Annuler",
+    "running": "Transcription sur cet appareil…",
+    "idle": "Prêt à commencer",
+    "idleHint": "Choisissez un cas et lancez-le. Les résultats sont calculés en direct.",
+    "noModel": "Aucun modèle vocal local détecté. Les cas textuels restent disponibles. Installez le modèle vocal dans votre déploiement pour utiliser l’audio.",
+    "audioHint": "Voix de synthèse générée à partir de cette référence. L’audio reste sur cet appareil pendant l’inférence.",
+    "textHint": "Ce cas teste uniquement les règles d’extraction, sans modèle vocal.",
+    "reference": "Transcription de référence",
+    "raw": "Transcription originale du modèle",
+    "edited": "Transcription relue",
+    "editHint": "Corrigez le texte pour voir les champs récupérés. La mesure originale est conservée.",
+    "reset": "Annuler les corrections",
+    "expected": "Attendu",
+    "actual": "Extrait",
+    "field": "Champ",
+    "source": "Phrase source",
+    "match": "Conforme",
+    "wrong": "Valeur différente",
+    "missing": "Absent",
+    "extra": "Inattendu",
+    "all": "Tous les champs",
+    "issues": "Différences seulement",
+    "agreement": "Concordance des champs",
+    "wordError": "Taux brut d’erreur de mots",
+    "elapsed": "Temps de traitement",
+    "after": "Après relecture du texte",
+    "before": "Avant relecture",
+    "baseline": "Texte de référence → règles",
+    "empty": "Aucun champ structuré attendu ou extrait.",
+    "noIssues": "Tous les champs évalués correspondent à la référence.",
+    "download": "Télécharger la session JSON",
+    "limit": "Ces cas de développement ont été rédigés avec l’extracteur. Les scores décrivent ce cas et cet appareil, pas la précision clinique ni le temps gagné.",
+    "method": "Lire les résultats",
+    "methodText": "La concordance compte les champs atomiques exacts parmi les champs attendus et inattendus. Les attributs des prescriptions sont comparés dans l’ordre. Le taux d’erreur ignore casse, accents et ponctuation, mais distingue nombres écrits et chiffres. Le temps inclut décodage, chargement et inférence.",
+    "error": "L’exécution a échoué. Réessayez ou choisissez un cas textuel.",
+    "homeTitle": "Votre journée clinique, en un regard.",
+    "homeHint": "Saisir localement. Vérifier les données. Poursuivre les soins.",
+    "homeLink": "Explorer le parcours ML",
+    "workspace": "Espace clinique",
+    "audio": "Audio + ML",
+    "text": "Règles textuelles",
+    "online": "Réseau disponible",
+    "offline": "Réseau déconnecté",
+    "model": "Modèle local",
+    "notRun": "Non mesuré",
+    "reviewCount": "champs à vérifier",
+    "sourceHint": "Dépliez un champ pour consulter la phrase exacte utilisée par l’extracteur.",
+    "confidence": "Confiance",
+    "flagLine": "Ce que l’application avait signalé :",
+    "flagBody": "{caught} des {wrong} valeurs erronées portaient la mention « À vérifier », sur {flagged} champs signalés parmi les {produced} produits. Le seuil est mesuré, pas choisi : voir npm run eval:asr."
+},
   appName: 'AfyaCore',
   patients: 'Patients',
   settings: 'Paramètres',
@@ -507,6 +669,7 @@ const fr: Strings = {
   consentRefused: 'Refusé',
   consentNotAsked: 'Non demandé',
   excludedForConsent: 'patients exclus, sans consentement',
+  withheldPendingReview: 'valeurs retenues, non vérifiées',
   retentionHint: 'Durée de conservation des dossiers dans cet établissement.',
   retentionYears: 'Durée de conservation',
   retentionUnset: 'Aucune durée définie : rien n’est supprimé.',
@@ -600,6 +763,30 @@ const fr: Strings = {
   amendNotice:
     'Cette consultation est déjà validée. Toute correction remplace l’enregistrement et sera renvoyée à la synchronisation.',
   saveCorrection: 'Enregistrer la correction',
+  machineFields: 'Valeurs saisies par la machine',
+  machineFieldsHint:
+    'Chaque valeur ci-dessous a été dictée ou lue sur une photo. Comparez-la à ce qui a été dit, puis validez-la. Rien n’est enregistré tant que toutes ne sont pas validées.',
+  checkedCount: 'validées',
+  tickField: 'Valider',
+  tickedField: 'Validé',
+  reviewRequired: 'Validez chaque valeur saisie par la machine avant d’enregistrer.',
+  reviewChanged: 'Cette valeur a changé depuis sa validation. Validez-la à nouveau.',
+  allChecked: 'Toutes les valeurs saisies par la machine ont été validées.',
+  playSample: 'Écouter une dictée d’exemple',
+  sampleHint:
+    'Une voix de synthèse lit une consultation fictive ; le modèle la transcrit ici, sur l’appareil. Aucun patient réel.',
+  transcribing: 'Transcription sur l’appareil…',
+  extractionPreview: 'Ce que l’extracteur a reconnu',
+  thisWeek: 'Cette semaine',
+  facilityOverview: 'Vue d’ensemble du centre',
+  last14Days: '14 derniers jours',
+  aboveBaseline: 'au-dessus des 4 semaines précédentes',
+  baselineHint:
+    'Consultations validées, comptées par mot-clé du diagnostic. Un repère signale une semaine qui dépasse la moyenne des quatre précédentes de plus de deux écarts-types. C’est une invitation à regarder, pas une alerte.',
+  noSignal: 'Rien d’inhabituel cette semaine.',
+  trends: 'Évolution',
+  noTrendYet: 'L’évolution apparaît à partir de la deuxième visite.',
+  visits: 'visites',
   deleteRecord: 'Supprimer la consultation',
   deleteRecordConfirm:
     'Supprimer définitivement cette consultation validée ? Elle disparaîtra des rapports mensuels, y compris ceux déjà transmis.',
@@ -645,6 +832,71 @@ const fr: Strings = {
 }
 
 const mg: Strings = {
+  studio: {
+    "title": "Atrikasa porofo",
+    "subtitle": "Araho ny angona, avy amin’ny feo ho saha voalamina.",
+    "tag": "SEHATRA FIKAROHANA",
+    "intro": "Henoy. Diniho. Ahitsio.",
+    "description": "Ampiasao amin’ny tranga noforonina ny modely eo amin’ny fitaovana. Jereo ny saha voaray, ny tsy hita ary ny vokatry ny fanitsiana.",
+    "synthetic": "Tranga noforonina ihany · tsy misy rakitra marary",
+    "input": "01 / Loharano",
+    "output": "02 / Vokatry ny modely",
+    "review": "03 / Fampitahana saha",
+    "locale": "Fiteny fanoratana",
+    "case": "Tranga fitsapana",
+    "run": "Alefaso ny modely feo eo an-toerana",
+    "runText": "Famakafakana lahatsoratra ihany",
+    "cancel": "Ajanony",
+    "running": "Mandika feo eo amin’ity fitaovana ity…",
+    "idle": "Vonona hanomboka",
+    "idleHint": "Misafidiana tranga ary alefaso. Kajiana eo no ho eo ny valiny.",
+    "noModel": "Tsy hita ny modely feo eo an-toerana. Mbola azo ampiasaina ny tranga an-tsoratra. Apetraho ny modely raha hampiasa feo.",
+    "audioHint": "Feo noforonina avy amin’ity lahatsoratra ity. Mijanona eo amin’ny fitaovana ny feo mandritra ny fanodinana.",
+    "textHint": "Fitsapana ny fitsipika an-tsoratra ihany ity, tsy mampiasa modely feo.",
+    "reference": "Lahatsoratra fototra",
+    "raw": "Lahatsoratra voalohan’ny modely",
+    "edited": "Lahatsoratra voahitsy",
+    "editHint": "Ahitsio ny lahatsoratra hijerena ny saha tafaverina. Tehirizina ny fandrefesana voalohany.",
+    "reset": "Avereno ny lahatsoratra voalohany",
+    "expected": "Andrasana",
+    "actual": "Voaray",
+    "field": "Saha",
+    "source": "Fehezanteny loharano",
+    "match": "Mitovy",
+    "wrong": "Sanda hafa",
+    "missing": "Tsy hita",
+    "extra": "Tsy nampoizina",
+    "all": "Saha rehetra",
+    "issues": "Fahasamihafana ihany",
+    "agreement": "Fifanarahan’ny saha",
+    "wordError": "Tahan’ny teny diso",
+    "elapsed": "Fotoana fanodinana",
+    "after": "Taorian’ny fanitsiana",
+    "before": "Talohan’ny fanitsiana",
+    "baseline": "Lahatsoratra fototra → fitsipika",
+    "empty": "Tsy misy saha voalamina andrasana na voaray.",
+    "noIssues": "Mitovy amin’ny fototra ny saha rehetra nodinihina.",
+    "download": "Alaivo ny session JSON",
+    "limit": "Tranga noforonina niaraka tamin’ny mpamaky ireo. Momba ity tranga sy fitaovana ity ihany ny isa, fa tsy porofon’ny fahamarinan’ny fitsaboana na fotoana voavonjy.",
+    "method": "Famakiana ny valiny",
+    "methodText": "Isaina ny saha mitovy amin’ny andrasana sy ireo tsy nampoizina. Ampitahaina araka ny filaharany ny fanafody. Tsy isaina ny mari-piatoana sy ny tsindrim-peo amin’ny teny diso. Tafiditra amin’ny fotoana ny famakiana, fampidirana modely ary fanodinana.",
+    "error": "Tsy vita ny fanodinana. Andramo indray na misafidiana lahatsoratra.",
+    "homeTitle": "Topimaso mazava ny andro fitsaboana.",
+    "homeHint": "Raketo eto. Hamarino ny angona. Tohizo ny fitsaboana.",
+    "homeLink": "Jereo ny fizotran’ny ML",
+    "workspace": "Sehatra fitsaboana",
+    "audio": "Feo + ML",
+    "text": "Fitsipika an-tsoratra",
+    "online": "Misy tambajotra",
+    "offline": "Tsy misy tambajotra",
+    "model": "Modely eo an-toerana",
+    "notRun": "Tsy mbola norefesina",
+    "reviewCount": "saha mila hamarinina",
+    "sourceHint": "Sokafy ny saha hijerena ny fehezanteny nampiasain’ny mpamaky.",
+    "confidence": "Fatokisana",
+    "flagLine": "Izay nomarihin’ny rindrambaiko:",
+    "flagBody": "{caught} amin’ny {wrong} sanda diso no nanana marika « Hamarino », tamin’ny {flagged} saha voamarika amin’ny {produced} novokarina. Nomarinina ny fetra, tsy nofidiana fotsiny: jereo npm run eval:asr."
+},
   appName: 'AfyaCore',
   patients: 'Marary',
   settings: 'Fandrindrana',
@@ -815,6 +1067,7 @@ const mg: Strings = {
   consentRefused: 'Nolavina',
   consentNotAsked: 'Tsy mbola nangatahina',
   excludedForConsent: 'marary tsy tafiditra, tsy nanaiky',
+  withheldPendingReview: 'isa notazonina, tsy voamarina',
   retentionHint: 'Faharetan’ny fitehirizana ny antontan-taratasy eto.',
   retentionYears: 'Faharetan’ny fitehirizana',
   retentionUnset: 'Tsy misy faharetana voafaritra : tsy misy fafana.',
@@ -908,6 +1161,30 @@ const mg: Strings = {
   amendNotice:
     'Efa voamarina ity fitsaboana ity. Ny fanitsiana dia hanolo ny rakitra ary halefa indray amin’ny fampifanarahana.',
   saveCorrection: 'Tehirizo ny fanitsiana',
+  machineFields: 'Isa avy amin’ny milina',
+  machineFieldsHint:
+    'Notenenina na novakiana tamin’ny sary ny isa tsirairay etsy ambany. Ampitahao amin’izay nolazaina, dia ekeo. Tsy misy voatahiry raha tsy voamarina daholo.',
+  checkedCount: 'voamarina',
+  tickField: 'Ekeo',
+  tickedField: 'Voamarina',
+  reviewRequired: 'Hamarino ny isa rehetra avy amin’ny milina alohan’ny hitahiry.',
+  reviewChanged: 'Niova ity isa ity hatramin’ny nanamarinana azy. Hamarino indray.',
+  allChecked: 'Voamarina daholo ny isa avy amin’ny milina.',
+  playSample: 'Henoy ohatra fitenenana',
+  sampleHint:
+    'Feo noforonina no mamaky fitsaboana noforonina; ny milina no mandika azy eto amin’ny finday. Tsy misy marary tena izy.',
+  transcribing: 'Mandika eto amin’ny finday…',
+  extractionPreview: 'Izay fantatry ny milina',
+  thisWeek: 'Ity herinandro ity',
+  facilityOverview: 'Topimaso ny toeram-pitsaboana',
+  last14Days: '14 andro farany',
+  aboveBaseline: 'ambonin’ny 4 herinandro teo aloha',
+  baselineHint:
+    'Fitsaboana voamarina, isaina araka ny teny fototra amin’ny aretina. Ny marika dia milaza fa mihoatra lavitra ny salan’isan’ny herinandro efatra teo aloha ity herinandro ity. Fanentanana hijery izany, fa tsy fampitandremana.',
+  noSignal: 'Tsy misy zavatra hafahafa ity herinandro ity.',
+  trends: 'Fivoarana',
+  noTrendYet: 'Hiseho ny fivoarana rehefa misy fitsidihana faharoa.',
+  visits: 'fitsidihana',
   deleteRecord: 'Fafao ity fitsaboana ity',
   deleteRecordConfirm:
     'Hofafana tanteraka ity fitsaboana voamarina ity? Hiala amin’ny tatitra isam-bolana izy, na dia efa nalefa aza.',
@@ -952,6 +1229,71 @@ const mg: Strings = {
 }
 
 const en: Strings = {
+  studio: {
+    "title": "Evidence Studio",
+    "subtitle": "Follow the evidence, from speech to structured fields.",
+    "tag": "RESEARCH WORKSPACE",
+    "intro": "Listen. Inspect. Correct.",
+    "description": "Run a synthetic consultation through the local speech model. See exactly what survived, what was missed, and what human review changes.",
+    "synthetic": "Synthetic cases only · no patient records",
+    "input": "01 / Source",
+    "output": "02 / Model output",
+    "review": "03 / Field comparison",
+    "locale": "Documentation language",
+    "case": "Test case",
+    "run": "Run local speech model",
+    "runText": "Run text-only extraction",
+    "cancel": "Cancel run",
+    "running": "Transcribing on this device…",
+    "idle": "Ready when you are",
+    "idleHint": "Choose a case and run it. Results here are computed live.",
+    "noModel": "No local speech pack found. Text cases still work. Install the speech pack in your deployment to run audio.",
+    "audioHint": "Synthetic speech generated from this reference. Audio stays on this device during inference.",
+    "textHint": "This case tests extraction rules only; no speech model is invoked.",
+    "reference": "Reference transcript",
+    "raw": "Original model transcript",
+    "edited": "Reviewed transcript",
+    "editHint": "Correct the transcript to see which fields recover. The original measurement is preserved.",
+    "reset": "Undo transcript edits",
+    "expected": "Expected",
+    "actual": "Extracted",
+    "field": "Field",
+    "source": "Source phrase",
+    "match": "Match",
+    "wrong": "Different value",
+    "missing": "Missing",
+    "extra": "Unexpected",
+    "all": "All fields",
+    "issues": "Differences only",
+    "agreement": "Field agreement",
+    "wordError": "Raw word error rate",
+    "elapsed": "Processing time",
+    "after": "After transcript review",
+    "before": "Before review",
+    "baseline": "Reference text → rules",
+    "empty": "No structured fields expected or extracted.",
+    "noIssues": "Every evaluated field matches the reference.",
+    "download": "Download session JSON",
+    "limit": "These are development cases, written alongside the extractor. Scores describe this case and device, not clinical accuracy or time saved.",
+    "method": "How to read these results",
+    "methodText": "Agreement counts exact matches over expected and unexpected atomic fields. Prescription attributes are compared in order. Word error rate ignores case, accents and punctuation, but does not equate spoken numbers with digits. Processing time includes decoding, model loading and inference.",
+    "error": "This run did not complete. Retry or select a text case.",
+    "homeTitle": "A clearer view of your clinical day.",
+    "homeHint": "Capture locally. Review the evidence. Keep care moving.",
+    "homeLink": "Explore the ML workflow",
+    "workspace": "Clinical workspace",
+    "audio": "Audio + ML",
+    "text": "Text rules only",
+    "online": "Network available",
+    "offline": "Network disconnected",
+    "model": "Local model",
+    "notRun": "Not measured",
+    "reviewCount": "fields awaiting review",
+    "sourceHint": "Expand a field to inspect the exact phrase used by the extractor.",
+    "confidence": "Confidence",
+    "flagLine": "What the app had flagged:",
+    "flagBody": "{caught} of the {wrong} wrong values carried a Check this label, across {flagged} flagged fields of the {produced} produced. The threshold is measured, not chosen: see npm run eval:asr."
+},
   appName: 'AfyaCore',
   patients: 'Patients',
   settings: 'Settings',
@@ -1122,6 +1464,7 @@ const en: Strings = {
   consentRefused: 'Refused',
   consentNotAsked: 'Not asked',
   excludedForConsent: 'patients excluded, no consent',
+  withheldPendingReview: 'values held back, not confirmed',
   retentionHint: 'How long this facility keeps records.',
   retentionYears: 'Retention period',
   retentionUnset: 'No period set: nothing is ever deleted.',
@@ -1215,6 +1558,30 @@ const en: Strings = {
   amendNotice:
     'This consultation is already confirmed. A correction replaces the record and will be sent again on the next sync.',
   saveCorrection: 'Save correction',
+  machineFields: 'Machine-entered values',
+  machineFieldsHint:
+    'Each value below was dictated or read from a photo. Compare it with what was said, then confirm it. Nothing is saved until every one is confirmed.',
+  checkedCount: 'confirmed',
+  tickField: 'Confirm',
+  tickedField: 'Confirmed',
+  reviewRequired: 'Confirm every machine-entered value before saving.',
+  reviewChanged: 'This value changed after it was confirmed. Confirm it again.',
+  allChecked: 'Every machine-entered value has been confirmed.',
+  playSample: 'Play a sample dictation',
+  sampleHint:
+    'A synthetic voice reads a made-up consultation; the model transcribes it here, on the device. No real patient.',
+  transcribing: 'Transcribing on the device…',
+  extractionPreview: 'What the extractor recognised',
+  thisWeek: 'This week',
+  facilityOverview: 'Facility overview',
+  last14Days: 'Last 14 days',
+  aboveBaseline: 'above the previous 4 weeks',
+  baselineHint:
+    'Confirmed consultations, counted by diagnosis keyword. A mark means this week exceeds the mean of the previous four by more than two standard deviations. It is a prompt to look, not an alert.',
+  noSignal: 'Nothing unusual this week.',
+  trends: 'Trends',
+  noTrendYet: 'Trends appear after a second visit.',
+  visits: 'visits',
   deleteRecord: 'Delete consultation',
   deleteRecordConfirm:
     'Permanently delete this confirmed consultation? It will drop out of the monthly reports, including any already submitted.',

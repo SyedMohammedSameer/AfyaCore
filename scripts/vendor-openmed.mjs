@@ -42,12 +42,26 @@ const ortDir = join(root, 'public', 'ort')
  * fails for the same two reasons the OCR runtime is vendored: an unreachable
  * CDN, and a service worker that cannot cache an opaque cross-origin response.
  *
- * Only the plain SIMD-threaded build is copied. The `jsep` variant is the
- * WebGPU path at 25 MB, and this model runs on CPU on the phones this targets;
- * `asyncify` and `jspi` are alternative suspension mechanisms we do not use.
- * Taking one of the four keeps this at 13 MB rather than 75 MB.
+ * The `jsep` variant is the WebGPU path at 25 MB and this model runs on CPU
+ * on the phones this targets; `jspi` needs a browser feature those phones do
+ * not have. Neither is copied.
+ *
+ * Both cores, because the runtime picks by filename and the two builds of
+ * transformers.js in play here pick differently. The ORT bundle that
+ * @huggingface/transformers 4.x imports in the browser resolves
+ * `<wasmPaths>ort-wasm-simd-threaded.asyncify.mjs`; with only the plain
+ * core on the server, every on-device model reported "no available backend
+ * found" at first inference, which the availability probes could not see
+ * because they check for the model's config.json, not for a working
+ * runtime. The plain core stays for the Safari path transformers.js keeps.
+ * 37 MB on the server in total, fetched once by a phone and never precached.
  */
-const ORT_FILES = ['ort-wasm-simd-threaded.wasm', 'ort-wasm-simd-threaded.mjs']
+const ORT_FILES = [
+  'ort-wasm-simd-threaded.wasm',
+  'ort-wasm-simd-threaded.mjs',
+  'ort-wasm-simd-threaded.asyncify.wasm',
+  'ort-wasm-simd-threaded.asyncify.mjs',
+]
 const BASE = `https://huggingface.co/${REPO}/resolve/main`
 
 /**

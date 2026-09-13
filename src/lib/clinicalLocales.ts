@@ -82,7 +82,9 @@ function frDuration(segment: string): number | undefined {
 }
 
 function frDose(segment: string): string | undefined {
-  const m = segment.match(new RegExp(`(${FR_N})\\s*(mg|g|ml|ui|comprimes?|cuilleres?|gouttes?|sachets?)\\b`))
+  // Plain digits are allowed without the number pattern's trailing boundary:
+  // a recogniser writes "500mg" as one token and `\d+\b` cannot see it.
+  const m = segment.match(new RegExp(`(${FR_N}|\\d+(?:[.,]\\d+)?)\\s*(mg|g|ml|ui|comprimes?|cuilleres?|gouttes?|sachets?)\\b`))
   if (!m) return undefined
   const v = parseFrenchNumber(m[1]!)
   return v === undefined ? undefined : `${v} ${m[2]}`
@@ -101,7 +103,9 @@ export const FR_LOCALE: ClinicalLocale = {
     { key: 'weight', triggers: ['poids', 'pese'] },
     { key: 'height', triggers: ['taille', 'mesure'] },
   ],
-  bpTriggers: ['pression arterielle', 'tension arterielle', 'tension', 'ta'],
+  // 'attention' is not a word anyone dictates before a blood pressure; it is
+  // what Whisper writes for 'tension' often enough to be worth reading.
+  bpTriggers: ['pression arterielle', 'tension arterielle', 'tension', 'attention', 'ta'],
   bpMayBeCmHg: true,
   diagnosisTriggers: ['diagnostic', 'diagnostique', 'impression'],
   complaintTriggers: ['motif de consultation', 'motif', 'se plaint de', 'vient pour', 'plainte'],
@@ -167,8 +171,10 @@ function enFrequency(segment: string): number | undefined {
     if (h !== undefined && h >= 1 && h <= 24) return Math.round(24 / h)
   }
 
-  const abbrev = segment.match(/\b(od|om|on|nocte|mane|bd|bid|tds|tid|qds|qid|daily)\b/)
-  if (abbrev) return EN_FREQUENCY_ABBREV[abbrev[1]!]
+  // Not `\b` after the abbreviation: a recogniser runs "tds for 3/7" into
+  // "tds4-3", and "od" comes back as "odd" often enough to read.
+  const abbrev = segment.match(/\b(odd|od|om|on|nocte|mane|bd|bid|tds|tid|qds|qid|daily)(?![a-z])/)
+  if (abbrev) return EN_FREQUENCY_ABBREV[abbrev[1] === 'odd' ? 'od' : abbrev[1]!]
 
   if (/\btwice\b/.test(segment)) return 2
   if (/\bthrice\b/.test(segment)) return 3
@@ -180,7 +186,9 @@ function enFrequency(segment: string): number | undefined {
 
 function enDuration(segment: string): number | undefined {
   // "5/7" means five days, "2/52" two weeks: standard shorthand on a chart.
-  const shorthand = segment.match(/\b(\d{1,3})\s*\/\s*(7|52)\b/)
+  // Spoken, it is "five stroke seven", and that is what a recogniser writes;
+  // "for" in front of it is heard as "4" often enough to be allowed through.
+  const shorthand = segment.match(/(?:\bfor\s*|\b4\s*-?\s*|\b)(\d{1,3})\s*-?\s*(?:\/|stroke)\s*(7|52)\b/)
   if (shorthand) {
     const n = Number.parseInt(shorthand[1]!, 10)
     const unit = shorthand[2] === '7' ? 1 : 7
@@ -203,8 +211,9 @@ function enDuration(segment: string): number | undefined {
 }
 
 function enDose(segment: string): string | undefined {
+  // See frDose: "500mg" is one token to a recogniser.
   const m = segment.match(
-    new RegExp(`(${EN_N})\\s*(mg|g|ml|iu|units?|tablets?|tabs?|capsules?|caps?|drops?|sachets?|spoons?)\\b`),
+    new RegExp(`(${EN_N}|\\d+(?:[.,]\\d+)?)\\s*(mg|g|ml|iu|units?|tablets?|tabs?|capsules?|caps?|drops?|sachets?|spoons?)\\b`),
   )
   if (!m) return undefined
   const v = parseEnglishNumber(m[1]!)
@@ -230,6 +239,8 @@ export const EN_LOCALE: ClinicalLocale = {
   diagnosisTriggers: ['diagnosis', 'impression', 'assessment'],
   complaintTriggers: [
     'presenting complaint', 'chief complaint', 'complains of', 'complaining of',
+    // What a recogniser makes of "presenting complaint" said quickly.
+    'presenting complained', 'presenting complaints',
     'reason for visit', 'came for', 'c/o',
   ],
   sectionWords: ['prescribe', 'prescription', 'give', 'treatment', 'plan', 'rx'],

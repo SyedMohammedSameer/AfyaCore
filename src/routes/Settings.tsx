@@ -128,10 +128,15 @@ export function Settings() {
     if (level !== 'identified') {
       const neural = result.manifest.neuralRedactions
       const excluded = result.manifest.excludedForConsent
+      const withheld = result.manifest.withheldPendingReview
       setLastExport(
         // Consent first: a facility looking at this line most needs to know
         // who is missing from the file, not how many words were blacked out.
         (excluded > 0 ? `${excluded} ${t.excludedForConsent} · ` : '') +
+          // Then what a model asserted and nobody has confirmed. A recipient
+          // counting blanks cannot otherwise tell that apart from a value the
+          // consultation never had.
+          (withheld > 0 ? `${withheld} ${t.withheldPendingReview} · ` : '') +
           `${result.manifest.freeTextRedactions} ${t.redactionSummary}` +
           // Reported separately rather than summed: the two passes answer
           // different questions, and a facility deciding whether the 67 MB was
@@ -139,7 +144,8 @@ export function Settings() {
           (neural !== undefined ? ` · ${neural} ${t.neuralRedactionSummary}` : ''),
       )
     } else {
-      setLastExport('')
+      const withheld = result.manifest.withheldPendingReview
+      setLastExport(withheld > 0 ? `${withheld} ${t.withheldPendingReview}` : '')
     }
     // Exports are the disclosure event, so they are the one thing the audit
     // trail must never miss.
@@ -167,7 +173,10 @@ export function Settings() {
         {
           exportedAt: new Date().toISOString(),
           schemaVersion: 1,
-          note: 'Attachments excluded. Field names follow FHIR R4 naming where possible.',
+          note:
+            'Attachments excluded. Field names follow FHIR R4 naming where possible. ' +
+            'Machine-entered values that no clinician had confirmed are withheld; ' +
+            'see deidentification.withheldPendingReview for the count.',
           // Travels with the file so a recipient knows what was stripped, and
           // an identified export is never mistaken for a safe one.
           deidentification: manifest,
@@ -344,15 +353,31 @@ export function Settings() {
           <Card className="flex flex-col gap-3">
             <p className="text-sm text-ink-2">{t.reportingHint}</p>
             {monthlySummary && monthlySummary.length > 0 ? (
-              <ul className="flex flex-col gap-1 text-sm">
-                {monthlySummary.slice(0, 8).map((c, i) => (
-                  <li key={i} className="flex justify-between gap-2">
-                    <span className="truncate text-ink-2">
-                      {indicatorLabel(c.indicator, lang)} · {c.ageBand}
-                    </span>
-                    <span className="font-semibold text-ink">{c.count}</span>
-                  </li>
-                ))}
+              /* Summed per indicator for the eye, with a bar for the share of
+                 the month's consultations; the exported file keeps every
+                 age-band and sex cell. */
+              <ul className="flex flex-col gap-2 text-sm">
+                {(() => {
+                  const totals = new Map<string, number>()
+                  for (const c of monthlySummary) totals.set(c.indicator, (totals.get(c.indicator) ?? 0) + c.count)
+                  const all = totals.get('consultations') ?? 1
+                  return [...totals.entries()]
+                    .sort((a, b) => Number(a[0] !== 'consultations') - Number(b[0] !== 'consultations') || b[1] - a[1])
+                    .map(([indicator, count]) => (
+                      <li key={indicator} className="flex flex-col gap-1">
+                        <span className="flex justify-between gap-2">
+                          <span className="truncate text-ink-2">{indicatorLabel(indicator, lang)}</span>
+                          <span className="numeric font-semibold text-ink">{count}</span>
+                        </span>
+                        <span className="h-1.5 overflow-hidden rounded-full bg-line" aria-hidden>
+                          <span
+                            className={indicator === 'consultations' ? 'block h-full rounded-full bg-ink-4' : 'block h-full rounded-full bg-brand-600'}
+                            style={{ width: `${Math.min(100, (count / all) * 100)}%` }}
+                          />
+                        </span>
+                      </li>
+                    ))
+                })()}
               </ul>
             ) : (
               <p className="text-sm text-ink-4">{t.noReportData}</p>

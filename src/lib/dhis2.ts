@@ -16,6 +16,7 @@
  */
 import type { Encounter, LangCode, Patient } from '../db/schema'
 import { patientAge } from '../db/repo'
+import { withholdPendingFields } from './fieldReview'
 
 /** WHO/IMCI-aligned age bands, which is how these reports are conventionally cut. */
 export type AgeBand = '<1' | '1-4' | '5-14' | '15-49' | '50+' | 'unknown'
@@ -172,8 +173,16 @@ export function dhis2Period(date: Date): string {
 /**
  * Aggregate finalised encounters in a month into indicator counts.
  *
- * Drafts are excluded, an unconfirmed consultation must never reach a national
+ * Drafts are excluded: an unconfirmed consultation must never reach a national
  * statistic.
+ *
+ * A confirmed consultation that has since been *corrected* is counted, because
+ * it happened, but any field the correction added by machine and nobody has
+ * confirmed is withheld first. The case that made this necessary: a photo read
+ * during an amendment supplied a diagnosis of "paludisme simple" that no
+ * clinician had ticked, and it went into the district's malaria figure. The
+ * consultation now counts under `other` until somebody confirms what it was,
+ * which is a missing attribution rather than an invented one.
  */
 export function aggregateMonth(
   patients: Patient[],
@@ -196,6 +205,7 @@ export function aggregateMonth(
     if (e.status !== 'final') continue
     if (e.occurredAt < start || e.occurredAt >= end) continue
 
+    const { encounter } = withholdPendingFields(e)
     const patient = byId.get(e.patientId)
     // Age is taken at the time of the encounter, not today, a report run in
     // December must not age a child out of the under-5 band retroactively.
@@ -203,7 +213,7 @@ export function aggregateMonth(
     const sex = patient?.sex ?? 'unknown'
 
     bump('consultations', band, sex)
-    bump(classifyDiagnosis(e.diagnosis), band, sex)
+    bump(classifyDiagnosis(encounter.diagnosis), band, sex)
   }
 
   return [...cells.values()].sort(

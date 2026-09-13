@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AfyaCore, ML4H 2026 demonstration spec sheet</title>
+<style>
+  @page { size: A4; margin: 11mm 12mm 10mm 12mm; }
+  :root { --ink:#1c2321; --ink2:#4a5551; --ink3:#5d6b66; --line:#e4dfd5; --brand:#0a6b52; --brand50:#edf6f1; --warn:#8a5300; --warnbg:#fdf3e0; }
+  html, body { margin:0; padding:0; }
+  body { font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; color:var(--ink); font-size:8.75pt; line-height:1.27; }
+  h1 { font-size:14.5pt; line-height:1.15; margin:0 0 3pt; letter-spacing:-0.01em; }
+  .byline { color:var(--ink2); margin:0 0 7pt; font-size:9pt; }
+  .byline a { color:var(--brand); text-decoration:none; }
+  h2 { font-size:8.8pt; text-transform:uppercase; letter-spacing:0.08em; color:var(--brand); margin:6.5pt 0 2pt; border-bottom:1px solid var(--line); padding-bottom:1.5pt; }
+  p { margin:0 0 4pt; text-align:justify; hyphens:auto; }
+  ul { margin:0 0 4pt 12pt; padding:0; } li { margin:0 0 1.5pt; }
+  .cols { column-count:2; column-gap:6mm; }
+  .nobreak { break-inside:avoid; }
+  table { border-collapse:collapse; width:100%; font-size:8pt; margin:2pt 0 5pt; }
+  th, td { text-align:left; padding:2pt 4pt; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-weight:600; color:var(--ink3); font-size:7.8pt; text-transform:uppercase; letter-spacing:0.05em; }
+  td.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .arch { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:3pt; margin:2pt 0 4pt; font-size:7.8pt; }
+  .box { border:1px solid var(--line); border-radius:5pt; padding:4pt 6pt; background:#fff; }
+  .box b { display:block; color:var(--brand); font-size:8.2pt; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:1.5pt; }
+  .box.wide { grid-column: 1 / -1; background:var(--brand50); border-color:#a9d7c3; }
+  .callout { background:var(--warnbg); border-left:3px solid var(--warn); padding:3pt 6pt; margin:4pt 0 5pt; font-size:8.8pt; }
+  .refs { font-size:7.4pt; color:var(--ink2); line-height:1.3; }
+  .refs ol { margin:0 0 0 12pt; padding:0; } .refs li { margin:0 0 1pt; }
+  .kv { display:flex; gap:10pt; flex-wrap:wrap; font-size:8.6pt; color:var(--ink2); margin:0 0 6pt; }
+  .kv span b { color:var(--ink); font-weight:600; }
+  code { font-family: "IBM Plex Mono", Menlo, monospace; font-size:8.3pt; background:#f7f5f0; padding:0 2pt; border-radius:2pt; }
+  .pagebreak { break-before: page; }
+</style>
+</head>
+<body>
+
+<h1>AfyaCore: offline-first clinical documentation with on-device speech recognition, per-field human review and de-identified export, for primary care in sub-Saharan Africa</h1>
+<p class="byline">Mohammed Sameer Syed · Independent · <a href="mailto:sdmohammedsameer@gmail.com">sdmohammedsameer@gmail.com</a> · Code (MIT): <a href="https://github.com/SyedMohammedSameer/AfyaCore">github.com/SyedMohammedSameer/AfyaCore</a> · Demo video: <a href="#">[link to be inserted]</a></p>
+
+<div class="kv">
+  <span><b>Track</b> Demonstrations</span>
+  <span><b>Maturity</b> pilot candidate, v0.0.2; not yet used by a clinician</span>
+  <span><b>Data in demo</b> entirely synthetic</span>
+  <span><b>Install</b> 150 kB gzip; models optional, self-hosted</span>
+</div>
+
+<div class="cols">
+
+<h2>1. Problem, users and setting</h2>
+<p>Primary care facilities across sub-Saharan Africa document in paper registers and compile the monthly return the ministry expects by hand. Connectivity is intermittent or absent, so tools that assume a server fail where the burden is highest. In Madagascar, where AfyaCore began, documentation is written in French while most patients speak Malagasy, so the instruction sheet a patient takes home is routinely in a language they cannot read. Phones are shared; records that leave the facility must be de-identified; and a speech tool that streams audio to a browser vendor discloses a patient's voice and diagnosis to a third party.</p>
+<p><b>Users</b> are nurses and clinicians at health posts, the administrator who configures the device, and the district office that receives DHIS2 aggregates. Nine country profiles ship (MG, SN, CI, CD, KE, NG, GH, TZ, UG), each a data entry: phone formats to redact, clinical language, HMIS, data-protection regime.</p>
+
+<h2>2. System</h2>
+<p>A progressive web app (React, TypeScript) installed from a URL on Android or iOS. IndexedDB is the source of truth, not a cache: every write succeeds locally and a facility offline for a week notices only a rising pending count. A zero-dependency Node sync server reconciles devices with cursor-based push-then-pull, enrolment by single-use code, server-side last-write-wins, and a rule that a local draft is never overwritten. Both sides keep a hash-chained audit log of who did what to which record id, never clinical content.</p>
+
+<div class="arch nobreak">
+  <div class="box"><b>Capture</b>Dictation, photo of a paper register, or typing. Whisper base (q8, ONNX, WebAssembly) in a worker; Tesseract on-device.</div>
+  <div class="box"><b>Extract</b>Deterministic clinical extractor driven by language packs (FR, EN): spoken numerals, cmHg convention, tds / 5/7 shorthand, fixed-dose combinations, plausibility ranges.</div>
+  <div class="box"><b>Review</b>Per-field provenance and confidence; each machine value ticked individually against its source phrase; the record cannot become final otherwise, and an unconfirmed value is withheld from every export and aggregate.</div>
+  <div class="box wide"><b>Leave the device</b>Patient sheet in the patient's language (10 languages) · DHIS2 <code>dataValueSet</code> and CSV aggregates · FHIR R4 bundle · JSON, every record-level export passing through one de-identification step (deterministic scrub of roster identifiers and phone formats, optional OpenMed French PII model that can only add redactions), gated on per-patient research consent, pseudonymised per export.</div>
+</div>
+
+<h2>3. Machine learning, and how it is kept safe</h2>
+<p>Three models run on the device, each an optional download the facility places on its own origin, none in the install: <b>Whisper base</b> (81 MB) for speech, <b>Tesseract</b> (7 MB) for print, and <b>OpenMed French PII</b> (70 MB, DistilBERT token classifier, Apache-2.0) for names the roster does not hold. An energy segmenter cuts the microphone at pauses and each utterance is transcribed as it closes, so results appear incrementally; known silence hallucinations are dropped. Text-to-fields is rules, on purpose: a 20% word error rate against free prose is unusable, but against eight vitals, a bounded formulary and a handful of frequency idioms it is very usable, because the output is a small set of fields a clinician confirms.</p>
+<p>Five properties are structural rather than conventions. (1) Nothing machine-derived is saved without confirmation, <em>field by field</em>: a tick is bound to the exact value shown, a changed value is pending again, <code>finaliseEncounter</code> refuses a record with an unticked machine value, and because that guard only covers the draft-to-final moment, a value nobody has ticked is additionally withheld where the record leaves the device and where it becomes a statistic. (2) Extraction never overwrites typed input. (3) Every value carries its source, the phrase it came from, and an uncertainty flag that decides reading order rather than whether a value is reviewed. (4) Nothing is diagnostic: vital-sign colouring is a fixed threshold table, and the facility overview's excess rule is stated on screen as a prompt to look. (5) A confirmed record stays confirmed when corrected; the correction goes back through the same review gate. Drug names the recogniser spells phonetically are recovered by edit distance against the formulary only when a dose, frequency or duration follows, and always at a confidence that forces review with the raw phrase in view.</p>
+
+<h2>4. Evaluation</h2>
+<p>From <code>npm run eval</code> and <code>npm run eval:asr</code>, against a synthetic corpus written with the implementation, plus E3C, a published clinical corpus with gold entity annotations, for retention.</p>
+<table class="nobreak">
+<tr><th>Measure</th><th class="n">French</th><th class="n">English</th></tr>
+<tr><td>Extraction F1 on clean transcripts (12 / 10 cases)</td><td class="n">100%</td><td class="n">100%</td></tr>
+<tr><td>Speech → fields F1, extractor as first shipped</td><td class="n">36%</td><td class="n">60%</td></tr>
+<tr><td>Speech → fields F1, hardened against the recogniser</td><td class="n"><b>67%</b></td><td class="n"><b>91%</b></td></tr>
+<tr><td>Raw WER, whisper-base q8 on TTS speech</td><td class="n">60%</td><td class="n">48%</td></tr>
+<tr><td>De-identification recall, identifiers on the roster</td><td class="n" colspan="2">100% (deterministic)</td></tr>
+<tr><td>Recall, identifiers off the roster: deterministic → + OpenMed</td><td class="n" colspan="2">0% → 40%</td></tr>
+<tr><td>Clinical entity retention on real text (E3C, n=1258 FR / 1014 EN)</td><td class="n">98.3%</td><td class="n">99.3%</td></tr>
+<tr><td>Wrong values a flag-first reviewer reaches, before → after recalibration</td><td class="n">18% → <b>91%</b></td><td class="n">20% → <b>100%</b></td></tr>
+<tr><td>Rows that asks them to read first</td><td class="n">21% → 62%</td><td class="n">11% → 46%</td></tr>
+<tr><td>Extraction latency, median</td><td class="n">0.44 ms</td><td class="n">0.51 ms</td></tr>
+</table>
+<p>The speech rows are the honest centre of this sheet. The corpus is spoken by a text-to-speech voice, transcribed by the same model files through the same transformers.js build the phone runs, and scored by the same code as the text harness. The first run exposed regular failures: commas where full stops were spoken, so a diagnosis swallowed the prescription after it; <em>par assez tamol</em> for paracétamol; <em>5 stroke 7</em> for 5/7. Each is now handled and pinned by a test on the verbatim transcript. Synthetic speech is a controlled condition and <b>not an upper bound</b>: it removes noise, accent and disfluency, and adds a domain mismatch of its own. Recordings from intended users, independently annotated, are the next measurement and are not a substitute we can claim to have made.</p>
+<p>Putting the recogniser in the loop also made the review interface measurable, which is where the last two rows come from. Every machine value is reviewed regardless, so the <em>Check this</em> flag only decides what a clinician reads first. But it was <code>confidence &lt; 0.8</code> and the extractor gives every chief complaint and diagnosis a confidence of exactly 0.8, so the two fields a recogniser mangles most could not be flagged at all, and they were the majority of every wrong value. Moving the line to the next boundary in the extractor's own scale, which has digit-derived vitals and complete prescriptions above it and spoken numerals, unit inferences, recovered drug names and narrative spans below it, takes a flag-first reviewer from 1 wrong value in 5 to nearly all of them. Both columns come from the corpus that found the problem: this is a correction, on 64 rows, not an independent validation.</p>
+<p>The offline claim is tested in a real browser in CI: build, create an account, switch the network off, reload, sign in, record a consultation, reload again. Schema upgrades are tested against databases with data in them, including that a patient recorded before the consent field existed is treated as <em>not</em> having consented.</p>
+
+<h2>5. Deployment status and lessons learned</h2>
+<p>AfyaCore has not been validated with a facility, and no clinician has used it. Two rounds of finding out what it actually does shaped it more than any feature. An external review of v0.0.1 found five controls described more favourably than they behaved, among them dictation streaming audio to the browser vendor while the security document claimed no third-party call; each is fixed with a regression test named after the failure. Preparing this demonstration found a sixth: transformers.js 4.x requests an <code>asyncify</code> ONNX Runtime core the vendor scripts did not ship, so on-device inference had never started in a browser while every screen reported the model installed, because the availability probe checks for a config file rather than a working runtime. It was found by pressing the button; the bundled sample dictation exists so that pressing the button is part of every walk-through.</p>
+<ul>
+  <li><b>Measure the pipeline, not the parts.</b> An extractor at 100% and a recogniser with published WER told us nothing about fields from speech until the two were scored together, and scoring them together is also what exposed the flag calibration and, indirectly, the export leak.</li>
+  <li><b>A guard placed at one transition does not cover the others.</b> Requiring review before a draft becomes final read like a complete rule and was not: a correction is written into a record that is already final, so an unconfirmed diagnosis reached a research export and the district's malaria count. The fix withholds the field rather than demoting the record, because the consultation did happen.</li>
+  <li><b>Constants in a safety control need evidence too.</b> A threshold nobody chose sat exactly on the confidence of the two fields it most needed to catch, and nothing failed: the interface simply looked confident about its worst answers.</li>
+</ul>
+
+<h2>6. Demonstration plan</h2>
+<p>A laptop and an Android phone serving the production build from a local origin with the models on it, synthetic data only. The laptop opens the app's evidence workspace, where an attendee picks a synthetic case, runs the vendored speech model on the device, and reads the transcript, the fields it produced, which match the reference, which the app had flagged, and how correcting the transcript changes the score, with a session record they can download. Then the clinical path on the phone: sign in on a shared device; dictate a consultation, or play the bundled sample when the hall is loud, and watch the transcript mark which words become which fields; tick each machine value and see the save refuse until the last is ticked; print the patient sheet in Malagasy; switch the network off, reload, continue; export the DHIS2 return and a pseudonymised FHIR bundle. Attendees can dictate in French or English themselves.</p>
+
+<h2>7. Limitations and ethics</h2>
+<p>Records are unencrypted at rest; device encryption protects them and a PIN only binds attribution. Eight of ten patient-sheet languages have not been read by a speaker and the sheet says so; wrong dosage wording is a safety issue. Malagasy dictation is excluded because Whisper produces confident French for Malagasy input. The audit chain detects tampering rather than preventing it. The facility overview is arithmetic, not epidemiology. Country legal metadata is not legal advice. The evaluation corpus was written alongside the implementation and bounds correctness on anticipated cases only.</p>
+
+<div class="refs nobreak">
+<h2>References</h2>
+<ol>
+<li>Radford A. et al. Robust speech recognition via large-scale weak supervision (Whisper). 2022. arXiv:2212.04356.</li>
+<li>Xenova / Hugging Face. transformers.js: state-of-the-art machine learning for the web. github.com/huggingface/transformers.js.</li>
+<li>OpenMed. French clinical PII detection model (DistilBERT, Apache-2.0). huggingface.co/OpenMed.</li>
+<li>Magnini B. et al. The E3C project: European clinical case corpus. 2021. doi:10.57771/dey2-g751.</li>
+<li>HL7. FHIR Release 4. hl7.org/fhir/R4. · DHIS2. Data value sets. docs.dhis2.org.</li>
+<li>Smith R. An overview of the Tesseract OCR engine. ICDAR 2007.</li>
+</ol>
+</div>
+
+</div>
+</body>
+</html>

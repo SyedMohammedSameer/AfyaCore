@@ -301,6 +301,18 @@ async function main() {
     await visit(page, BASE)
     await shot(page, 'desktop-today')
 
+    // This surface must show a real model result, not a pasted transcript.
+    await visit(page, `${BASE}/studio`)
+    await clickText(page, 'button', /^run local speech model$/)
+    await page.waitForSelector('textarea[aria-label="Reviewed transcript"]', { timeout: 120_000 })
+    await shot(page, 'desktop-studio')
+    await scrollTo(page, /03 \/ field comparison/i)
+    await shot(page, 'desktop-studio-evidence')
+    await page.setViewport(MOBILE)
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await shot(page, 'mobile-studio')
+    await page.setViewport(DESKTOP)
+
     await visit(page, `${BASE}/patients`)
     await shot(page, 'desktop-roster')
 
@@ -326,12 +338,24 @@ async function main() {
 
     // Walk the clinical path by clicking, the same way a person would, so the
     // ids in the URLs stay whatever the seed happened to generate.
-    await clickText(page, 'a[href^="/patient/"]', /RAKOTOARISOA/)
+    //
+    // The patient with four visits, so the profile has trends to draw.
+    await clickText(page, 'a[href^="/patient/"]', /RAZAFIMAHATRATRA/)
     await shot(page, 'mobile-patient')
 
-    await clickText(page, 'a[href*="/review"]', /paludisme|malaria/)
+    // The review screen with work on it. The seed leaves one consultation as
+    // a draft with dictated values nobody has ticked, so this shows the
+    // per-field checklist doing its job rather than a confirmed record with
+    // nothing left to check.
+    await visit(page, BASE)
+    await clickText(page, 'a[href*="/encounter/"]', /ANDRIANARIVO/)
+    await clickText(page, 'button', /^review$/i)
     await shot(page, 'mobile-review')
 
+    // Instructions come from a confirmed consultation with prescriptions.
+    await visit(page, `${BASE}/patients`)
+    await clickText(page, 'a[href^="/patient/"]', /RAKOTOARISOA/)
+    await clickText(page, 'a[href*="/review"]', /paludisme|malaria/)
     await visit(page, `${page.url().replace('/review', '/instructions')}`)
     await shot(page, 'mobile-instructions')
 

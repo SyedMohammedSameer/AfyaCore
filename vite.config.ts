@@ -13,11 +13,12 @@ import { VitePWA } from 'vite-plugin-pwa'
  * import.meta.url)`. Vite treats that as an asset reference, resolves it, and
  * emits the file: 23.5 MB of `asyncify` core landing in `dist/` on every build.
  *
- * Nothing ever loads it. `src/lib/openmed.ts` sets `wasmPaths = '/ort/'`, and
- * the runtime resolves its core by *filename* against that prefix, where
- * `npm run vendor:openmed` has placed the single 13 MB core we actually use. So
- * the emitted asset is pure deployment weight: it quadruples the size of a
- * `dist/` a facility's server has to host, to ship a file no client requests.
+ * Nothing loads it from `assets/`. `src/lib/openmed.ts` and the speech worker
+ * set `wasmPaths = '/ort/'`, and the runtime resolves its core by *filename*
+ * against that prefix, where `npm run vendor:whisper` or `vendor:openmed` has
+ * placed it (the asyncify core this bundle asks for, and the plain one). So
+ * the emitted asset is pure deployment weight: a second copy of a 23 MB file
+ * under a hashed name that no client ever requests.
  *
  * Rewriting the expression to the bare filename removes the asset reference
  * while leaving the runtime's own resolution untouched, which is the behaviour
@@ -69,7 +70,11 @@ export default defineConfig({
         // that installed the optional PII model. Precaching it would put it in
         // every install, including the ones that never use it, which is exactly
         // the cost this app is built to avoid.
-        globIgnores: ['**/models/**', '**/ocr/**', '**/transformers*', '**/ort-*'],
+        // The speech worker carries its own copy of transformers.js (a worker
+        // is bundled as its own graph), so it is excluded for the same reason
+        // and cached on first use by the rule below. 545 kB was being
+        // precached on every install for a feature most installs never load.
+        globIgnores: ['**/models/**', '**/ocr/**', '**/transformers*', '**/ort-*', '**/asr.worker*'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/ocr\//, /^\/models\//],
         cleanupOutdatedCaches: true,
@@ -83,6 +88,18 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'afyacore-ocr',
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // The sample dictations, a few hundred kB of synthetic speech used
+            // for demonstrations. Not precached, for the same reason as the
+            // models; kept once fetched so a booth demo survives the hall's
+            // wifi going down between the first play and the second.
+            urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/samples/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'afyacore-samples',
               cacheableResponse: { statuses: [0, 200] },
             },
           },
@@ -124,7 +141,7 @@ export default defineConfig({
             // whole premise is a 130 kB install over 2G.
             urlPattern: ({ url }: { url: URL }) =>
               url.pathname.startsWith('/models/') ||
-              /\/(transformers|ort-).*\.(js|wasm|mjs)$/.test(url.pathname),
+              /\/(transformers|ort-|asr\.worker).*\.(js|wasm|mjs)$/.test(url.pathname),
             handler: 'CacheFirst',
             options: {
               cacheName: 'afyacore-models',

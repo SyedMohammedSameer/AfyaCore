@@ -131,11 +131,39 @@ export interface Prescription {
  */
 export interface FieldProvenance {
   source: CaptureSource
-  /** 0–1. Only meaningful for `voice`/`photo`. */
+  /** Rule-match strength, NOT a calibrated probability that the value is correct. */
   confidence?: number
   /** The raw text the value was extracted from, for audit and correction. */
   rawText?: string
 }
+
+/**
+ * Below this rule-match strength, a machine value is labelled *Check this* and
+ * sorted to the top of the review checklist.
+ *
+ * It does not decide *whether* a value is reviewed. Every machine-entered
+ * value has to be ticked individually before a consultation can be confirmed
+ * (see lib/fieldReview.ts); this decides what a clinician reads **first**.
+ *
+ * The number was 0.8 and it was chosen by nobody, which the evaluation
+ * eventually noticed. `narrative()` in lib/clinicalExtract.ts gives every
+ * chief complaint and diagnosis a confidence of exactly 0.8, and the test was
+ * `< 0.8`, so the flag could never fire on the two fields a speech recogniser
+ * mangles most: on the spoken corpus, "diagnosis" and "chief complaint" were
+ * the majority of wrong values and not one of them carried a flag. Reading
+ * only the flagged rows would have found 1 error in 5.
+ *
+ * `npm run eval:asr` reports the measurement. Moving the line to the next
+ * boundary in the extractor's own scale takes the share of wrong values a
+ * flag-first reader reaches from 20% to 100% in English and from 18% to 91%
+ * in French. Above that line sit digit-derived vitals and prescriptions with
+ * a complete dose, frequency and duration; below it sit spoken numerals, unit
+ * inferences and narrative spans.
+ *
+ * Both numbers come from the corpus that found the problem, so they are a
+ * correction rather than an independent validation, and the README says so.
+ */
+export const UNCERTAIN_BELOW = 0.9
 
 export interface Encounter {
   id: string
@@ -151,6 +179,8 @@ export interface Encounter {
   prescriptions: Prescription[]
   /** Keyed by field path, e.g. "vitals.temperature" or "chiefComplaint". */
   provenance: Record<string, FieldProvenance>
+  /** Exact field/source snapshots acknowledged by a signed-in reviewer. */
+  fieldReviews?: Record<string, { signature: string; at: number; by: string }>
   /** IDs into the `attachments` table. */
   attachmentIds: string[]
   /**

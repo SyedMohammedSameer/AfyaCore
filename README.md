@@ -10,7 +10,7 @@
   <a href="https://github.com/SyedMohammedSameer/AfyaCore/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/SyedMohammedSameer/AfyaCore/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="Licence: MIT" src="https://img.shields.io/badge/licence-MIT-0d8b7d.svg"></a>
   <img alt="PWA" src="https://img.shields.io/badge/PWA-installable-0d8b7d.svg">
-  <img alt="Bundle" src="https://img.shields.io/badge/initial%20load-~139%20kB%20gzip-0d8b7d.svg">
+  <img alt="Bundle" src="https://img.shields.io/badge/initial%20load-~154%20kB%20gzip-0d8b7d.svg">
   <img alt="Offline" src="https://img.shields.io/badge/offline-first-0d8b7d.svg">
 </p>
 
@@ -20,12 +20,14 @@
 
 > **Status: pilot candidate, `0.0.2`.** Not yet validated with a facility or an NGO, and no clinician
 > has used it. Records are encrypted at rest on the device but not on the sync server, and on-device
-> speech recognition ships
-> but its accuracy on clinical French has not been measured by us. An external review in September 2026
-> found five release blockers — dictation sending audio off-device while the docs claimed otherwise,
-> rejected sync records silently marked as synced, "anonymous" exports that were still linkable,
-> role permissions declared but not enforced, and invalid FHIR identifiers — all now fixed, each
-> with a regression test named after the failure. See [Known limits](#known-limits),
+> speech recognition ships but its accuracy on real clinical speech has not been measured by us.
+> An external review in September 2026 found five release blockers: dictation sending audio
+> off-device while the docs claimed otherwise, rejected sync records silently marked as synced,
+> "anonymous" exports that were still linkable, role permissions declared but not enforced, and
+> invalid FHIR identifiers. Preparing a conference demonstration then found five more, including
+> on-device inference that had never once run in a browser while every screen reported the model
+> installed. All ten are fixed, each with a regression test named after the failure. See
+> [What review found](#what-review-found), [Known limits](#known-limits),
 > [SECURITY.md](SECURITY.md) and [docs/COMPLIANCE.md](docs/COMPLIANCE.md).
 
 ---
@@ -69,11 +71,17 @@ to `1` for the 110-second cut, which runs the same 500 words at a more comfortab
 The offline sequence is captured live rather than composed from stills, because it is the claim the
 project rests on: the capture enrols the device against a throwaway sync server, switches the
 browser's network off, reloads the page from nothing, and photographs each step. The sync chip
-above each phone in that shot is the app's own indicator, magnified — the first cut left sync
-unconfigured, so the chip read "Saved on device" whether the network was up or down and the online
+above each phone in that shot is the app's own indicator, magnified. The first cut left sync
+unconfigured, so the chip read "Saved on device" whether the network was up or down, and the online
 and offline frames were identical in the one place a viewer would look.
 
 It is silent on purpose. Add your own music.
+
+The conference cut is a different render of the same composition: 110 seconds at 1x with a
+voice-over underneath, which is what ML4H's demonstration track requires. `docs/ml4h/voiceover.md`
+is the script, timed to the beats; `node video/narrate.mjs` lays a synthetic scratch track down so
+the timing can be checked, and `SPEED=1 NARRATION=1 node video/render.mjs out/afyacore-ml4h.mp4`
+renders it. Record the real voice before submitting: `node video/narrate.mjs --voice you.m4a`.
 
 ---
 
@@ -88,14 +96,33 @@ than it behaved**, and nothing that failed when it did.
 | Found | Was | Now |
 |---|---|---|
 | Dictation | Audio streamed to the browser vendor while SECURITY.md claimed no third-party call at runtime | Transcribed on the device by a vendored Whisper model; where none is installed, on-device if the browser can, else off until acknowledged, audited, withdrawable |
-| Sync conflicts | A record the server rejected was marked as synced, and the pull could never correct it — permanent silent divergence | The canonical row travels with the rejection and converges; rejected rows are never acknowledged |
+| Sync conflicts | A record the server rejected was marked as synced, and the pull could never correct it, so the copies diverged permanently and silently | The canonical row travels with the rejection and converges; rejected rows are never acknowledged |
 | "Anonymous" exports | Stable encounter and prescription ids, exact row timestamps, and prescription notes never scrubbed at all | All ids pseudonymised per export, row timestamps dropped, notes scrubbed |
 | Role permissions | Declared in a matrix that only components consulted, and Settings did not | Enforced at the service boundary; a clinician cannot export identified, delete, repoint sync or erase |
 | FHIR ids | 73 characters against R4's 64-char limit, and `urn:uuid:` on things that were not UUIDs | Folded to a stable legal id; the compliance claim downgraded until a validator has actually run |
 
-Three of the five were invisible at the levels most often exercised — the FHIR
-overflow only bites identified exports, the export linkage only shows up when
-you diff two files — which is the argument for having somebody else read it.
+Three of the five were invisible at the levels most often exercised. The FHIR
+overflow only bites identified exports, and the export linkage only shows up
+when you diff two files. That is the argument for having somebody else read it.
+
+### What preparing a demonstration found
+
+Building the evaluation harness and the [Evidence Studio](#evidence-studio) for a conference
+submission turned out to be another reviewer, and a harsher one, because it exercised paths that no
+test and no screenshot had. Five more of the same shape, all fixed here, all with a regression test:
+
+| Found | Was | Now |
+|---|---|---|
+| On-device inference | Had **never once run in a browser**. transformers.js asks ONNX Runtime for an `asyncify` core the vendor scripts did not ship, and its runtime then refused the quantised Whisper decoder outright | Both cores vendored, the session keeps the graph's own dequantisation, and `npm run smoke:ml` presses the button in a real browser |
+| Every model availability screen | Reported the model installed regardless, because the probe checks for a `config.json` and not for a runtime that starts | Unchanged, and now honest, because the thing it describes works. The probe still cannot see a broken runtime, which is why the smoke walk exists |
+| Amendments | An unconfirmed machine value written during a correction reached a research export, and an unconfirmed diagnosis was counted as a malaria case in the district return. `finaliseEncounter` guards the draft-to-final moment and a correction is neither | The record stands and is still counted; the unconfirmed **field** is withheld at both boundaries, with the count in the export manifest |
+| The *Check this* flag | `confidence < 0.8` against a narrative confidence of exactly `0.8`, so it could never fire on a diagnosis or a complaint, which were most of every wrong value | A named threshold at the measured boundary. A flag-first reader now reaches 100% of wrong values in English and 91% in French, up from 20% and 18% |
+| The install-cost harness | Counted 147 kB gzip of a chunk no install fetches, once the speech worker left the precache, and reported a shell 55% larger than the real one | The exclusion list mirrors the build's, and the comment says it has to be kept in step by hand |
+
+The first two are one failure and it is the instructive one: **an availability check is not a
+liveness check.** Three probes, a settings screen and a green evaluation all agreed the speech
+model was installed and working, and none of them had ever asked it to transcribe anything. What
+found it was a button, pressed by a person, on the production build.
 
 ## The app
 
@@ -109,12 +136,17 @@ Every screenshot below is the real build against the synthetic demo workspace, r
 
 | Sign in | Review | Patient instructions |
 |---|---|---|
-| <img src="docs/screenshots/mobile-lock.webp" alt="PIN entry lock screen" width="240"> | <img src="docs/screenshots/mobile-review.webp" alt="Review screen showing per-field provenance" width="240"> | <img src="docs/screenshots/mobile-instructions.webp" alt="Patient instruction sheet in Malagasy with dosing icons" width="240"> |
-| A shared phone needs to know who is holding it, or the audit trail says "someone at this facility". | Per-field provenance. Low-confidence values are flagged *Check this* before anything is saved. | Rendered in the **patient's** language, with dosing icons for anyone who cannot read. |
+| <img src="docs/screenshots/mobile-lock.webp" alt="PIN entry lock screen" width="240"> | <img src="docs/screenshots/mobile-review.webp" alt="Review screen listing every machine-entered value with the phrase it came from and a tick for each" width="240"> | <img src="docs/screenshots/mobile-instructions.webp" alt="Patient instruction sheet in Malagasy with dosing icons" width="240"> |
+| A shared phone needs to know who is holding it, or the audit trail says "someone at this facility". | Every machine-entered value, with the phrase it came from, ticked one by one. The record cannot be saved until the last tick, and a value that changes afterwards is pending again. | Rendered in the **patient's** language, with dosing icons for anyone who cannot read. |
+
+| Patient | The transcript explains itself |
+|---|---|
+| <img src="docs/screenshots/mobile-patient.webp" alt="Patient profile with a trend line per vital across four visits" width="240"> | A dictated transcript is marked up before anything is applied: the words about to become a temperature, a drug, a diagnosis or a complaint each carry their own colour, and what is left unmarked is visibly headed for the notes. Drug names the recogniser misspelt are recovered from the formulary and offered at a confidence that forces review. |
+| Blood pressure and weight across four visits, coloured by the same threshold table as everywhere else. The timeline says what happened last time; this says which way it is going. | |
 
 The one screen worth dwelling on, in all three states it can be in. These are three captures of the
-same screen under two deployment configurations — `npm run screenshots` moves the speech model aside
-and back so both are photographed from the running app rather than described:
+same screen under two deployment configurations. `npm run screenshots` moves the speech model aside
+and back, so both are photographed from the running app rather than described:
 
 | With the speech model | Without it | After acknowledgement |
 |---|---|---|
@@ -130,13 +162,33 @@ breathe:
   <img src="docs/screenshots/desktop-reports.webp" alt="Monthly DHIS2 return, CSV export and the active country profile" width="820">
 </p>
 
+## Evidence Studio
+
+Open **Evidence Studio** in the navigation to run the browser speech model on
+synthetic French and English recordings, inspect each extracted field against
+its annotated reference, and correct the transcript. The original model score
+stays unchanged while the reviewed result updates. Text-only cases are clearly
+labelled; they exercise the extractor without invoking ML.
+
+![Evidence Studio](docs/screenshots/desktop-studio.webp)
+
+Each session can be downloaded as JSON with its source case, audio hash,
+original output, corrections, timing and scoring method. These are development
+cases, not evidence of clinical accuracy. See
+[product readiness and evaluation priorities](docs/ml4h/PRODUCT-READINESS.md).
+
+`npm run smoke:ml` extends the offline walk with real inference in both
+languages before and after a disconnected reload. Run it against the production
+preview with the Whisper pack installed. `npm run screenshots` also captures
+the Studio after a real model run.
+
 ## The interface
 
 Flat, warm and high-contrast, on an opaque `#F7F5F0` paper ground. The earlier treatment was glass
 and gradient, which reads as a consumer app and, more to the point, spends contrast on decoration:
 translucency over a coloured ground is exactly what fails on a cheap LCD held under a metal roof at
 midday. Depth here comes from a 1px hairline and a shadow you have to look for. Colour is reserved
-for meaning — a red pill on this screen means a vital is out of range and nothing else.
+for meaning: a red pill on this screen means a vital is out of range and nothing else.
 
 The ground is paper, not screen. Cool blue-grey is the safe choice and it is what DHIS2 and IBM
 Carbon (which OpenMRS 3 is built on) do, but it also makes a phone in a hot room look like a
@@ -149,9 +201,9 @@ than either done properly.
 
 Type is **IBM Plex Sans**, and it is now actually shipped. The stack previously named `Inter` and
 never loaded it, so on an Android phone the app silently rendered in whatever the system happened to
-have — which is also what every screenshot in this README used to show. One variable file covers
+have, which is also what every screenshot in this README used to show. One variable file covers
 every weight. Only the latin subset is declared, by hand: the package's own stylesheet declares six
-subsets, and while a browser fetches only the range it needs, the *bundler* does not — vite emitted
+subsets, and while a browser fetches only the range it needs, the *bundler* does not. Vite emitted
 all six and the service worker precached 162 kB of fonts for scripts this app has no strings in.
 French, Malagasy and English all fit inside latin, so 45 kB is the whole typographic budget, paid
 once and then cached permanently.
@@ -211,11 +263,61 @@ for (const remote of encounters) {
 }
 ```
 
+**A confirmation is per value, and it is bound to the value.** The review screen disables its
+button, but a disabled button is not a rule; this is. A tick records the exact snapshot the
+reviewer saw, and a record with a machine value nobody has ticked cannot become final however
+it is asked. [`src/lib/fieldReview.ts`](src/lib/fieldReview.ts), [`src/db/repo.ts`](src/db/repo.ts)
+
+```ts
+export function pendingReviews(encounter: Encounter): string[] {
+  return machineFields(encounter).filter((key) => !isReviewed(encounter, key))
+}
+
+// finaliseEncounter
+if (pendingReviews(existing).length > 0) throw new Error('review-required')
+```
+
+**And that guard had a hole, which the evaluation walked straight into.** `finaliseEncounter`
+guards the moment a *draft* becomes final. An amendment is written into a record that is already
+final, so a photo read during a correction put an unconfirmed weight into a research export and an
+unconfirmed diagnosis of `paludisme simple` into the district's malaria return, while the paragraph
+above claimed the opposite. Demoting the record back to `draft` would have fixed the leak and
+broken something worse, since the consultation really did happen and may already have been counted
+in a submitted figure. So the record stands and the **field** is withheld, at the two boundaries
+that matter. [`src/lib/fieldReview.ts`](src/lib/fieldReview.ts),
+[`src/lib/withholding.test.ts`](src/lib/withholding.test.ts)
+
+```ts
+// deidentify(), ahead of the privacy level: this is a rule about human
+// confirmation, so an identified export is bound by it too.
+const withheldPass = withholdAcross(encounters)
+
+// aggregateMonth(): the visit is still counted, under `other` rather than
+// under a diagnosis nobody confirmed.
+const { encounter } = withholdPendingFields(e)
+bump(classifyDiagnosis(encounter.diagnosis), band, sex)
+```
+
 ## What it does
 
 - **Patient roster**, accent-insensitive search over names, register numbers and phone numbers
 - **Consultation capture**, vitals, complaint, diagnosis, notes, prescriptions, photos
 - **Dictation → structured fields**, speak the consultation, get a filled form (French or English)
+- **An evidence workspace**, pick a synthetic case, run the speech model on the device, and see
+  the transcript, the fields it produced, which of them match the reference, what the app had
+  flagged, and how a human correction changes the score, with a session record you can download
+- **The transcript explains itself**, before anything is applied, the words about to become a
+  temperature, a drug or a diagnosis are marked in the transcript, colour by field type
+- **Per-field review**, every value the machine entered has to be ticked individually, against
+  the phrase it came from, before a consultation can be confirmed; a value that changes after
+  the tick is pending again
+- **A sample dictation**, with the speech model installed, a bundled synthetic recording runs
+  through the same segmenter and worker as the microphone, for rooms where a microphone cannot
+  be relied on
+- **Facility overview**, confirmed consultations per day for the last fortnight, and each
+  reporting indicator's week against the four before it, marked when it stands out
+- **Trends**, a line per vital across a patient's confirmed visits, coloured by the same
+  threshold table as everywhere else
 - **Triage colouring**, out-of-range and clinically urgent vitals are flagged at input
 - **Patient instruction sheet**, dosage instructions rendered in the *patient's* language, large,
   printable, and readable aloud
@@ -230,7 +332,7 @@ for (const remote of encounters) {
 - **A tamper-evident audit trail**, hash-chained locally and on the server, recording who created,
   amended, merged, deleted or exported what
 - **Trilingual interface**, French, Malagasy and English, switched from the header on any screen
-- **Exports**, FHIR R4 bundle, DHIS2 monthly `dataValueSet`, aggregate CSV, and a raw JSON dump —
+- **Exports**, FHIR R4 bundle, DHIS2 monthly `dataValueSet`, aggregate CSV, and a raw JSON dump,
   all gated on per-patient research consent at de-identified levels
 - **Sync** between the devices at a facility, with a zero-dependency server you can self-host
 - **De-identified export**, identifiers stripped before anything leaves the device, with a stable
@@ -248,7 +350,7 @@ Two things are translated independently, because they are used by different peop
 | **Patient instruction sheet** | the patient's recorded language | **10 languages, covering all nine countries** |
 | **Dictation and extraction** | the deployment's country | **French, English** |
 
-The patient sheet used to print in French, Malagasy and English — which meant that for **eight of
+The patient sheet used to print in French, Malagasy and English, which meant that for **eight of
 the nine countries it printed in the clinician's language**. A dispensary in Tanzania handed out
 English. That is exactly the failure the sheet exists to prevent, and it survived the pan-African
 work because phone patterns, formularies, statutes and HMIS names all generalised and the
@@ -278,7 +380,7 @@ languages and by a factor of four in the dose delivered. A facility deploying in
 languages needs a speaker who works in that health system to read five strings before a sheet is
 handed to a patient.
 
-What holds the sheet up meanwhile is the part that needs no translation at all — the drug name as
+What holds the sheet up meanwhile is the part that needs no translation at all: the drug name as
 written, the numerals, the total count to hand over, and the sunrise/midday/night dosing icons.
 Those were always the load-bearing elements for a patient with limited literacy, and they are
 identical in every language.
@@ -419,14 +521,14 @@ for the length of a session and nowhere else, so signing out, the idle timeout a
 all drop it, and the phone goes back to holding ciphertext.
 
 Adding a colleague wraps the key again rather than re-encrypting the database, changing a PIN
-rewrites one wrap, and disabling an account deletes theirs — so a departure takes effect that
+rewrites one wrap, and disabling an account deletes theirs, so a departure takes effect that
 evening rather than at the next sync. An account with no wrap signs in and reads nothing, and is
 told so; the only way it gets a key is somebody who already holds one setting its PIN, which is a
 property rather than an inconvenience.
 
 Ids and timestamps stay in the clear, because the sync badge, the retention purge and the roster's
-first page all have to work without decrypting the register. That leaks shape — how many
-consultations, on which days, how far behind sync — and nothing else. The four indexes that made
+first page all have to work without decrypting the register. That leaks shape, meaning how many
+consultations there were, on which days, and how far behind sync the device is, and nothing else. The four indexes that made
 patient names searchable on disk are gone, and the roster's search decrypts in memory to pay for it.
 
 Stated plainly: **a 4-digit PIN is still the weak link.** 600k PBKDF2 rounds put an offline search
@@ -476,10 +578,10 @@ every one ships `counselReviewed: false`, which the app displays. Retention peri
 wherever we could not establish them from a primary source: a confidently wrong retention period in
 a health system gets followed, whereas an obviously absent one gets asked about.
 
-A breach deadline is one of three things — a fixed number of hours, an immediate duty, or not
+A breach deadline is one of three things: a fixed number of hours, an immediate duty, or not
 established. It used to be `number | null`, and that shape was itself a bug: Uganda's DPPA s.23
 requires notification *immediately*, which is inexpressible as a nullable number, so it shipped as
-`72` — the GDPR-shaped figure a reader reaches for — and the app told administrators they had three
+`72`, the GDPR-shaped figure a reader reaches for, and the app told administrators they had three
 days they did not have. [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md) §5 carries the full matrix, what
 was checked to build it, and how confident each row is.
 
@@ -502,9 +604,13 @@ by an explicit script and none of them is in the install. Every model in
 [`docs/MODEL-RESEARCH.md`](docs/MODEL-RESEARCH.md) is an upgrade path behind an interface, not a
 launch blocker, which is what keeps the install small enough for a 2G connection.
 
-Initial download: **~139 kB gzipped** (the entry chunk and its stylesheet) plus a 45 kB font.
+Initial download: **~154 kB gzipped** (the entry chunk and its stylesheet) plus a 45 kB font.
 Routes beyond the home screen load on demand and are then cached permanently by the service worker;
-the full precached shell is 232 kB over the wire, 629 KiB on disk.
+the full precached shell is 350 kB over the wire, 974 KiB on disk. The speech worker, which carries
+its own copy of transformers.js, is no longer in that shell: 545 KiB was being precached on every
+install for a feature most installs never load, and it is now fetched and kept on first use like
+the models it drives. That exclusion also had to be added to the harness by hand, and until it was,
+`npm run eval` reported a precached shell 55% larger than the one a phone actually fetches.
 
 ## One app, every device
 
@@ -544,6 +650,7 @@ npm run admin      # server administration: facilities, enrolment codes, devices
 npm test           # extraction, merge, FHIR, de-identification, auth and audit suites
 npm run eval       # accuracy, de-identification recall and install cost
 npm run eval:stub  # the same, exercising the neural path against a fake backend
+npm run eval:asr   # speech to fields on the vendored Whisper pack (macOS voices; skips elsewhere)
 npm run smoke      # offline walk in a real browser: build and preview first
 npm run typecheck  # tsc --noEmit, no build
 npm run build      # vendor OCR assets + typecheck + production build
@@ -558,11 +665,11 @@ committed**, they are regenerated at build time, and the fetched model is cached
 clinical retention against **real** clinical narrative with gold annotations, rather than only
 against the synthetic corpus we wrote ourselves. It is not committed and not redistributed: the
 licence could not be established from a primary source (secondary sources disagree between CC BY 4.0
-and CC BY-NC 4.0), so rather than guess — the rule this project applies to retention periods and
-breach deadlines — it is fetched by whoever runs the evaluation, used for evaluation only, and
-cited. See the header of `scripts/vendor-e3c.mjs`.
+and CC BY-NC 4.0), it is fetched by whoever runs the evaluation, used for evaluation only, and
+cited, rather than guessed at. That is the rule this project already applies to retention periods
+and breach deadlines. See the header of `scripts/vendor-e3c.mjs`.
 
-Two model scripts are separate and optional, and neither is part of `npm run build` — making them
+Two model scripts are separate and optional, and neither is part of `npm run build`. Making them
 build steps would break the build anywhere the Hub is unreachable, which includes the connections
 this project is about:
 
@@ -603,7 +710,7 @@ fields**, which is not. The second is deterministic rules, runs in 0.05 ms, and 
 number in the evaluation comes from. The first is Whisper on the device, or the browser's
 recogniser where no model is installed.
 
-Whisper does not stream — it transcribes a finished buffer — so `src/lib/audio.ts` cuts the
+Whisper does not stream. It transcribes a finished buffer, so `src/lib/audio.ts` cuts the
 microphone at pauses and each utterance is transcribed as it closes. A segment has to be at least
 three seconds before a pause can end it, because clinicians pause constantly and a model handed
 "trente-huit neuf" alone has no idea it is looking at a temperature. Inference runs in a worker: a
@@ -626,6 +733,14 @@ Or in English:
 Either way you get: `38.5 °C`, `92 /min`, `120/80 mmHg`, complaint, diagnosis, and two correctly
 separated prescriptions with dose, frequency and duration.
 
+**Found by pressing the button.** Until this release the on-device path had never transcribed
+anything in a browser. transformers.js 4.x asks ONNX Runtime for its `asyncify` WebAssembly core
+and the vendor scripts shipped only the plain one, so the worker reported "no available backend
+found" at first inference, and the de-identification model failed the same way. Nothing caught
+it: the availability probes check for a model's `config.json`, not for a working runtime, and
+the evaluation runs in Node, where a different runtime loads. Both cores are vendored now, and
+the sample dictation in the panel is the test that would have found it.
+
 Details that took real work:
 
 - **Spoken numerals**, `trente-huit virgule cinq` → `38.5`, including the irregular French
@@ -645,8 +760,14 @@ Details that took real work:
 
 These are structural, not conventions:
 
-1. **Nothing AI-derived is ever saved without human confirmation.** Encounters start as `draft`;
-   only the review screen promotes one to `final`.
+1. **Nothing AI-derived is ever saved without human confirmation, field by field.** Encounters
+   start as `draft`; only the review screen promotes one to `final`, and it refuses until every
+   machine-entered value has been ticked individually. The tick is bound to the exact value the
+   reviewer saw: change the value and the tick comes off. One button over a page of numbers is
+   a review step nobody reads by the fortieth patient; this is what replaced it. And a value
+   nobody has ticked is withheld where the record **leaves the device** and where it **becomes a
+   statistic**, because `finaliseEncounter` only guards the moment a draft becomes final and a
+   correction is written into a record that is already final. See below.
 2. **Extraction never overwrites typed input.** If the clinician entered a value, dictation cannot
    replace it.
 3. **Provenance is per-field.** Every value carries its source (typed / dictated / photo) and the
@@ -667,9 +788,85 @@ destroyed. Accuracy numbers never fail a build; correctness failures do.
 
 | | French | English |
 |---|---|---|
-| Extraction P / R / F1 | 100% / 100% / 100% | 100% / 100% / 100% |
+| Extraction P / R / F1, clean text | 100% / 100% / 100% | 100% / 100% / 100% |
 | Cases | 12 | 10 |
-| Median latency | 0.44 ms | 0.51 ms |
+| Median latency | under 2 ms | under 2 ms |
+
+`npm run eval:asr` closes the gap those numbers left open. Each case is spoken by a text-to-speech
+voice, transcribed by the vendored Whisper pack through the same transformers.js build the phone
+runs, and pushed through the same extractor and the same scorer. **Field F1 from speech** is the
+number that matters: how much of the consultation reaches structured fields correctly once the
+recogniser is in the loop.
+
+| Speech → fields (whisper-base, q8) | French | English |
+|---|---|---|
+| Raw word error rate | 60% | 48% |
+| Field F1, extractor as first shipped | 36% | 60% |
+| **Field F1, extractor hardened against the recogniser** | **67%** | **91%** |
+| Real-time factor, Node on a laptop | 0.05 | 0.04 |
+
+The first row is pessimistic on purpose: Whisper writes `38,5` where the reference says
+`trente-huit virgule cinq`, and that scores as three errors although the extractor reads both.
+The gap between the second and third rows is what the recogniser actually cost and what could be
+recovered from it. The failures were regular. Whisper writes a comma where the clinician paused,
+so the full stop between `paludisme simple` and `paracétamol 500 mg` arrived as a comma and the
+diagnosis swallowed the prescription. It spells drugs as it hears them: `par assez tamol`,
+`a mux ici une`, `artémété lume et fantrine`. It writes `500mg` as one token and `5/7` as
+`5 stroke 7`, and drops the word `poids` while keeping `12,4 kg`. Every one of those is now
+handled ([`src/lib/clinicalExtract.asr.test.ts`](src/lib/clinicalExtract.asr.test.ts) pins each
+against the verbatim transcript), and the drug names are recovered by edit distance against the
+formulary under two guards: a candidate counts only when a dose, frequency or duration follows
+it, and it is always scored below the review threshold, so it is flagged and has to be ticked
+with the raw phrase in view ([`src/lib/fuzzyDrug.ts`](src/lib/fuzzyDrug.ts)). What remains is
+lost in the audio: `pouls quatre-vingt-douze` came back as `pougat revendouse` and no rule can
+have that.
+
+Two things this table does not say. **It is not an upper bound on field performance**, which is the
+easy thing to call it and the wrong one. Text-to-speech removes what obviously makes recognition
+harder, meaning noise, a queue at the door, disfluency and accent, and it adds a domain mismatch of its own,
+since Whisper was trained on human speech and a synthesiser is not one, and it pronounces drug
+names the way a dictionary would rather than the way a clinician does. It is a controlled,
+reproducible condition that measures the whole pipeline with the exact model files the phone runs,
+and it is not a substitute for recordings of the people who would use this. And priming the decoder
+with the formulary, the documented way to teach Whisper vocabulary, produced byte-identical
+transcripts through this pipeline (`--prime`), so it is reported as tried and not adopted rather
+than as a feature.
+
+### The uncertainty flag was pointing at the wrong fields
+
+Every machine value has to be ticked before a consultation can be confirmed, so the *Check this*
+flag does not decide **whether** a value is reviewed. It decides what a clinician reads **first**:
+flagged rows are labelled and sorted to the top. That makes it worth asking whether the rows the
+app is unsure about are the rows it gets wrong, and until this release nobody had.
+
+They were not. The flag was `confidence < 0.8`, and `narrative()` gives every chief complaint and
+diagnosis a confidence of exactly `0.8`. The two fields a speech recogniser mangles most could not
+be flagged by construction, and they were the majority of every wrong value on the spoken corpus.
+
+| Reading only the flagged rows | French | English |
+|---|---|---|
+| Wrong values reached, at the old `< 0.8` | 18% | 20% |
+| **Wrong values reached, at the measured `< 0.9`** | **91%** | **100%** |
+| Error rate among rows it does not flag | 39% → 9% | 13% → 0% |
+| Share of rows it asks a clinician to read first | 21% → 62% | 11% → 46% |
+
+A row here is what a clinician actually ticks: each vital, the complaint, the diagnosis, and each
+prescription as a whole. Only values the extractor produced are counted, because a field it missed
+has no row on the screen and no flag to be right or wrong about.
+
+The new line is not a tuned parameter. It is the next boundary in the extractor's own scale: above
+it sit vitals transcribed as digits and prescriptions with a complete dose, frequency and duration;
+below it sit spoken numerals, the cmHg unit inference, recovered drug names and narrative spans.
+`npm run eval:asr` prints the error rate at every confidence the extractor emits, so a reader can
+judge a different line.
+
+⚠️ **This is a correction, not a validation.** Both columns come from the corpus that found the
+problem, and 64 rows across 22 cases is a small sample to move a threshold on. What the numbers
+support is that the old line was in the wrong place; what they cannot support is a precise claim
+about the new one. The one wrong value the flag still misses is a systolic of 133 the recogniser
+heard for 130, which arrived as digits and therefore looks confident.
+[`src/lib/uncertaintyFlag.test.ts`](src/lib/uncertaintyFlag.test.ts) pins the boundary so a later
+change cannot quietly put a narrative field back on the wrong side of it.
 
 | De-identification | deterministic | + OpenMed |
 |---|---|---|
@@ -682,16 +879,16 @@ destroyed. Accuracy numbers never fail a build; correctness failures do.
 
 | Install | |
 |---|---|
-| Initial load, blocking | 139 kB gzip |
+| Initial load, blocking | 154 kB gzip |
 | Interface font, `font-display: swap` | 45 kB raw |
-| Precached shell, background | 232 kB |
-| On demand, never precached | OCR ~7 MB · PII model ~67 MB |
+| Precached shell, background | 350 kB |
+| On demand, never precached | speech worker 545 KiB · ONNX Runtime 37 MB · OCR ~7 MB · speech model ~81 MB · PII model ~67 MB |
 
 Three things this table is careful about:
 
 **The off-roster row is the whole case for the neural pass.** Exact matching cannot reach a name the
-device does not hold, so it is 0% by construction. The 70 MB download moves it to **40%** — real,
-and nowhere near solved. The three it missed were `Ramanantsoa`, `Manjakandriana` and `Solofo`, all
+device does not hold, so it is 0% by construction. The 70 MB download moves it to **40%**, which is
+real and nowhere near solved. The three it missed were `Ramanantsoa`, `Manjakandriana` and `Solofo`, all
 Malagasy: this is a French model with a 30,522-token *English* WordPiece vocabulary and accent
 stripping, so Malagasy proper nouns fragment heavily. It is weakest exactly where this app is
 deployed, which is worth more as a finding than a good number would have been.
@@ -699,34 +896,39 @@ deployed, which is worth more as a finding than a good number would have been.
 **Clinical retention is not decoration.** A scrubber that redacts every word scores 100% recall and
 destroys the record. On real French the model cost 2.4% of gold clinical entities before a guard was
 added, and the worst losses were `lymphome malin non hodgkinien`, `hernie de Spiegel`,
-`Castleman's disease` and `Henoch-Schönlein purpura` — because Hodgkin, Spiegel, Castleman, Henoch
+`Castleman's disease` and `Henoch-Schönlein purpura`, because Hodgkin, Spiegel, Castleman, Henoch
 and Schönlein are **surnames**. A PII model is right to flag them and the result is a record missing
 its diagnosis. It also ate `paracétamol`. Neither failure was findable on a corpus we wrote
 ourselves: a "must keep" list can only contain terms somebody thought of, and nobody thinks of
 eponyms until a model eats one. See [`docs/MODEL-RESEARCH.md`](docs/MODEL-RESEARCH.md) §4b for the
 guard and for the residual 1.7%, which is lowercase common nouns like `lyse` and `melena` that are
-also given names — reported rather than engineered around, because the obvious fix (distrust a name
-label on a lowercase token) is dangerous when dictation output is frequently all-lowercase.
+also given names. Those are reported rather than engineered around, because the obvious fix
+(distrust a name label on a lowercase token) is dangerous when dictation output is frequently
+all-lowercase.
 
 ⚠️ **The FHIR bundle has not been through the official validator**, so "standards-compliant" is not
 a claim made here. Two concrete defects found by review and fixed: derived resource ids
 (`<encounter>-<prescription>`) exceeded R4's 64-character limit on identified exports, where the
-underlying ids are real UUIDs — de-identified exports stayed inside it only because pseudonyms are
-eight characters, so the defect was invisible at the levels most often exercised; and every derived
+underlying ids are real UUIDs, and de-identified exports stayed inside it only because pseudonyms
+are eight characters, so the defect was invisible at the levels most often exercised; and every derived
 id was emitted as `urn:uuid:<not-a-uuid>`, which a validator rejects at the bundle level. Running
 `org.hl7.fhir.validator` over identified, pseudonymous and anonymous fixtures is the outstanding
 work before the claim goes back.
 
 **The offline claim is tested in a browser, not asserted.** `npm run smoke` drives the production
 build through Chromium: create an account, load the demo, **turn the network off**, reload, sign in,
-open the roster, record a consultation, reload again, and come back online. Eleven steps, all of
-which must pass. Unit tests cannot see the service worker, the precache manifest and IndexedDB
+open the roster, record a consultation, reload again, and come back online. Twelve steps, all of
+which must pass. `npm run smoke:ml` makes it fourteen and covers the claim the models
+rest on: it transcribes a French and an English clip with the vendored Whisper pack while online,
+then does it again after an offline reload and asserts the two transcripts are identical, so
+"inference runs on the device" is checked rather than inferred from the absence of a request. It
+stays behind a flag because it needs the ~120 MB of models a CI runner has no reason to fetch. Unit tests cannot see the service worker, the precache manifest and IndexedDB
 persistence working *together*, and a precache that missed the shell fails in front of an audience
 rather than in CI. Verified by breaking it: with `**/*.html` and `**/*.js` added to `globIgnores`,
 the offline reload step fails, which is the whole point of having it.
 
 **Schema upgrades are tested against a database with data in it.** `src/db/migration.test.ts` opens
-a v1 and a v2 database, writes real consultations, then opens the current schema over the top —
+a v1 and a v2 database, writes real consultations, then opens the current schema over the top,
 which is exactly what a phone that has been in a health post for a year does after an update. A PWA
 has no review queue and no staged rollout: a push reaches every device at the facility on the next
 load. The test that matters most there asserts that a patient recorded before the consent field
@@ -734,8 +936,8 @@ existed is treated as **not** having consented, because a migration that backfil
 silently enrol a year of patients into research nobody asked them about.
 
 **Clinical retention is also measured on real clinical text.** `npm run vendor:e3c` scores
-retention against gold `CLINENTITY` annotations in the [E3C corpus](https://doi.org/10.57771/dey2-g751)
-— real published clinical narrative in French and English, annotated by people with no interest in
+retention against gold `CLINENTITY` annotations in the [E3C corpus](https://doi.org/10.57771/dey2-g751),
+real published clinical narrative in French and English, annotated by people with no interest in
 how this scrubber performs. It is out of domain (hospital case reports, not health-post dictation)
 and it has no PII layer, so it cannot measure recall; it measures the half our own corpus is least
 able to judge honestly, which is how much real clinical content a scrub destroys.
@@ -761,14 +963,24 @@ much quieter bug than a wrong one.
   to disclose. Without it, Chrome and Edge stream captured audio to their own recognition service,
   so a dictated consultation discloses the patient's voice, name and diagnosis to a third party; the
   app then asks for browser on-device recognition (Chrome 138+), and where that is unavailable too,
-  dictation is **off until an administrator acknowledges the disclosure** — audited, withdrawable,
-  and reminded on screen while in force. Typing always works offline and never leaves the device.
-- ⚠️ **On-device speech is unmeasured here, and covers French and English only.** The word error
-  rate of the vendored model on clinical French, in a consultation room, on the phones this
-  targets, has not been measured by us — the published Common Voice figures are not that setting.
+  dictation is **off until an administrator acknowledges the disclosure**, which is audited,
+  withdrawable, and reminded on screen while in force. Typing always works offline and never leaves the device.
+- ⚠️ **On-device speech is measured on synthetic speech only, and covers French and English.**
+  `npm run eval:asr` puts field F1 from speech at 67% in French and 91% in English on a
+  text-to-speech voice. That is a controlled condition, not a bound in either direction: it removes
+  noise and accent and adds a synthetic-speech domain mismatch. Nobody has measured a clinician
+  dictating in a consultation room on the phones this targets, and the next thing worth doing is
+  collecting consented role-play recordings from intended users and annotating them independently.
   Malagasy is deliberately excluded: Whisper produces confident French for Malagasy input rather
   than failing, and a wrong transcription in a clinical field is worse than none, so Malagasy stays
   on the browser path. Measure it before relying on it.
+- ⚠️ **The uncertainty flag's threshold was moved on 64 rows.** It is measurably better placed
+  than the old one and it is not calibrated. Nothing depends on it being right: every machine
+  value is reviewed regardless, and the flag only decides reading order.
+- ⚠️ **The facility overview is arithmetic, not epidemiology.** A week is marked when its count
+  exceeds the mean of the previous four by more than two standard deviations, with a floor so a
+  baseline of zeros cannot mark a single case. It knows nothing of season, catchment or a
+  campaign that brought more people through the door, and the screen calls it a prompt to look.
 - ⚠️ **The audit chain detects tampering, it does not prevent it.** A hash chain makes an edited or
   deleted entry visible, but anyone who can rewrite the whole chain leaves no trace. Recording the
   head hash off the device is the mitigation, and it is manual.
@@ -778,9 +990,9 @@ much quieter bug than a wrong one.
   under it. The device half also inherits the strength of a 4-to-12 digit PIN, which is real but
   finite: 600k PBKDF2 rounds make an offline search of a 4-digit PIN a matter of hours.
 - ⚠️ **Erasure is still a tombstone.** `deletePatient` destroys the attachment photographs but leaves
-  the patient and encounter rows as tombstones on both the device and the server — correct for sync
-  convergence, wrong for a data-subject erasure request, which wants the clinical content gone from
-  both sides. Retention purge (below) destroys rows properly, but it works on age, not on a
+  the patient and encounter rows as tombstones on both the device and the server. That is correct
+  for sync convergence and wrong for a data-subject erasure request, which wants the clinical
+  content gone from both sides. Retention purge (below) destroys rows properly, but it works on age, not on a
   patient's request. Tracked as R10 in [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
 - ⚠️ **The retention *period* is unknown for most countries.** The mechanism exists on both device
   and server; the number does not. Retention is generally set by health-sector rules rather than the
@@ -794,9 +1006,9 @@ much quieter bug than a wrong one.
 - ⚠️ **Deleting a confirmed consultation changes figures already reported.** The record drops out of
   the monthly aggregate, so a re-export will not match what was submitted. The prompt says so, but
   nothing enforces it; a reporting lock once a month is exported is the real fix.
-- **OCR covers French and English only**, and follows the *country*, not the interface language —
-  the same binding the extractor uses, because documentation language is a property of the health
-  system rather than of the person holding the phone. A device downloads exactly one model. There is
+- **OCR covers French and English only**, and follows the *country*, not the interface language.
+  That is the same binding the extractor uses, because documentation language is a property of the
+  health system rather than of the person holding the phone. A device downloads exactly one model. There is
   no Malagasy model: Tesseract has no `mlg`, so a Malagasy register is read with `fra`.
 - **OCR reads print well, handwriting poorly.** Expect heavy correction on handwritten registers,
   this is a property of the problem, not of the implementation.

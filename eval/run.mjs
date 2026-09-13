@@ -27,6 +27,7 @@
  */
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { scoreE3C } from './e3c.mjs'
+import { prf, scoreExtraction } from './score.mjs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
@@ -66,84 +67,6 @@ const explainSpans = process.argv.includes('--explain')
  * Extraction
  * ------------------------------------------------------------------ */
 
-/**
- * Score one extraction case field by field.
- *
- * Counted as a micro-average over atomic facts (each vital, each prescription
- * attribute, complaint, diagnosis) rather than per case. A case-level
- * "correct/incorrect" would let one missed duration mark an otherwise perfect
- * consultation as a failure, which tells a reader nothing about where the
- * extractor is weak.
- */
-function scoreExtraction(expected, actual) {
-  let tp = 0
-  let fp = 0
-  let fn = 0
-  const misses = []
-
-  const compare = (key, want, got) => {
-    if (want === undefined && got === undefined) return
-    if (want === undefined) {
-      fp++
-      misses.push(`+${key}=${got}`)
-      return
-    }
-    if (got === undefined) {
-      fn++
-      misses.push(`-${key}`)
-      return
-    }
-    if (typeof want === 'number' ? Math.abs(want - got) < 1e-6 : normalise(want) === normalise(got)) {
-      tp++
-    } else {
-      // A wrong value is both a miss and a spurious answer. Counting it only as
-      // a miss would let a confidently wrong extractor look merely incomplete.
-      fp++
-      fn++
-      misses.push(`~${key}: want ${want}, got ${got}`)
-    }
-  }
-
-  const wantVitals = expected.vitals ?? {}
-  const gotVitals = actual.vitals ?? {}
-  for (const key of new Set([...Object.keys(wantVitals), ...Object.keys(gotVitals)])) {
-    compare(`vitals.${key}`, wantVitals[key], gotVitals[key]?.value)
-  }
-
-  compare('chiefComplaint', expected.chiefComplaint, actual.chiefComplaint?.value)
-  compare('diagnosis', expected.diagnosis, actual.diagnosis?.value)
-
-  const wantRx = expected.prescriptions ?? []
-  const gotRx = actual.prescriptions ?? []
-  for (let i = 0; i < Math.max(wantRx.length, gotRx.length); i++) {
-    const want = wantRx[i]
-    const got = gotRx[i]
-    if (!want) {
-      fp++
-      misses.push(`+rx[${i}]=${got?.drug}`)
-      continue
-    }
-    if (!got) {
-      fn++
-      misses.push(`-rx[${i}]=${want.drug}`)
-      continue
-    }
-    for (const attr of ['drug', 'dose', 'frequencyPerDay', 'durationDays']) {
-      compare(`rx[${i}].${attr}`, want[attr], got[attr])
-    }
-  }
-
-  return { tp, fp, fn, misses }
-}
-
-const normalise = (s) =>
-  String(s)
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim()
-
 async function runExtraction(extractClinical, locales) {
   const files = (await readdir(join(here, 'corpus'))).filter((f) => f.startsWith('extraction.'))
   const results = []
@@ -180,20 +103,6 @@ async function runExtraction(extractClinical, locales) {
   }
 
   return results
-}
-
-function prf(tp, fp, fn) {
-  const precision = tp + fp === 0 ? 1 : tp / (tp + fp)
-  const recall = tp + fn === 0 ? 1 : tp / (tp + fn)
-  const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall)
-  return {
-    tp,
-    fp,
-    fn,
-    precision: Number(precision.toFixed(4)),
-    recall: Number(recall.toFixed(4)),
-    f1: Number(f1.toFixed(4)),
-  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -410,8 +319,17 @@ async function measureBundle() {
     const path = join(assets, file)
     const { size } = await stat(path)
 
-    // Mirrors globIgnores in vite.config.ts: these never enter the precache.
-    if (/transformers|ort-/.test(file)) {
+    /*
+     * Mirrors globIgnores in vite.config.ts: these never enter the precache.
+     *
+     * `asr.worker` joined that list when the speech worker turned out to be
+     * carrying its own copy of transformers.js — a worker is bundled as its
+     * own graph, so the exclusion for the first copy did not match it. This
+     * pattern has to be kept in step with the one in vite.config.ts by hand,
+     * and when it was not, the reported precache figure was 55% too high:
+     * it counted 147 kB gzip of a chunk no install fetches.
+     */
+    if (/transformers|ort-|asr\.worker/.test(file)) {
       onDemandRaw += size
       continue
     }

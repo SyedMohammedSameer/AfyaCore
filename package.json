@@ -19,6 +19,7 @@
     "eval": "vite-node eval/run.mjs",
     "eval:stub": "vite-node eval/run.mjs -- --stub-neural",
     "eval:explain": "vite-node eval/run.mjs -- --explain",
+    "eval:asr": "vite-node eval/asr.mjs",
     "vendor:ocr": "node scripts/vendor-ocr.mjs",
     "vendor:openmed": "node scripts/vendor-openmed.mjs",
     "vendor:whisper": "node scripts/vendor-whisper.mjs",
@@ -29,7 +30,9 @@
     "smoke": "node scripts/smoke.mjs",
     "sync": "node server/sync-server.mjs",
     "admin": "node server/cli.mjs",
-    "record:demo": "node scripts/record-demo.mjs"
+    "record:demo": "node scripts/record-demo.mjs",
+    "smoke:ml": "node scripts/smoke.mjs --with-ml",
+    "samples:studio": "node scripts/studio-samples.mjs"
   },
   "dependencies": {
     "dexie": "^4.4.4",

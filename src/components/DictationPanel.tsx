@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Mic, ShieldAlert, ShieldCheck, Square, WandSparkles, WifiOff } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { FlaskConical, Mic, ShieldAlert, ShieldCheck, Square, WandSparkles, WifiOff } from 'lucide-react'
+import { TranscriptHighlights } from './TranscriptHighlights'
 import { Button, Card, cx } from './ui'
 import { useOnline } from './AppShell'
 import { recogniser } from '../lib/speech'
@@ -35,6 +36,9 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
   const [finalText, setFinalText] = useState('')
   const [interim, setInterim] = useState('')
   const [disclosure, setDisclosure] = useState<DictationState | null>(null)
+  // Where the audio is coming from while `listening`: the room, or a bundled
+  // recording played for a demonstration.
+  const [source, setSource] = useState<'mic' | 'sample'>('mic')
 
   // Interim results arrive continuously; keeping the committed text in a ref
   // avoids a stale closure inside the recogniser callback.
@@ -55,6 +59,7 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
     if (local.current) local.current.stop(locale.speechLang)
     else recogniser.stop()
     setListening(false)
+    setSource('mic')
     setInterim('')
   }, [locale.speechLang])
 
@@ -98,8 +103,37 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
     setListening(false)
   }, [])
 
+  /**
+   * A bundled recording, run through the on-device model.
+   *
+   * Only where the model is installed: the browser recogniser cannot take a
+   * file, and playing a clip into the room microphone would be a trick. The
+   * clip is a synthetic voice reading a made-up consultation, and the panel
+   * says so, because a demo that let an audience believe they were hearing
+   * a patient would be lying about the one thing this app is careful about.
+   */
+  const sampleUrl =
+    locale.speechLang === 'fr-FR'
+      ? '/samples/dictation-fr.m4a'
+      : locale.speechLang === 'en-US'
+        ? '/samples/dictation-en.m4a'
+        : null
+
+  async function playSample() {
+    if (!localPack || !sampleUrl) return
+    setError('')
+    reset()
+    setSource('sample')
+    setListening(true)
+    local.current ??= new LocalWhisperRecogniser(localPack)
+    await local.current.transcribeUrl(sampleUrl, locale.speechLang, onResult, onError)
+    setListening(false)
+    setSource('mic')
+  }
+
   function start() {
     setError('')
+    setSource('mic')
     setListening(true)
     if (localPack) {
       local.current ??= new LocalWhisperRecogniser(localPack)
@@ -120,6 +154,19 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
     setFinalText('')
     setInterim('')
   }
+
+  // Above the early returns below, because it is a hook. The panel renders its
+  // main body while `disclosure` is still unknown and may then switch to the
+  // disclosure card; a hook that exists in one of those renders and not the
+  // other unmounts the whole screen, which `npm run screenshots` caught as a
+  // blank frame the moment the speech pack was hidden.
+  //
+  // Re-run on every change to the transcript so the marks keep up with the
+  // words. Microseconds, per the evaluation, so there is nothing to debounce.
+  const preview = useMemo(
+    () => (finalText.trim() ? extractClinical(finalText, locale) : null),
+    [finalText, locale],
+  )
 
   // The local path needs a microphone and a worker, not the browser's Web
   // Speech API, so `disclosure` decides rather than `recogniser.available`:
@@ -217,13 +264,23 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
 
         <div className="min-w-0 flex-1">
           <p className="text-lg leading-tight font-extrabold tracking-[-0.03em] text-ink">
-            {listening ? t.listening : t.dictate}
+            {listening ? (source === 'sample' ? t.transcribing : t.listening) : t.dictate}
           </p>
           <p className="mt-0.5 text-sm leading-snug text-ink-3">
-            {localPack ? t.dictationLocalHint : t.dictationHint}
+            {listening && source === 'sample' ? t.sampleHint : localPack ? t.dictationLocalHint : t.dictationHint}
           </p>
         </div>
       </div>
+
+      {localPack && sampleUrl && !listening && !hasText && (
+        <button
+          onClick={() => void playSample()}
+          className="press press-active -mt-1 inline-flex items-center gap-2 self-start rounded-full px-3 py-1.5 text-sm font-semibold text-brand-700 ring-1 ring-brand-200 hover:bg-brand-50"
+        >
+          <FlaskConical size={15} />
+          {t.playSample}
+        </button>
+      )}
 
       {error && (
         <p className="rounded-field bg-danger-50 p-2.5 text-sm font-medium text-danger-700">
@@ -231,17 +288,14 @@ export function DictationPanel({ onApply }: DictationPanelProps) {
         </p>
       )}
 
-      {(hasText || interim) && (
+      {hasText && preview ? (
+        <TranscriptHighlights text={finalText} interim={interim} result={preview} />
+      ) : interim ? (
         <div className="surface-card rounded-field p-3.5">
-          <p className="mb-1 text-[0.6875rem] font-bold tracking-wider text-ink-4 uppercase">
-            {t.transcript}
-          </p>
-          <p className="text-base leading-relaxed text-ink">
-            {finalText}
-            {interim && <span className="text-ink-4"> {interim}</span>}
-          </p>
+          <p className="mb-1 text-[0.6875rem] font-bold tracking-wider text-ink-4 uppercase">{t.transcript}</p>
+          <p className="text-base leading-relaxed text-ink-4">{interim}</p>
         </div>
-      )}
+      ) : null}
 
       {hasText && (
         <div className="flex gap-2">

@@ -180,6 +180,13 @@ function decode(ffmpeg, from, height, dir, index) {
 
 async function main() {
   const ffmpeg = await findFfmpeg()
+  // The compositor's ffmpeg is linked against dylibs that sit beside it, and
+  // nothing sets the loader path when it is run outside Remotion: called
+  // directly it dies with "Library not loaded: libavdevice.dylib". Point the
+  // loader at its own directory; a system ffmpeg ignores the variable.
+  for (const key of ['DYLD_LIBRARY_PATH', 'LD_LIBRARY_PATH']) {
+    process.env[key] = [dirname(ffmpeg), process.env[key]].filter(Boolean).join(':')
+  }
   try {
     await access(SOURCE)
   } catch {

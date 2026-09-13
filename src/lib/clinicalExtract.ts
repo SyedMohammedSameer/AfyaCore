@@ -17,6 +17,7 @@
  */
 import { VITAL_RANGES, type VitalKey } from '../db/schema'
 import { FR_LOCALE, type ClinicalLocale } from './clinicalLocales'
+import { fuzzyDrugHits } from './fuzzyDrug'
 
 export interface ExtractedField<T> {
   value: T
@@ -33,6 +34,11 @@ export interface ExtractedPrescription {
   durationDays?: number
   rawText: string
   confidence: number
+  /**
+   * True when the name was recovered from a recogniser's misspelling by the
+   * fuzzy pass (see fuzzyDrug.ts). Always low confidence; always reviewed.
+   */
+  recovered?: boolean
 }
 
 export interface ExtractionResult {
@@ -153,6 +159,31 @@ export function extractClinical(text: string, locale: ClinicalLocale = FR_LOCALE
     }
   }
 
+  // --- Unit-only vitals -----------------------------------------------------
+  // A recogniser drops the trigger word more often than the unit: "poids
+  // douze virgule quatre kilos" came back as "12,4 kg" with no "poids" at
+  // all. A number followed by a weight or height unit is unambiguous enough
+  // to take, scored lower because it is an inference rather than a match.
+  const unitFallbacks: { key: VitalKey; units: string }[] = [
+    { key: 'weight', units: 'kg|kilos?|kilogrammes?|kilograms?' },
+    { key: 'height', units: 'cm|centimetres?|centimeters?' },
+  ]
+  for (const { key, units } of unitFallbacks) {
+    if (vitals[key]) continue
+    const re = new RegExp(`(?<![\\d.,])(${N})\\s*(?:${units})\\b`, 'g')
+    let m: RegExpExecArray | null
+    while ((m = re.exec(folded)) !== null) {
+      const value = locale.parseNumber(m[1]!)
+      if (value === undefined || !plausible(key, value)) continue
+      const start = m.index
+      const end = m.index + m[0].length
+      if (claims.some((c) => start < c.end && end > c.start)) continue
+      vitals[key] = { value, rawText: original.slice(start, end).trim(), confidence: 0.7 }
+      claims.push({ start, end })
+      break
+    }
+  }
+
   // --- Prescriptions --------------------------------------------------------
   // Hyphens fold to spaces so "artemether-lumefantrine" and the spaced form are
   // one entry. The replacement is length-preserving, so indices stay aligned.
@@ -177,6 +208,33 @@ export function extractClinical(text: string, locale: ClinicalLocale = FR_LOCALE
   }
   drugHits.sort((a, b) => a.start - b.start)
 
+  /**
+   * What a recogniser did to a drug name is recoverable more often than not,
+   * provided a dose, frequency or duration follows to prove the run of words
+   * was a prescription. See fuzzyDrug.ts for the rule and the two guards.
+   */
+  const contextAfter = (at: number) => {
+    const next = drugHits.find((h) => h.start > at)?.start ?? folded.length
+    const segment = folded.slice(at, Math.min(at + 90, next))
+    const stop = segment.search(/[.;]/)
+    const scoped = stop === -1 ? segment : segment.slice(0, stop)
+    return (
+      locale.dose(scoped) !== undefined ||
+      locale.frequency(scoped) !== undefined ||
+      locale.duration(scoped) !== undefined
+    )
+  }
+  const recovered = new Set<string>()
+  for (const hit of fuzzyDrugHits(foldedDrugs, locale.formulary, {
+    taken: drugHits,
+    isNumber: (run) => locale.parseNumber(run) !== undefined,
+    hasPrescriptionContext: contextAfter,
+  })) {
+    drugHits.push({ drug: hit.drug, start: hit.start, end: hit.end })
+    recovered.add(`${hit.start}:${hit.end}`)
+  }
+  drugHits.sort((a, b) => a.start - b.start)
+
   const prescriptions: ExtractedPrescription[] = []
   drugHits.forEach((hit, i) => {
     // A prescription's modifiers run until the next drug, the end of the
@@ -194,15 +252,23 @@ export function extractClinical(text: string, locale: ClinicalLocale = FR_LOCALE
     const durationDays = locale.duration(scoped)
     const claimEnd = hit.end + scoped.length
 
+    const wasRecovered = recovered.has(`${hit.start}:${hit.end}`)
     prescriptions.push({
-      drug: original.slice(hit.start, hit.end).trim(),
+      // A recovered name is offered in its canonical spelling, because the
+      // transcript's spelling is the thing that was wrong; the raw phrase
+      // travels alongside so the clinician can see what was actually heard.
+      drug: wasRecovered ? hit.drug : original.slice(hit.start, hit.end).trim(),
       dose,
       frequencyPerDay,
       durationDays,
       rawText: original.slice(hit.start, claimEnd).trim(),
       // An unqualified drug name is a weak signal; a full dose, frequency and
-      // duration triple is a strong one.
-      confidence: 0.5 + 0.5 * ([dose, frequencyPerDay, durationDays].filter((x) => x !== undefined).length / 3),
+      // duration triple is a strong one. A recovered name is never more than
+      // a suggestion, whatever followed it.
+      confidence: wasRecovered
+        ? 0.5
+        : 0.5 + 0.5 * ([dose, frequencyPerDay, durationDays].filter((x) => x !== undefined).length / 3),
+      ...(wasRecovered ? { recovered: true } : {}),
     })
     claims.push({ start: hit.start, end: claimEnd })
   })
@@ -237,10 +303,23 @@ export function extractClinical(text: string, locale: ClinicalLocale = FR_LOCALE
 
       const boundary = boundaryRe.exec(folded.slice(start, start + length))
       if (boundary) length = boundary.index
+      // A recovered drug name is a boundary too, though it is not in the
+      // word list: the diagnosis ends where the prescription begins.
+      for (const hit of drugHits) {
+        if (hit.start > start && hit.start < start + length) length = hit.start - start
+      }
+      // A recogniser writes a comma where the clinician paused, so the full
+      // stop between "paludisme simple" and "paracétamol 500 mg" arrives as a
+      // comma and the diagnosis swallows the prescription. A comma followed
+      // by a number, a unit or a dosing word is a new section, not a clause.
+      const commaCut = folded.slice(start, start + length).search(/,\s*(?=[^,]*(?:\d|\b(?:mg|g|ml|fois|pendant|matin|soir|tds|bd|od|qds|daily|for|times|twice)\b))/)
+      if (commaCut > 1) length = commaCut
       if (length < 2) continue
 
-      const value = original.slice(start, start + length).trim()
+      // Trailing punctuation is the recogniser's, not the clinician's.
+      const value = original.slice(start, start + length).replace(/[\s,;:.]+$/, '').trim()
       if (!value) continue
+      length = value.length + (original.slice(start, start + length).length - original.slice(start, start + length).trimStart().length)
 
       const end = start + length
       claims.push({ start: m.index, end })

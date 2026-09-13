@@ -169,6 +169,10 @@ export class LocalWhisperRecogniser {
   private segmenter: Segmenter | null = null
   private nextId = 1
   private stopped = true
+  /** Segments sent to the worker and not yet answered. */
+  private inflight = new Set<number>()
+  /** Plays a sample recording aloud while it is transcribed. */
+  private player: HTMLAudioElement | null = null
 
   constructor(
     private readonly pack: Pack,
@@ -192,32 +196,7 @@ export class LocalWhisperRecogniser {
     this.segmenter = new Segmenter(this.options.segmenter)
 
     try {
-      // Reused across dictations, deliberately. `start` used to create one
-      // every time, which meant a clinician who stopped and started again
-      // leaked the first worker — still holding a parsed 80 MB graph — and
-      // paid the load cost a second time. It also orphaned the tail segment
-      // `stop` had just sent to the old worker, so the last sentence of the
-      // previous dictation was silently lost.
-      this.worker ??= this.options.createWorker
-        ? this.options.createWorker()
-        : new Worker(new URL('./asr.worker.ts', import.meta.url), { type: 'module' })
-
-      this.worker.onmessage = (event: MessageEvent<FromWorker>) => {
-        const message = event.data
-        if (message.type === 'text') {
-          // Dropped silently rather than surfaced as an error: it is not a
-          // failure, it is the model having nothing to say about a segment.
-          if (!isHallucination(message.text)) {
-            onResult({ transcript: message.text.trim(), isFinal: true })
-          }
-        } else if (message.type === 'error') {
-          onError(message.message)
-        }
-      }
-      this.worker.onerror = () => onError('worker')
-      // Sent every start. The worker guards against loading twice, and the
-      // second message costs one structured clone of a small object.
-      this.worker.postMessage({ type: 'load', pack: this.pack } satisfies ToWorker)
+      this.attachWorker(onResult, onError)
 
       const open = this.options.openMicrophone
         ? this.options.openMicrophone
@@ -282,10 +261,129 @@ export class LocalWhisperRecogniser {
     }
   }
 
+
+  /**
+   * Create the worker once and point its messages at this dictation.
+   *
+   * Reused across dictations, deliberately. `start` used to create one every
+   * time, which meant a clinician who stopped and started again leaked the
+   * first worker, still holding a parsed 80 MB graph, and paid the load cost
+   * a second time. It also orphaned the tail segment `stop` had just sent to
+   * the old worker, so the last sentence of the previous dictation was
+   * silently lost.
+   */
+  private attachWorker(onResult: (r: SpeechResult) => void, onError: (e: string) => void): void {
+    this.worker ??= this.options.createWorker
+      ? this.options.createWorker()
+      : new Worker(new URL('./asr.worker.ts', import.meta.url), { type: 'module' })
+
+    this.worker.onmessage = (event: MessageEvent<FromWorker>) => {
+      const message = event.data
+      if (message.type === 'text') {
+        this.inflight.delete(message.id)
+        // Dropped silently rather than surfaced as an error: it is not a
+        // failure, it is the model having nothing to say about a segment.
+        if (!isHallucination(message.text)) {
+          onResult({ transcript: message.text.trim(), isFinal: true })
+        }
+      } else if (message.type === 'error') {
+        if (message.id !== undefined) this.inflight.delete(message.id)
+        onError(message.message)
+      }
+    }
+    this.worker.onerror = () => onError('worker')
+    // Sent every start. The worker guards against loading twice, and the
+    // second message costs one structured clone of a small object.
+    this.worker.postMessage({ type: 'load', pack: this.pack } satisfies ToWorker)
+  }
+
+  /**
+   * Transcribe a recording instead of the microphone.
+   *
+   * For demonstrations. A conference hall is the one room where a microphone
+   * cannot be relied on, and a demo of on-device dictation that cannot be
+   * heard over the hall is not a demo. The recording goes through exactly the
+   * path live audio does: decoded, resampled to 16 kHz, cut into utterances
+   * by the same segmenter, transcribed by the same worker, so what the
+   * audience sees is the model working and not a script.
+   *
+   * The clip is played aloud at the same time so the room hears what the
+   * model is hearing. Resolves once every segment has been answered.
+   */
+  async transcribeUrl(
+    url: string,
+    lang: RecogniserLang,
+    onResult: (r: SpeechResult) => void,
+    onError: (e: string) => void,
+    { play = true }: { play?: boolean } = {},
+  ): Promise<void> {
+    const language = WHISPER_LANG[lang]
+    if (!language) {
+      onError('unsupported-language')
+      return
+    }
+    this.stopped = false
+    try {
+      this.attachWorker(onResult, onError)
+
+      const response = await fetch(url)
+      if (!response.ok) throw new Error(`sample: HTTP ${response.status}`)
+      const bytes = await response.arrayBuffer()
+      const context = new AudioContext({ sampleRate: TARGET_RATE })
+      let audio: Float32Array
+      try {
+        const decoded = await context.decodeAudioData(bytes.slice(0))
+        // Samples are authored mono; a stereo file would be read from its
+        // left channel, which is fine for speech.
+        audio = resample(new Float32Array(decoded.getChannelData(0)), decoded.sampleRate, TARGET_RATE)
+      } finally {
+        void context.close().catch(() => {})
+      }
+      if (this.stopped) return
+
+      if (play) {
+        this.player?.pause()
+        this.player = new Audio(url)
+        void this.player.play().catch(() => {
+          // Autoplay policy or no output device. The transcription still
+          // runs; the room simply does not hear the clip.
+        })
+      }
+
+      // Fed frame by frame, the size the microphone delivers, so the
+      // segmenter behaves exactly as it does live and results arrive one
+      // utterance at a time rather than as one block at the end. Frames are
+      // copied because the segmenter holds references to what it is given.
+      const segmenter = new Segmenter(this.options.segmenter)
+      const FRAME = 4096
+      for (let at = 0; at < audio.length && !this.stopped; at += FRAME) {
+        const segment = segmenter.push(new Float32Array(audio.subarray(at, at + FRAME)))
+        if (segment) this.send(segment, language)
+      }
+      if (this.stopped) return
+      const tail = segmenter.flush()
+      if (tail) this.send(tail, language)
+
+      // Wait for the worker to answer everything it was sent, and for the
+      // clip to finish, whichever is later, so the caller can put the panel
+      // back to idle at the right moment.
+      while (!this.stopped && (this.inflight.size > 0 || (this.player && !this.player.ended && !this.player.paused))) {
+        await new Promise((r) => setTimeout(r, 150))
+      }
+    } catch (err) {
+      onError(String(err))
+    } finally {
+      this.player?.pause()
+      this.player = null
+    }
+  }
+
   private send(audio: Float32Array, language: string): void {
+    const id = this.nextId++
+    this.inflight.add(id)
     // Transferred rather than copied: a 25-second segment is 1.6 MB and
     // structured-cloning it on every pause is real jank on a cheap phone.
-    this.worker?.postMessage({ type: 'transcribe', id: this.nextId++, audio, language }, [
+    this.worker?.postMessage({ type: 'transcribe', id, audio, language }, [
       audio.buffer as ArrayBuffer,
     ])
   }
@@ -299,6 +397,8 @@ export class LocalWhisperRecogniser {
    */
   stop(language: RecogniserLang = 'fr-FR'): void {
     this.stopped = true
+    this.player?.pause()
+    this.player = null
     const tail = this.segmenter?.flush()
     const whisperLang = WHISPER_LANG[language]
     if (tail && whisperLang) this.send(tail, whisperLang)
@@ -328,6 +428,7 @@ export class LocalWhisperRecogniser {
     this.stop()
     this.worker?.terminate()
     this.worker = null
+    this.inflight.clear()
     // A disposed recogniser can be started again; it just pays for the model
     // load once more. Resetting the id keeps the two runs from sharing a
     // sequence, which only matters for reading a message trace.

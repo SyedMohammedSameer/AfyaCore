@@ -68,6 +68,7 @@ const Instructions = lazyRoute(() =>
   import('./routes/Instructions').then((m) => ({ default: m.Instructions })),
 )
 const Settings = lazyRoute(() => import('./routes/Settings').then((m) => ({ default: m.Settings })))
+const EvidenceStudio = lazyRoute(() => import('./routes/EvidenceStudio').then((m) => ({ default: m.EvidenceStudio })))
 
 function RouteFallback() {
   return (
@@ -112,6 +113,7 @@ function AppRoutes() {
           <Route path="/" element={<HomeScreen />} />
           <Route path="/patients" element={<Roster />} />
           <Route path="/reports" element={<Settings />} />
+          <Route path="/studio" element={<EvidenceStudio />} />
           <Route path="/patient/new" element={<NewPatient />} />
           <Route path="/patient/:patientId" element={<PatientProfile />} />
           {/* Same component as /patient/new: it switches to edit mode on the

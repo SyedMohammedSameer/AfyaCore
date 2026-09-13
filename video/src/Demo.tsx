@@ -1,5 +1,5 @@
 import React from 'react'
-import { AbsoluteFill, Sequence } from 'remotion'
+import { AbsoluteFill, Audio, Sequence, staticFile } from 'remotion'
 import { Title } from './Title'
 import { Scene } from './Scene'
 import { Models } from './Models'
@@ -45,7 +45,7 @@ const BEATS: Beat[] = [
       <Scene
         src="screens/mobile-today.webp"
         kicker="Open it and start"
-        claim="A full clinical record, in a 139 kB install."
+        claim="A full clinical record, in a 150 kB install."
         note="Opens from the home screen on any Android or iPhone. No app store, no account, no server to reach first. Drafts and today's consultations are the first thing you see."
       />
     ),
@@ -84,8 +84,8 @@ const BEATS: Beat[] = [
       <Scene
         src="screens/mobile-review.webp"
         kicker="You stay in charge"
-        claim="Every field shows where it came from."
-        note="Dictated, typed, or read from a photo. Anything the extractor was unsure of is flagged Check this before it can be saved, and machine output never overwrites something a clinician typed."
+        claim="Every machine value is confirmed by a person."
+        note="Each dictated value is listed with the phrase it came from and ticked one by one. The record cannot be saved until the last tick, a value that changes afterwards is pending again, and machine output never overwrites what a clinician typed."
       />
     ),
   },
@@ -128,10 +128,25 @@ const BEATS: Beat[] = [
 
 export const TOTAL = BEATS.reduce((n, b) => n + b.d, 0)
 
-export const Demo: React.FC = () => {
+export type DemoProps = {
+  /**
+   * Whether to lay `public/narration.m4a` under the picture.
+   *
+   * The submission cut needs a voice-over; the README trailer does not. The
+   * file is produced by `node video/narrate.mjs` (a synthetic scratch track)
+   * or recorded from `docs/ml4h/voiceover.md`, and is only referenced when
+   * asked for, so a render without it is not a render with a missing file.
+   */
+  narration: boolean
+  /** Playback speed the render is made at. See SPEED in theme.ts. */
+  speed: number
+}
+
+export const Demo: React.FC<DemoProps> = ({ narration }) => {
   let at = 0
   return (
     <AbsoluteFill style={{ background: theme.ground }}>
+      {narration && <Audio src={staticFile('narration.m4a')} />}
       {BEATS.map((beat, i) => {
         const from = at
         at += beat.d

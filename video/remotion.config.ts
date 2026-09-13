@@ -4,12 +4,12 @@ Config.setVideoImageFormat('jpeg')
 Config.setOverwriteOutput(true)
 
 /**
- * No audio track at all.
+ * Muting is decided per render, in `render.mjs`, not here.
  *
- * Remotion muxes a silent AAC track by default even when a composition has no
- * sound in it. Music is added afterwards in an editor, and a silent track that
- * arrives first is something to notice and delete rather than something that
- * helps — so the render leaves the audio slot genuinely empty.
+ * The README trailer is silent on purpose (a muxed silent track confused
+ * every player we tried it in) and passes `--muted`. The conference cut lays
+ * a voice-over under the picture and must not be muted. A `Config.setMuted`
+ * in this file won the argument over the composition's own Audio element,
+ * so the narrated render came out with no audio stream at all, which is the
+ * one defect a submission video cannot survive.
  */
-Config.setMuted(true)
-Config.setEnforceAudioTrack(false)

@@ -1,4 +1,4 @@
-% ML4H 2026 Demo Track — spec sheet body.
+% ML4H 2026 Demo Track: spec sheet body.
 %
 % Paste into the ML4H 2026 LaTeX template with \mlhtrack{demo}.
 % Single blind: do NOT anonymise. Max 2 pages excluding references.
@@ -54,7 +54,7 @@ rather than from a feature list.
 
 \textbf{Architecture.} A single-page progressive web application (React 19,
 TypeScript, IndexedDB via Dexie) with an optional self-hosted synchronisation
-server. The initial blocking load is 143\,kB gzipped; the application shell is
+server. The initial blocking load is 154\,kB gzipped; the application shell is
 precached by a service worker and the app is fully functional with the network
 disabled. There is no cloud dependency in the clinical path.
 
@@ -72,8 +72,16 @@ locale-aware rule system rather than a language model. This is a deliberate
 choice: the failure mode of a generative extractor is a plausible wrong number
 in a clinical field, and at this level of care there is no downstream check that
 would catch it. Every extracted value carries a plausibility range; values
-outside it are dropped rather than recorded. Median extraction latency is
-0.26--0.40\,ms.
+outside it are dropped rather than recorded. Median extraction latency is under
+2\,ms, negligible beside the recogniser it consumes.
+
+\textbf{Human review.} Nothing the machine produced enters the record on its
+own. Each extracted value is presented beside the exact phrase it came from and
+confirmed individually; the confirmation is bound to that value, so a value that
+changes afterwards is pending again. Because the confirmation gate sits at the
+draft-to-final transition and a correction is written into a record that is
+already final, a value nobody has confirmed is additionally withheld where the
+record leaves the device and where it enters an aggregate.
 
 \textbf{De-identification.} Exports pass through a two-stage scrub. A
 deterministic stage matches every identifier the device holds for that patient.
@@ -107,12 +115,19 @@ validation, which is what this stage of maturity supports.
 \toprule
 & French & English \\
 \midrule
-Extraction P / R / F1 & 100\% & 100\% \\
-Cases & 12 & 10 \\
-Median latency & 0.26\,ms & 0.40\,ms \\
+Extraction F1, written transcript & 100\% & 100\% \\
+Extraction F1, \emph{from speech} & 67\% & 91\% \\
+\quad before hardening the rules & 36\% & 60\% \\
+Raw word error rate & 60\% & 48\% \\
+\midrule
+Wrong values a flag-first reviewer reaches & 91\% & 100\% \\
+\quad before recalibrating the threshold & 18\% & 20\% \\
 \bottomrule
 \end{tabular}
-\caption{Clinical extraction, synthetic corpus.}
+\caption{Extraction on 22 synthetic cases, then the same cases spoken by a
+text-to-speech voice and transcribed by the on-device model. Synthetic speech is
+a controlled condition, not a bound in either direction: it removes noise and
+accent and adds a domain mismatch of its own.}
 \end{table}
 
 \begin{table}[h]
@@ -131,8 +146,10 @@ Clinical retained, real English (n=1014) & 100\% & 99.3\% \\
 matching; it is the number the 70\,MB model has to move.}
 \end{table}
 
-The system carries 555 automated tests, a twelve-step offline walk that drives
-the production build through a real browser with the network disabled, and
+The system carries 632 automated tests, a twelve-step offline walk that drives
+the production build through a real browser with the network disabled (fourteen
+steps with the models installed, which transcribes in both languages before and
+after a disconnected reload and asserts the transcripts are identical), and
 schema-migration tests that open a database with a year of records in it. The
 evaluation harness runs in continuous integration and fails the build when an
 identifier the roster holds survives a scrub, or when clinical content is
@@ -146,12 +163,28 @@ Wolof, Hausa and Malagasy.
 
 \section{Discussion}
 
-\textbf{The evaluation harness found what review did not.} It caught that
-\texttt{centim\`etres} begins with \texttt{cent}, a French number word, so
-\emph{``taille quatre-vingt-quinze centim\`etres''} parsed as $95 \times 100$,
-failed the plausibility check, and silently dropped every height dictated in
-French. A missing field is a far quieter bug than a wrong one, and no amount of
-code review had surfaced it.
+\textbf{Measuring the pipeline, rather than its parts, is what found the
+defects.} An extractor at 100\% and a recogniser with a published word error rate
+said nothing about fields from speech until the two were scored together. Doing
+so cost 33 to 40 points of F1 and showed exactly where: the recogniser writes a
+comma where a full stop was spoken, so a diagnosis swallows the prescription
+after it, and it spells drug names as it hears them (\emph{par assez tamol} for
+\emph{parac\'etamol}). Each failure is now handled and pinned by a test on the
+verbatim transcript. The same harness earlier caught that \texttt{centim\`etres}
+begins with \texttt{cent}, a French number word, silently dropping every height
+dictated in French.
+
+\textbf{A guard at one transition does not cover the others, and a threshold
+nobody chose is not a control.} Requiring confirmation before a draft becomes
+final read like a complete rule and was not: a correction is written into a
+record that is already final, so an unconfirmed diagnosis reached a research
+export and a district malaria count. Separately, the interface flags values it is
+unsure of, and the flag was \texttt{confidence < 0.8} while the extractor assigns
+every diagnosis and chief complaint a confidence of exactly 0.8. The two fields a
+recogniser mangles most could not be flagged at all, and they were the majority
+of every wrong value; a reviewer reading only flagged rows would have reached one
+error in five. Neither defect failed anything. Both were found by measuring a
+control instead of reading it.
 
 \textbf{The neural scrub is weakest where the tool is aimed.} Moving off-roster
 recall from 0\% to 40\% is real and nowhere near solved. All three identifiers it
@@ -190,7 +223,12 @@ covers the device but not the synchronisation server.
 \textbf{In-person demonstration.} The app installs from a URL on any modern
 phone and runs entirely offline with a synthetic demo workspace, so the full
 system --- including on-device dictation --- can be demonstrated on attendees'
-own devices with no network and no real patient data.
+own devices with no network and no real patient data. The application also ships
+the evaluation as a screen: an attendee picks a synthetic case, runs the speech
+model on the device, and reads the transcript, the fields it produced, which of
+them match the annotated reference, which the interface had flagged, and how
+correcting the transcript changes the score, with a session record they can
+download.
 
 % ---------------------------------------------------------------------------
 % References do not count against the 2-page limit.

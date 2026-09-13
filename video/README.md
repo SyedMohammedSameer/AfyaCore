@@ -33,9 +33,15 @@ npm run build && npm run preview     # the app the video photographs
 # here
 npm install
 npm run capture                      # collect real frames into public/
-npm run render                       # -> out/afyacore-demo.mp4
+npm run render                       # -> out/afyacore-demo.mp4 (2x, silent, for the README)
+node narrate.mjs                     # scratch voice-over from ../docs/ml4h/voiceover.md
+SPEED=1 NARRATION=1 node render.mjs out/afyacore-ml4h.mp4   # 110 s, narrated, for ML4H
 npm run studio                       # interactive editor
 ```
+
+`SPEED` and `NARRATION` reach the composition as input props (`Root.tsx`); the
+authoring default stays `SPEED` in `src/theme.ts`. `narrate.mjs --voice file`
+swaps in a real recording; the synthetic one is for checking timing only.
 
 `capture` finds a browser through `scripts/find-chrome.mjs`, the same list the
 screenshot and smoke scripts use — Chrome, Chromium, Brave or Edge. Override it

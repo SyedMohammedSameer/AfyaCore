@@ -113,7 +113,23 @@ const MODELS = {
  * runtime here is vendored: an unreachable CDN, and a service worker that
  * cannot cache an opaque cross-origin response.
  */
-const ORT_FILES = ['ort-wasm-simd-threaded.wasm', 'ort-wasm-simd-threaded.mjs']
+/*
+ * Both cores, because the runtime picks by filename and the two builds of
+ * transformers.js in play here pick differently. The ORT bundle that
+ * @huggingface/transformers 4.x imports in the browser resolves
+ * `<wasmPaths>ort-wasm-simd-threaded.asyncify.mjs`; with only the plain
+ * core on the server, every on-device model reported "no available backend
+ * found" at first inference, which the availability probes could not see
+ * because they check for the model's config.json, not for a working
+ * runtime. The plain core stays for the Safari path transformers.js keeps.
+ * 37 MB on the server in total, fetched once by a phone and never precached.
+ */
+const ORT_FILES = [
+  'ort-wasm-simd-threaded.wasm',
+  'ort-wasm-simd-threaded.mjs',
+  'ort-wasm-simd-threaded.asyncify.wasm',
+  'ort-wasm-simd-threaded.asyncify.mjs',
+]
 
 const size = (process.argv[2] ?? 'base').toLowerCase()
 const model = MODELS[size]

@@ -769,6 +769,13 @@ export async function loadBackend(options: LoadBackendOptions = {}): Promise<Ner
     // there, which surfaces as a silent fall back to the deterministic scrub.
     const pipe = await pipeline('token-classification', 'openmed-pii-fr', {
       dtype: 'int8',
+      // Same switch as the speech worker, for the same reason: the ONNX
+      // Runtime build this transformers.js pins rewrites quantised MatMul
+      // nodes at session creation and refused the vendored Whisper decoder
+      // outright. This graph is quantised the same way, so it keeps its own
+      // DequantizeLinear nodes rather than waiting to fail the same way on a
+      // phone in the field.
+      session_options: { extra: { session: { disable_quant_qdq: '1' } } },
     })
 
     cached = async (text: string) => {

@@ -1,5 +1,26 @@
 @import 'tailwindcss';
 
+.studio-hero {
+  background: #073e34;
+  color: #fff;
+  border-radius: 1rem;
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  position: relative;
+  overflow: hidden;
+}
+.studio-eyebrow { display: flex; align-items: center; gap: .5rem; font-size: .65rem; letter-spacing: .15em; color: #b1dfca; font-weight: 600; }
+.studio-dark-chip { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid #ffffff30; border-radius: .4rem; padding: .45rem .65rem; color: #e2f3eb; }
+.studio-section-label { font-size: .7rem; font-weight: 600; letter-spacing: .12em; color: #52645e; text-transform: uppercase; }
+.studio-field + .studio-field { border-top: 1px solid var(--color-line); }
+.studio-field summary { list-style: none; }
+.studio-field summary::-webkit-details-marker { display: none; }
+.studio-field summary:hover { background: #f5f9f6; }
+.workspace-columns { display: grid; gap: 1.5rem; align-items: start; }
+@media (min-width: 1280px) { .workspace-columns { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } }
+.workspace-hero { background: #fff; border: 1px solid var(--color-line); border-radius: 1rem; overflow: hidden; }
+.workspace-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #f4f8f5; border-top: 1px solid var(--color-line); }
+.workspace-metrics > div + div { border-left: 1px solid var(--color-line); }
+
 /*
   Load the interface face ourselves.
 

@@ -1,8 +1,11 @@
 import { Link, useNavigate } from 'react-router'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowUpRight, CalendarPlus, ClipboardList, FileEdit, Sparkles, UserPlus } from 'lucide-react'
+import { ArrowUpRight, CalendarPlus, ClipboardList, FileEdit, FlaskConical, Sparkles, TrendingUp, UserPlus } from 'lucide-react'
+import { BarStrip } from '../components/charts'
+import { dailyCounts, indicatorSignals } from '../lib/surveillance'
+import { indicatorLabel } from '../lib/dhis2'
 import { AppShell } from '../components/AppShell'
-import { Avatar, Badge, Button, EmptyState, SectionTitle, SkeletonRows, riseStyle } from '../components/ui'
+import { Avatar, Badge, Button, Card, EmptyState, SectionTitle, SkeletonRows, cx, riseStyle } from '../components/ui'
 import { db } from '../db/db'
 import { seedDemoData } from '../db/seed'
 import { liveEncounters, livePatientCount, searchPatients } from '../db/repo'
@@ -23,6 +26,94 @@ interface Overview {
   monthCount: number
   drafts: (Encounter & { patient?: Patient })[]
   recent: { patient: Patient; lastVisit?: number }[]
+  /** Confirmed consultations per day, last fortnight, oldest first. */
+  fortnight: ReturnType<typeof dailyCounts>
+  /** This week against the four before it, per reporting indicator. */
+  signals: ReturnType<typeof indicatorSignals>
+}
+
+/**
+ * What the facility has seen lately, from the records already on the phone.
+ *
+ * Two weeks of daily bars, then each reporting indicator with this week's
+ * count against the previous four. A marked row is a week that stands out
+ * against its own recent past by the plainest rule in routine surveillance;
+ * the wording underneath says, in as many words, that it is a prompt to look
+ * and not an alert. See src/lib/surveillance.ts for the rule and its limits.
+ */
+function FacilityOverview({ data }: { data: Overview }) {
+  const { t, lang } = useI18n()
+  const total = data.fortnight.reduce((n, d) => n + d.count, 0)
+  if (total === 0) return null
+  const rows = data.signals.filter((s) => s.thisWeek > 0 || s.baseline.some((n) => n > 0))
+  const excess = rows.filter((s) => s.excess)
+
+  return (
+    <section>
+      <SectionTitle>{t.facilityOverview}</SectionTitle>
+      <Card className="flex flex-col gap-4">
+        <div>
+          <div className="mb-2 flex items-baseline justify-between gap-3">
+            <span className="text-[0.6875rem] font-semibold tracking-[0.06em] text-ink-3 uppercase">{t.last14Days}</span>
+            <span className="numeric text-sm font-semibold text-ink">
+              {total} <span className="font-normal text-ink-3">{t.encounters.toLowerCase()}</span>
+            </span>
+          </div>
+          <BarStrip
+            values={data.fortnight.map((d) => d.count)}
+            className="text-brand-600"
+            label={`${t.last14Days}: ${data.fortnight.map((d) => d.count).join(', ')}`}
+          />
+        </div>
+
+        {rows.length > 0 && (
+          <ul className="flex flex-col divide-y divide-line/70">
+            {rows.map((s) => {
+              const scale = Math.max(1, s.thisWeek, ...s.baseline)
+              return (
+                <li key={s.indicator} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-ink">{indicatorLabel(s.indicator, lang)}</span>
+                    {s.excess && (
+                      <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-warn-700">
+                        <TrendingUp size={13} />
+                        {t.aboveBaseline}
+                      </span>
+                    )}
+                  </span>
+                  {/* Four baseline weeks then this week, oldest first, so the
+                      eye reads left to right into the present. */}
+                  <span className="flex h-7 items-end gap-0.5" aria-hidden>
+                    {[...s.baseline].reverse().map((n, i) => (
+                      <span
+                        key={i}
+                        className="w-1.5 rounded-sm bg-ink-4/40"
+                        style={{ height: `${Math.max(8, (n / scale) * 100)}%` }}
+                      />
+                    ))}
+                    <span
+                      className={cx('w-2 rounded-sm', s.excess ? 'bg-warn-500' : 'bg-brand-600')}
+                      style={{ height: `${Math.max(8, (s.thisWeek / scale) * 100)}%` }}
+                    />
+                  </span>
+                  <span
+                    className={cx(
+                      'numeric w-9 text-right text-lg leading-none font-semibold',
+                      s.excess ? 'text-warn-700' : 'text-ink',
+                    )}
+                  >
+                    {s.thisWeek}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        <p className="text-xs leading-relaxed text-ink-4">{excess.length === 0 ? t.noSignal : t.baselineHint}</p>
+      </Card>
+    </section>
+  )
 }
 
 /**
@@ -33,7 +124,7 @@ interface Overview {
  */
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="surface-card rounded-card px-3.5 py-3">
+    <div className="px-4 py-4 sm:px-6">
       <p className="text-[0.6875rem] font-semibold tracking-[0.06em] text-ink-3 uppercase">{label}</p>
       <p className="numeric mt-1.5 text-[1.75rem] leading-none font-semibold tracking-[-0.03em] text-ink">
         {value}
@@ -77,6 +168,8 @@ export function HomeScreen() {
       monthCount: finals.filter((e) => e.occurredAt >= monthStart.getTime()).length,
       drafts,
       recent: patients.map((patient) => ({ patient, lastVisit: lastVisitBy.get(patient.id) })),
+      fortnight: dailyCounts(encounters),
+      signals: indicatorSignals(encounters),
     }
   }, [])
 
@@ -92,32 +185,13 @@ export function HomeScreen() {
       subtitle={dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}
       tabs
     >
-      {/*
-        The primary action leads, then the numbers, then the work.
-
-        This was a brand-gradient panel whose top third carried no information
-        at all: a heading that repeated the button beneath it, on a coloured
-        slab. A clinician opening this screen wants one of two things, and both
-        are now the first thing they can touch.
-      */}
-      <div className="flex flex-col gap-5 pb-4">
-        <div className="flex flex-col gap-3">
-          {/*
-            Stacked on a phone, side by side from `sm` up.
-
-            These were always two-up, and at every real phone width the primary
-            label did not fit: a large button is 40px of padding plus an 18px
-            icon plus its gap, which leaves about 105px for "New consultation"
-            in a 175px half. So it wrapped to two lines, next to a
-            vertically-centred icon and a neighbour that did not wrap, and the
-            row read as broken. It survived review because the breakpoint that
-            rescues it, `sm:flex-none`, starts at 640px — every desktop window
-            and no phone.
-
-            Full width is also the better phone target: these are the two things
-            a clinician opens this screen to do.
-          */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <div className="flex flex-col gap-6 pb-4">
+        <section className="workspace-hero">
+          <div className="p-5 sm:p-7">
+            <p className="studio-section-label">{t.studio.workspace}</p>
+            <h2 className="mt-3 max-w-xl text-2xl font-medium tracking-[-0.035em] sm:text-[2rem]">{t.studio.homeTitle}</h2>
+            <p className="mt-2 text-sm text-ink-3">{t.studio.homeHint}</p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Button
               size="lg"
               icon={<CalendarPlus size={18} />}
@@ -136,21 +210,23 @@ export function HomeScreen() {
               {t.newPatient}
             </Button>
           </div>
-          <div className="grid grid-cols-3 gap-2.5">
+          </div>
+          <div className="workspace-metrics">
             <Metric label={t.consultationsToday} value={data?.todayCount ?? 0} />
             <Metric label={t.thisMonth} value={data?.monthCount ?? 0} />
             <Metric label={t.patients} value={total} />
           </div>
-        </div>
+        </section>
 
         {data === undefined ? (
           <SkeletonRows count={4} />
         ) : (
-          <>
+          <div className="workspace-columns">
+            <div className="flex min-w-0 flex-col gap-6">
             {data.drafts.length > 0 && (
               <section>
                 <SectionTitle>{t.draftsPending}</SectionTitle>
-                <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-2.5">
                   {data.drafts.map((draft, index) => (
                     <Link
                       key={draft.id}
@@ -231,7 +307,17 @@ export function HomeScreen() {
                   </ul>
                 </div>
               )}
-            </section>          </>
+            </section>
+            </div>
+            <div className="flex min-w-0 flex-col gap-6">
+              <FacilityOverview data={data} />
+              <Link to="/studio" className="group flex items-center gap-4 rounded-card border border-brand-200 bg-brand-50 p-5">
+                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-surface text-brand-700"><FlaskConical size={22} /></span>
+                <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-brand-800">{t.studio.title}</p><p className="mt-1 text-xs leading-relaxed text-brand-700">{t.studio.homeLink}</p></div>
+                <ArrowUpRight size={18} className="text-brand-600" />
+              </Link>
+            </div>
+          </div>
         )}
       </div>
     </AppShell>

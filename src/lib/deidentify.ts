@@ -23,6 +23,7 @@ import { patientAge } from '../db/repo'
 import { applyEntities, MODEL_REPO, type NerBackend } from './openmed'
 import { allPhonePatterns } from './countries'
 import { requirePermission } from './identity'
+import { withholdAcross } from './fieldReview'
 
 export type DeidentLevel =
   /** No change. Identifiers included. */
@@ -103,6 +104,16 @@ export interface DeidentResult {
      */
     neuralRedactions?: number
     neuralModel?: string
+    /**
+     * Machine-entered values held back because no clinician had confirmed
+     * them. See `withholdPendingFields` in lib/fieldReview.ts.
+     *
+     * In the manifest for the same reason as `excludedForConsent`: a recipient
+     * counting blanks needs to know the difference between a value that was
+     * never recorded and one that was recorded by a model and not yet read by
+     * a person. Only the second is worth asking the facility about.
+     */
+    withheldPendingReview: number
   }
 }
 
@@ -233,6 +244,17 @@ export async function deidentify(
 ): Promise<DeidentResult> {
   const { level } = options
 
+  /*
+   * Nothing a model asserted and nobody confirmed leaves this function.
+   *
+   * Ahead of the level branch, so it holds for an identified export too: this
+   * is a rule about human confirmation, not about privacy, and an identified
+   * clinical file going to a partner is exactly as wrong to fill with
+   * unconfirmed machine output as a research one.
+   */
+  const withheldPass = withholdAcross(encounters)
+  encounters = withheldPass.encounters
+
   if (level === 'identified') {
     /*
      * An identified export is the single most disclosing thing this app does:
@@ -256,6 +278,7 @@ export async function deidentify(
         fieldsRemoved: [],
         freeTextRedactions: 0,
         excludedForConsent: 0,
+        withheldPendingReview: withheldPass.withheld,
         ...(options.country ? { country: options.country } : {}),
       },
     }
@@ -367,6 +390,9 @@ export async function deidentify(
 
     return {
       ...e,
+      // Review snapshots contain verbatim values and staff ids. The exported
+      // clinical fields below are scrubbed; a second raw copy must not travel.
+      fieldReviews: undefined,
       id: encounterIdMap.get(e.id) ?? e.id,
       // An encounter for an unknown patient keeps a placeholder rather than the
       // real id, so an orphan row can never leak a link back to the roster.
@@ -442,6 +468,7 @@ export async function deidentify(
         'rowTimestamps',
       ],
       freeTextRedactions,
+      withheldPendingReview: withheldPass.withheld,
       ...(options.country ? { country: options.country } : {}),
       ...(neuralRedactions !== undefined
         ? { neuralRedactions, neuralModel: MODEL_REPO }
