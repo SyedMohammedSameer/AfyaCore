@@ -1,4 +1,4 @@
-# ML4H 2026 Demo Track — video script
+# ML4H 2026 Demo Track: video script
 
 **Format:** screen recording of the running app, with voice-over.
 **Length:** target 1:50, hard limit 2:00.
@@ -19,13 +19,13 @@ continuous take beats a polished montage here.
 
 ## Setup before you hit record
 
-1. `npm run vendor:whisper` — **essential.** Without the model, dictation falls
+1. `npm run vendor:whisper`, which is **essential.** Without the model, dictation falls
    back to the browser's cloud speech API. On-device inference is the ML claim
    the video has to show, and the panel says which mode it is in on screen.
 2. `npm run build && npx vite preview --port 4173`.
 3. Phone or a 390x844 browser window. Phone is better: this is a phone app, and
    a reviewer who sees it on a phone believes the deployment story.
-4. Load the demo workspace from Settings. Synthetic data only — the CFD permits
+4. Load the demo workspace from Settings. Synthetic data only; the CFD permits
    this explicitly, and the app has no real patients in it.
 5. Rehearse once without recording. The dictation beat is the only one that can
    surprise you.
@@ -37,16 +37,16 @@ which is about 110 seconds.
 
 ---
 
-**0:00-0:10 — Cold open on the lock screen.**
+**0:00 to 0:10. Cold open on the lock screen.**
 
 > "This is AfyaCore running on a phone, on the actual production build. Every
 > record on this device is encrypted; I'm unlocking it with a PIN."
 
-*Type the PIN. Let the roster load on its own — do not cut the wait.*
+*Type the PIN. Let the roster load on its own. Do not cut the wait.*
 
 ---
 
-**0:10-0:22 — Roster, then open a patient.**
+**0:10 to 0:22. Roster, then open a patient.**
 
 > "A health post's register. Search runs on the device against the encrypted
 > store, so it works with no network at all."
@@ -55,7 +55,7 @@ which is about 110 seconds.
 
 ---
 
-**0:22-0:50 — The ML beat. This is the one the submission lives on.**
+**0:22 to 0:50. The ML beat. This is the one the submission lives on.**
 
 > "New consultation. I'll dictate it the way a clinician would speak it."
 
@@ -66,13 +66,13 @@ which is about 110 seconds.
 
 *Stop. Let the fields populate on camera. Do not cut.*
 
-> "Whisper base is transcribing in a worker on the phone — the patient's voice
+> "Whisper base is transcribing in a worker on the phone, so the patient's voice
 > never reaches a network. The transcript is then parsed into structured
 > fields: temperature, pulse, blood pressure, diagnosis."
 
 ---
 
-**0:50-1:08 — Provenance and the human in the loop.**
+**0:50 to 1:08. Provenance and the human in the loop.**
 
 *Scroll so the provenance markers are visible.*
 
@@ -84,7 +84,7 @@ which is about 110 seconds.
 
 ---
 
-**1:08-1:22 — A second ML-adjacent output, and the offline claim.**
+**1:08 to 1:22. A second ML-adjacent output, and the offline claim.**
 
 *Turn on airplane mode, or DevTools offline. Reload the page.*
 
@@ -95,12 +95,12 @@ which is about 110 seconds.
 
 ---
 
-**1:22-1:40 — Output that can be acted upon.**
+**1:22 to 1:40. Output that can be acted upon.**
 
 *Open the paediatric patient (RASOANAIVO Tiana). Show the growth chart.*
 
 > "For an under-five, recorded weights are scored against the WHO growth
-> standards. This child is minus two point two weight-for-age — and the curve
+> standards. This child is minus two point two weight-for-age, and the curve
 > shows why that matters more than the number: she's been flat for eight
 > months."
 
@@ -110,7 +110,7 @@ which is about 110 seconds.
 
 ---
 
-**1:40-1:50 — Close on the export.**
+**1:40 to 1:50. Close on the export.**
 
 > "Exports are FHIR R4 for clinical exchange and DHIS2 for the national monthly
 > return. De-identification runs before anything leaves the device."

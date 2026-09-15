@@ -20,24 +20,19 @@ network.
 
 ## Abstract
 
-AfyaCore is an offline-first progressive web application that turns spoken
-consultations into structured clinical records at primary-care facilities in
-sub-Saharan Africa. Speech recognition (Whisper base, 72.6M parameters) and
-clinical de-identification (OpenMed PII, 33M parameters) both run on the
-clinician's own phone; no audio and no patient record reaches a network unless
-the facility explicitly configures synchronisation. The clinician dictates a
-consultation, an on-device transcript is parsed into typed clinical fields by a
-deterministic extractor, and every machine-derived value is shown with its
-provenance and must be confirmed by a human before it is committed. Records are
-encrypted at rest under a key wrapped by the clinician's PIN, and export runs a
-two-stage de-identification pass before anything leaves the device. The system
-is a functional end-to-end application -- capture, structuring, human review,
-encrypted storage, patient-facing instructions in ten languages, and FHIR R4 /
-DHIS2 export across nine country profiles -- with an initial load of 143 kB. It
-is validated technically (555 automated tests, a twelve-step offline walk
-through a real browser, de-identification scored against gold annotations in the
-E3C clinical corpus) but has not yet been evaluated with clinicians in a
-facility, and the submission reports what is measured and what is not.
+AfyaCore is an offline-first web application that turns a spoken consultation
+into a structured, encrypted clinical record on the clinician's own phone, for
+primary-care facilities in sub-Saharan Africa. Speech recognition (Whisper
+base) and clinical de-identification (OpenMed PII) run on the device; no audio
+and no record leaves it unless the facility configures synchronisation. A
+deterministic extractor turns the transcript into typed fields, and nothing
+machine-derived enters the record until a clinician confirms it beside its
+source phrase. The system is functional end to end and technically validated,
+including field accuracy measured from speech through the exact model files the
+phone runs (632 automated tests, a fourteen-step offline walk with real
+inference before and after a disconnected reload, de-identification scored
+against gold annotations in the E3C clinical corpus); it has not yet been
+evaluated with clinicians.
 
 ## Video link
 

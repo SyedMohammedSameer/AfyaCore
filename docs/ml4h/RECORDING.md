@@ -35,7 +35,7 @@ both models download normally.
 
 WebM/VP8. The only ffmpeg available here is Playwright's, built
 `--disable-everything` with one video encoder (`libvpx`) and one image input
-path (`image2pipe` + `mjpeg`) — there is no h264 encoder to make an MP4 with.
+path (`image2pipe` + `mjpeg`), so there is no h264 encoder to make an MP4 with.
 Every editor and every upload target transcodes anyway, and adding the
 voice-over will re-export it regardless.
 
