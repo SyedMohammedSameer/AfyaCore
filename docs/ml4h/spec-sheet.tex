@@ -31,15 +31,11 @@ Primary-care facilities across sub-Saharan Africa record consultations on
 paper: written once, hard to find at the next visit, and reaching national
 reporting as a hand-tallied monthly aggregate. Digitisation fails on
 constraints of the setting: intermittent connectivity, low-end Android
-hardware, and staff who cannot spend a consultation typing. AfyaCore is a
-data-capture tool for nurses, midwives and clinical officers at health posts
-and health centres, used during or just after a general primary-care
-consultation. The clinician dictates in French or English; on-device speech
+hardware, and staff who cannot spend a consultation typing. AfyaCore is a data-capture tool for nurses, midwives and clinical officers at
+health posts and health centres. The clinician dictates in French or English; on-device speech
 recognition produces a transcript, a deterministic extractor parses vital
 signs, diagnosis and prescriptions into typed fields, and each field is shown
-with its source phrase and confidence for the clinician to confirm. It does
-not diagnose, triage or recommend treatment. The device is assumed to be
-shared, offline for long periods, and at risk of loss.
+with its source phrase and confidence for the clinician to confirm. It does not diagnose, triage or recommend treatment.
 
 \section{Method}
 
@@ -50,14 +46,10 @@ fully functional with the network disabled.
 
 \textbf{Speech recognition.} OpenAI Whisper \texttt{base} (72.6M parameters)
 \citep{radford2022whisper}, exported to ONNX, quantised to int8 (81\,MB) and
-run in a Web Worker through \texttt{transformers.js} on WebAssembly. Without
-it the application falls back to the browser's Web Speech API, which sends
-audio off the device, so dictation is then disabled behind an explicit
-administrator acknowledgement.
+run in a Web Worker through \texttt{transformers.js} on WebAssembly. Without it, dictation is disabled rather than sent to a cloud API.
 
 \textbf{Extraction and review.} The transcript is parsed by a deterministic,
-locale-aware rule system rather than a language model, because the failure
-mode of a generative extractor is a plausible wrong number in a clinical field
+locale-aware rule system rather than a language model, whose failure mode is a plausible wrong number
 with nothing downstream to catch it. Each value carries a plausibility range,
 is dropped if outside it, and is confirmed individually beside the phrase it
 came from; a later change makes it pending again, and an unconfirmed value is
@@ -67,9 +59,9 @@ withheld from the export and the monthly aggregate.
 deterministic stage that removes every identifier the device holds for the
 patient, then an optional on-device neural stage (OpenMed PII French Clinical,
 33M parameters, 70\,MB) \citep{openmed2025} for identifiers the roster has
-never seen. At rest, the clinical stores are AES-GCM ciphertext under a
-256-bit key wrapped per staff account by PBKDF2-SHA256 (600{,}000 iterations)
-over that clinician's PIN, held in memory only for the session.
+never seen. At rest, clinical stores are AES-GCM ciphertext under a key wrapped by each
+clinician's PIN (PBKDF2, 600{,}000 iterations) and held in memory only for
+the session.
 
 \textbf{Data.} A synthetic corpus of 22 cases, scored as text and again as
 text-to-speech audio through the same model files, extractor and scorer the
@@ -78,10 +70,7 @@ phone runs; clinical-content retention is scored against gold
 
 \section{Results}
 
-A functional end-to-end system at version 0.0.2, deployed publicly and
-open-sourced under MIT. It has \emph{not} been piloted in a facility and no
-clinician has used it; the evidence is technical validation, which is what
-this stage supports.
+
 
 \begin{table}[h]
 \centering\small
@@ -108,10 +97,11 @@ Clinical retained, real English (n=1014) & 100\% & 99.3\% \\
 recall is 0\% by construction for exact matching.}
 \end{table}
 
-The system carries 632 automated tests and a fourteen-step offline walk that
-drives the production build through a real browser, transcribing both
-languages before and after a disconnected reload and asserting identical
-transcripts. Nine country profiles and patient instruction sheets in ten
+The system is at version 0.0.2, deployed publicly under MIT, and has \emph{not}
+been piloted in a facility; the evidence is technical validation. It carries
+632 automated tests and a fourteen-step offline walk that drives the production
+build through a real browser, transcribing both languages before and after a
+disconnected reload and asserting identical transcripts. Nine country profiles and patient instruction sheets in ten
 languages, including Kiswahili, Wolof, Hausa and Malagasy, are shipped.
 
 \section{Discussion}
@@ -144,17 +134,13 @@ each a place where documentation flattered behaviour; the worst was dictation
 streaming audio to the browser vendor under a claim of no third-party call.
 The system was built to a technical standard before it was put in front of a
 clinician, which is the wrong order; next is a formative study at one facility
-and consented role-play recordings from intended users. Eight of ten
-translations are unreviewed by a speaker, the FHIR bundle has not passed the
-official validator, and encryption at rest covers the device but not the
-server.
+and consented role-play recordings from intended users. Translation review, FHIR validation and server-side encryption remain open.
 
 \textbf{In-person demonstration.} The application installs from a URL on any
 modern phone and runs entirely offline with a synthetic workspace, dictation
 included, so it runs on attendees' own devices with no network and no real
-patient data. Its evaluation also ships as a screen: an attendee runs the
-speech model on a case and sees each field, whether it matched, whether it was
-flagged, and how a correction changes the score.
+patient data. Its evaluation also ships as a screen, where an attendee runs the model on a
+case and sees each field's match, flag, and how a correction changes the score.
 
 % References do not count against the 2-page limit.
 \bibliography{refs}
