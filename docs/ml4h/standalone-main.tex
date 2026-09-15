@@ -1,16 +1,14 @@
-% LAST RESORT ONLY. Use the official ML4H 2026 template if it compiles at all.
+% Self-contained ML4H 2026 Demo Track spec sheet.
 %
-% The body below is already pasted in. This is a self-contained document that produces a correctly formatted two-page
-% spec sheet using nothing but packages every TeX installation already has. It
-% exists so that a broken template project cannot cost the submission: paste the
-% body of spec-sheet.tex where marked, compile, submit.
+% Use the official ML4H template if it compiles for you; paste the body of
+% spec-sheet.tex into it. This file exists so a broken template project cannot
+% cost the submission: it depends only on packages every TeX installation has,
+% it opens no external file, and it compiles to TWO PAGES TOTAL, references
+% included.
 %
-% What it does NOT carry is the ML4H class's own styling and the \mlhtrack{demo}
-% marker. Reviewers read the content; a submission that compiles beats a
-% submission that does not.
+% Compile: pdflatex standalone-main.tex  (twice, for the citations)
 
 \documentclass[10pt,letterpaper]{article}
-
 \usepackage[margin=1in]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
@@ -18,12 +16,12 @@
 \usepackage{booktabs}
 \usepackage{natbib}
 \usepackage{microtype}
-
 \setlength{\parindent}{1.5em}
 \setlength{\parskip}{0pt}
+\providecommand{\citep}{\cite}
 
-% ML4H Demo Track, single blind: the submission is NOT anonymised.
-\title{\vspace{-2em}AfyaCore: On-Device Speech-to-Structured Clinical Records
+% ML4H Demo Track is single blind: the submission is NOT anonymised.
+\title{\vspace{-2.5em}AfyaCore: On-Device Speech-to-Structured Clinical Records
 for Health Facilities Without Reliable Connectivity}
 \author{Mohammed Sameer Syed\\ \texttt{sdmohammedsameer@gmail.com}}
 \date{}
@@ -32,77 +30,61 @@ for Health Facilities Without Reliable Connectivity}
 \maketitle
 
 \begin{abstract}
-AfyaCore is an offline-first web application that turns a spoken consultation
-into a structured, encrypted clinical record on the clinician's own phone, for
-primary-care facilities in sub-Saharan Africa. Speech recognition (Whisper
-base) and de-identification (OpenMed PII) run on the device; nothing leaves it
-unless the facility configures synchronisation. A deterministic extractor
-turns the transcript into typed fields, and nothing machine-derived enters the
-record until a clinician confirms it beside its source phrase. The system is
-functional end to end and technically validated, with field accuracy measured
-from speech through the exact model files the phone runs. It has not yet been
-evaluated with clinicians.
+AfyaCore turns a spoken consultation into a structured, encrypted clinical
+record on the clinician's own phone, for primary-care facilities in sub-Saharan
+Africa. Speech recognition (Whisper base) and de-identification (OpenMed PII)
+run on the device; nothing leaves it unless the facility configures
+synchronisation. A deterministic extractor turns the transcript into typed
+fields, and nothing machine-derived enters the record until a clinician
+confirms it beside its source phrase. It is technically validated, with field accuracy measured from speech through
+the model files the phone runs, but has not been evaluated with clinicians.
 \end{abstract}
 
 \section{Introduction}
 
 Primary-care facilities across sub-Saharan Africa record consultations on
-paper: written once, hard to find at the next visit, and reaching national
-reporting as a hand-tallied monthly aggregate. Digitisation fails on
-constraints of the setting: intermittent connectivity, low-end Android
-hardware, and staff who cannot spend a consultation typing. AfyaCore is a data-capture tool for nurses, midwives and clinical officers at
-health posts and health centres. The clinician dictates in French or English; on-device speech
-recognition produces a transcript, a deterministic extractor parses vital
-signs, diagnosis and prescriptions into typed fields, and each field is shown
-with its source phrase and confidence for the clinician to confirm. It does not diagnose, triage or recommend treatment.
+paper, written once and hard to retrieve at the next visit. Digitisation fails
+on constraints of the setting: intermittent connectivity, low-end Android
+hardware, and staff who cannot spend a consultation typing. AfyaCore is a capture tool for nurses, midwives and clinical officers at health
+posts. The clinician dictates in French or English; on-device recognition
+produces a transcript, a deterministic extractor parses vital signs, diagnosis
+and prescriptions into typed fields, each shown with its source phrase to
+confirm. It does not diagnose, triage or recommend treatment.
 
 \section{Method}
 
-\textbf{Architecture.} A single-page progressive web application with an
-optional self-hosted synchronisation server. The initial blocking load is
-154\,kB gzipped, a service worker precaches the shell, and the application is
-fully functional with the network disabled.
+\textbf{Architecture.} A single-page web application, optionally synchronised
+to a self-hosted server. The initial load is 154\,kB gzipped, precached by a
+service worker, and fully functional with the network off.
 
-\textbf{Speech recognition.} OpenAI Whisper \texttt{base} (72.6M parameters)
-\citep{radford2022whisper}, exported to ONNX, quantised to int8 (81\,MB) and
-run in a Web Worker through \texttt{transformers.js} on WebAssembly. Without it, dictation is disabled rather than sent to a cloud API.
+\textbf{Speech recognition.} Whisper \texttt{base} (72.6M parameters)
+\citep{radford2022whisper}, ONNX, int8 (81\,MB), in a Web Worker through
+\texttt{transformers.js} on WebAssembly. Without it, dictation is disabled
+rather than sent to a cloud API.
 
-\textbf{Extraction and review.} The transcript is parsed by a deterministic,
-locale-aware rule system rather than a language model, whose failure mode is a plausible wrong number
+\textbf{Extraction and review.} A deterministic, locale-aware rule system
+rather than a language model, whose failure mode is a plausible wrong number
 with nothing downstream to catch it. Each value carries a plausibility range,
-is dropped if outside it, and is confirmed individually beside the phrase it
-came from; a later change makes it pending again, and an unconfirmed value is
-withheld from the export and the monthly aggregate.
+is dropped if outside it, and is confirmed beside its source phrase; an
+unconfirmed value is withheld from exports and aggregates.
 
-\textbf{De-identification and encryption.} Exports pass through a
-deterministic stage that removes every identifier the device holds for the
-patient, then an optional on-device neural stage (OpenMed PII French Clinical,
-33M parameters, 70\,MB) \citep{openmed2025} for identifiers the roster has
-never seen. At rest, clinical stores are AES-GCM ciphertext under a key wrapped by each
-clinician's PIN (PBKDF2, 600{,}000 iterations) and held in memory only for
-the session.
-
-\textbf{Data.} A synthetic corpus of 22 cases, scored as text and again as
-text-to-speech audio through the same model files, extractor and scorer the
-phone runs; clinical-content retention is scored against gold
-\texttt{CLINENTITY} annotations in the E3C corpus \citep{magnini2021e3c}.
+\textbf{De-identification.} A deterministic stage removes every identifier the
+device holds, then an optional on-device neural stage (OpenMed PII French
+Clinical, 33M) \citep{openmed2025} catches those the roster never held. Records are
+AES-GCM ciphertext at rest under a PIN-wrapped key.
 
 \section{Results}
 
-
-
-\begin{table}[h]
-\centering\small
+\begin{table}[t]
+\centering\footnotesize
 \begin{tabular}{lrr}
 \toprule
 Speech to fields (22 synthetic cases) & French & English \\
 \midrule
 Extraction F1, written transcript & 100\% & 100\% \\
 Extraction F1, \emph{from synthetic speech} & 67\% & 91\% \\
-\quad extractor as first shipped & 36\% & 60\% \\
 Raw word error rate & 60\% & 48\% \\
 Wrong values a flag-first reviewer reaches & 91\% & 100\% \\
-\quad at the previous threshold & 18\% & 20\% \\
 \midrule
 De-identification & determ. & +\,neural \\
 \midrule
@@ -112,77 +94,64 @@ Clinical retained, real French (n=1258) & 100\% & 98.3\% \\
 Clinical retained, real English (n=1014) & 100\% & 99.3\% \\
 \bottomrule
 \end{tabular}
-\caption{Synthetic speech is a controlled condition, not a bound. Off-roster
-recall is 0\% by construction for exact matching.}
+\caption{Cases are scored as text and again as text-to-speech audio through the
+model files the phone runs; retention is scored against gold annotations in the
+E3C corpus \citep{magnini2021e3c}. Synthetic speech is a controlled condition,
+not a bound.}
 \end{table}
 
-The system is at version 0.0.2, deployed publicly under MIT, and has \emph{not}
-been piloted in a facility; the evidence is technical validation. It carries
-632 automated tests and a fourteen-step offline walk that drives the production
-build through a real browser, transcribing both languages before and after a
-disconnected reload and asserting identical transcripts. Nine country profiles and patient instruction sheets in ten
-languages, including Kiswahili, Wolof, Hausa and Malagasy, are shipped.
+Version 0.0.2, deployed publicly under MIT, has \emph{not} been piloted in a
+facility; the evidence is technical validation. It carries 632 automated tests
+and a fourteen-step offline walk through a real browser, transcribing both
+languages before and after a disconnected reload and asserting identical
+transcripts.
 
 \section{Discussion}
 
-\textbf{Measuring the pipeline, not its parts, found the defects.} An
-extractor at 100\% and a recogniser with a published word error rate said
-nothing about fields from speech until the two were scored together. That
-cost 33 to 40 points of F1 and showed where: the recogniser writes a comma
-where a full stop was spoken, so a diagnosis swallows the prescription after
-it, and it spells drugs as it hears them (\emph{par assez tamol} for
-\emph{parac\'etamol}). Each failure is now handled and pinned by a test.
+\textbf{Measuring the pipeline, not its parts, found the defects.} An extractor
+at 100\% and a recogniser with a published word error rate said nothing about
+fields from speech until the two were scored together, which cost 33 to 40
+points of F1. The recogniser writes a comma where a full stop was spoken, so a
+diagnosis swallows the prescription after it, and spells drugs as it hears them
+(\emph{par assez tamol} for \emph{parac\'etamol}). Each is now pinned by a test.
 
 \textbf{A threshold nobody chose is not a control.} The flag for uncertain
-values was \texttt{confidence} $<$ \texttt{0.8}, and the extractor gives every diagnosis
-and chief complaint exactly 0.8, so the two fields a recogniser mangles most
-could never be flagged; a reviewer reading flagged rows first reached one
-error in five. Likewise, a correction lands in a record that is already final,
-so an unconfirmed diagnosis reached a research export and a district malaria
-count. Both were found by measuring a control rather than reading it.
+values was \texttt{confidence} $<$ \texttt{0.8}, and the extractor gives every
+diagnosis and chief complaint exactly 0.8, so the two fields a recogniser
+mangles most could never be flagged; a reviewer reading flagged rows first
+reached one error in five. Separately, a correction lands in an already-final
+record, so an unconfirmed diagnosis reached a research export and a district
+malaria count. Neither defect failed a test.
 
-\textbf{The neural scrub is weakest where the tool is aimed, and it eats
-diagnoses.} All three off-roster identifiers it missed were Malagasy: a French
-model with an English WordPiece vocabulary fragments Malagasy proper nouns. On
-real French text it cost 2.4\% of gold clinical entities before a guard was
-added, including \emph{lymphome malin non hodgkinien}, because Hodgkin is a
-surname. Neither finding was reachable on a corpus we wrote ourselves.
+\textbf{The neural scrub is weakest where the tool is aimed.} All three off-roster identifiers it missed were Malagasy: a French model with an
+English WordPiece vocabulary fragments Malagasy proper nouns. On real French
+text it cost 2.4\% of gold clinical entities before a guard, including
+\emph{lymphome malin non hodgkinien}, because Hodgkin is a surname.
 
 \textbf{Hindsight and next.} An external review found five release blockers,
 each a place where documentation flattered behaviour; the worst was dictation
-streaming audio to the browser vendor under a claim of no third-party call.
-The system was built to a technical standard before it was put in front of a
-clinician, which is the wrong order; next is a formative study at one facility
-and consented role-play recordings from intended users. Translation review, FHIR validation and server-side encryption remain open.
+streaming audio to the browser vendor under a claim of no third-party call. The
+system was built to a technical standard before a clinician saw it, which is
+the wrong order; next is a formative study at one facility.
 
-\textbf{In-person demonstration.} The application installs from a URL on any
-modern phone and runs entirely offline with a synthetic workspace, dictation
-included, so it runs on attendees' own devices with no network and no real
-patient data. Its evaluation also ships as a screen, where an attendee runs the model on a
-case and sees each field's match, flag, and how a correction changes the score.
+\textbf{In-person demonstration.} The application installs from a URL and runs
+offline with a synthetic workspace, dictation included, on attendees' own
+devices with no network and no patient data. Its evaluation ships as a screen,
+scoring a case against its reference on the device.
 
-% References do not count against the 2-page limit.
-%
-% Written out inline rather than as \bibliography{refs}, so this document opens
-% no external file and needs no BibTeX pass. A missing refs.bib is a TeX file
-% error, which aborts the run with "Emergency stop" and produces no PDF at all.
+% References do not count against the 2-page limit, and are inline so that this
+% document opens no external file.
+\footnotesize
 \begin{thebibliography}{3}
-
-\bibitem[Radford et~al.(2022)]{radford2022whisper}
-A.~Radford, J.~W. Kim, T.~Xu, G.~Brockman, C.~McLeavey, and I.~Sutskever.
-\newblock Robust speech recognition via large-scale weak supervision.
-\newblock \emph{arXiv:2212.04356}, 2022.
-
-\bibitem[OpenMed(2025)]{openmed2025}
-OpenMed.
-\newblock {OpenMed} {NER}: Open-source clinical named entity recognition.
-\newblock \emph{arXiv:2508.01630}, 2025.
-
-\bibitem[Magnini et~al.(2021)]{magnini2021e3c}
-B.~Magnini, B.~Altuna, A.~Lavelli, M.~Speranza, and R.~Zanoli.
-\newblock The {E3C} project: European clinical case corpus, 2021.
-\newblock doi:10.57771/dey2-g751.
-
+\itemsep0pt \parskip0pt
+\bibitem[Radford et~al.(2022)]{radford2022whisper} A.~Radford, J.~W. Kim,
+T.~Xu, G.~Brockman, C.~McLeavey, and I.~Sutskever. Robust speech recognition
+via large-scale weak supervision. \emph{arXiv:2212.04356}, 2022.
+\bibitem[OpenMed(2025)]{openmed2025} OpenMed. {OpenMed} {NER}: open-source
+clinical named entity recognition. \emph{arXiv:2508.01630}, 2025.
+\bibitem[Magnini et~al.(2021)]{magnini2021e3c} B.~Magnini, B.~Altuna,
+A.~Lavelli, M.~Speranza, and R.~Zanoli. The {E3C} project: European clinical
+case corpus, 2021. doi:10.57771/dey2-g751.
 \end{thebibliography}
 
 \end{document}

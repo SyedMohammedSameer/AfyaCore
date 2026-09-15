@@ -1,77 +1,53 @@
-# ML4H 2026 demonstration submission
+# ML4H 2026 Demo Track submission
 
-> **Two drafts of the spec sheet exist in this folder. Submit the LaTeX one.**
->
-> `spec-sheet.tex` is written for the ML4H template and is the one to submit. It
-> now carries the speech-to-fields results, the flag recalibration and the
-> withholding fix. **It has not been compiled**, because this machine has no
-> LaTeX toolchain: paste it into the template, build it, and check it fits two
-> pages before submitting.
->
-> `spec-sheet.html` and the PDF beside it were written earlier, before the
-> LaTeX draft existed, and are superseded. Keep them only as a content source;
-> do not submit them.
->
-> Likewise there are two video scripts. `VIDEO-SCRIPT.md` goes with
-> `scripts/record-demo.mjs` and the recorded walk-through; `voiceover.md` goes
-> with the Remotion cut in `video/` and `video/narrate.mjs`. Pick one before
-> recording.
+Two artefacts are required: a spec sheet (max 2 pages, excluding references)
+and a demo video (max 2 minutes, with a voice-over).
 
-Call: https://ml4h.ahli.cc/submit/call-for-demonstrations/
-Deadline: **14 September 2026, 23:59 anywhere on Earth.** Decisions 19 October. Event 6 and 7
-December 2026, Sydney; one presenting author must register and attend.
+## Spec sheet: two ways to build it
 
-## What goes in
+**Preferred.** Open the official ML4H 2026 template, set `\mlhtrack{demo}`,
+and paste the body of `spec-sheet.tex` into it. Do not anonymise: the track is
+single blind. Fill in your affiliation in the template's author block; the name
+and email are already written in a comment there.
 
-| Item | Requirement | Where it is | State |
-|---|---|---|---|
-| Spec sheet | 2 pages max excluding references, not anonymised: problem, method, deployment results, lessons learned | `docs/ml4h/spec-sheet.html`, rendered to `AfyaCore-ML4H-2026-spec-sheet.pdf` by `node scripts/spec-pdf.mjs` | 2 pages. Insert the video link; check the affiliation line. |
-| Video | 2 minutes max, **with a voice-over**, hosted on Drive, Dropbox, Vimeo or similar; no link means desk rejection | `video/out/afyacore-ml4h.mp4`, 110 seconds, rendered from the real app at 1x | Scratch narration is synthetic. Record `docs/ml4h/voiceover.md`, then `node video/narrate.mjs --voice recording.m4a` and re-render. |
-| Working system | Demonstrable in person on synthetic or de-identified data | Production build, `npm run build && npm run preview`, with `npm run vendor:whisper` and `npm run vendor:openmed` run first | Demo workspace is synthetic; the bundled sample dictation is a synthetic voice. |
+**If the template will not compile.** Use `standalone-main.tex` as the whole
+document. The body is already in it, it depends only on packages every TeX
+installation carries, and it compiles to two pages in total. It loses the ML4H
+class styling, which reviewers do not score.
 
-## Rendering the submission cut
+## Verified length
 
-```bash
-npm run build && npm run preview          # terminal 1, keep it running
-npm run screenshots                       # README stills, reused by the video
-npm --prefix video run capture            # photographs the app, offline walk included
-node video/narrate.mjs                    # or: node video/narrate.mjs --voice you.m4a
-SPEED=1 NARRATION=1 node video/render.mjs out/afyacore-ml4h.mp4
-```
+Compiled here, not estimated. Against `jmlr.cls`, which the ML4H template
+derives from:
 
-`SPEED=1` is the readable 110-second cut; the README trailer stays at 2x and silent.
+| Build | Pages | Page 3 |
+|---|---|---|
+| ML4H class (jmlr) | body ends on page 2 | three reference entries only |
+| `standalone-main.tex` (article) | 2 total | none |
 
-## What reviewers are asked to score, and where the evidence is
+The call allows two pages **excluding references**, so references sitting on a
+third page is within the rule. If you want no third page at all, use
+`standalone-main.tex`, which fits everything in two.
 
-- **Relevance.** Problem and setting: spec sheet §1, README opening.
-- **Functionality.** End to end: the offline smoke walk (`npm run smoke`, 12 steps in a real
-  browser; `npm run smoke:ml` makes it 14 and runs the speech model twice with the network off,
-  asserting the offline transcript matches the online one), the demo workspace, the evidence
-  workspace at `/studio`, and the sample dictation in the capture panel.
-- **Technical credibility.** Models and pipeline: spec sheet §2 and §3, README "How dictation
-  works", `src/lib/asr.ts`, `src/lib/clinicalExtract.ts`, `src/lib/fieldReview.ts`. The two
-  defects this preparation found, and their regression tests, are the strongest evidence that
-  the claims are checked rather than asserted: `src/lib/withholding.test.ts` and
-  `src/lib/uncertaintyFlag.test.ts`.
-- **Evidence of impact.** Measured, not claimed: `npm run eval` and `npm run eval:asr`, spec sheet
-  §4. There is no field pilot; the sheet says so in the first line of §5 rather than the last.
-- **Submission quality.** The video is frames of the running build and nothing else
-  (`video/capture.mjs`); the narration is timed to its beats.
+Adding roughly 160 words to the body pushes the jmlr build's text onto page 3.
+Recompile if you edit.
 
-## Before pressing submit
+## Why the references are written out inline
 
-- [ ] Record the voice-over. The synthetic track is a placeholder.
-- [ ] Upload the video, paste the link into the spec sheet byline, re-render the PDF.
-- [ ] Confirm the affiliation and contact in the byline.
-- [ ] Re-run `npm test`, `npm run eval`, `npm run eval:asr` and paste any changed number into
-  the spec sheet table; the numbers there are from 12 September 2026.
-- [ ] Rehearse the Studio walk once on the machine you will bring: pick the English audio case,
-  run it, and check the two wrong fields come back flagged. That single screen is the clearest
-  three minutes of the demonstration.
-- [ ] Bring the phone with the models already placed on a local origin: a conference network
-  will not carry 150 MB of model files in the five minutes before a slot.
-- [ ] Open the deployed URL once from a device that has never seen it and press **Run local
-  speech model**. Netlify now builds with `npm run build:deploy`, so the deployment ships the
-  speech pack and a reviewer following the link runs the model rather than reading that they
-  could have. If the hub was unreachable during that build the Studio will say the pack is
-  missing, which is the one failure worth catching before a reviewer does.
+`\bibliography{refs}` needs `refs.bib` to be present. When TeX cannot find a
+file it aborts with "Emergency stop ... file error in nonstop mode" and writes
+no PDF, which is what happened on the first attempt. The three references are
+now inside the document, so it opens no external file and needs no BibTeX pass.
+
+## The rest
+
+- `openreview-fields.md`: title, keywords, TL;DR and abstract for the form.
+  The abstract there is word for word the one in the sheet.
+- `VIDEO-SCRIPT.md`: the shot list and narration, timed to 1:50.
+- `RECORDING.md`: how to record it, including the fake-microphone flag that
+  lets Whisper transcribe a supplied WAV on the device.
+
+## Still open
+
+The submission form has no field for the video link, and a submission without a
+working link is desk-rejected. Confirm with info@ml4h.cc where it goes.
