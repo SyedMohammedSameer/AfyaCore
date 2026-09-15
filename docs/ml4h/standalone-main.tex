@@ -1,20 +1,35 @@
-% ML4H 2026 Demo Track: spec sheet body.
+% LAST RESORT ONLY. Use the official ML4H 2026 template if it compiles at all.
 %
-% Paste into the ML4H 2026 LaTeX template with \mlhtrack{demo}.
-% Single blind: do NOT anonymise. Max 2 pages excluding references.
-% Every number below is reproduced by `npm run eval`, `npm run eval:asr`,
-% `npm run smoke:ml` or `npx vitest run` at the commit this was written from.
+% The body below is already pasted in. This is a self-contained document that produces a correctly formatted two-page
+% spec sheet using nothing but packages every TeX installation already has. It
+% exists so that a broken template project cannot cost the submission: paste the
+% body of spec-sheet.tex where marked, compile, submit.
+%
+% What it does NOT carry is the ML4H class's own styling and the \mlhtrack{demo}
+% marker. Reviewers read the content; a submission that compiles beats a
+% submission that does not.
 
-% If the class does not load natbib, \citep is undefined and every citation
-% errors. \providecommand leaves it alone when natbib is present.
-\providecommand{\citep}{\cite}
+\documentclass[10pt,letterpaper]{article}
 
-\title{AfyaCore: On-Device Speech-to-Structured Clinical Records for
-Health Facilities Without Reliable Connectivity}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage{booktabs}
+\usepackage{natbib}
+\usepackage{microtype}
 
-% Author block: set in the template. Name and email are fixed; the
-% affiliation line is yours to fill.
-% \author{Mohammed Sameer Syed \\ AFFILIATION \\ \texttt{sdmohammedsameer@gmail.com}}
+\setlength{\parindent}{1.5em}
+\setlength{\parskip}{0pt}
+
+% ML4H Demo Track, single blind: the submission is NOT anonymised.
+\title{\vspace{-2em}AfyaCore: On-Device Speech-to-Structured Clinical Records
+for Health Facilities Without Reliable Connectivity}
+\author{Mohammed Sameer Syed\\ \texttt{sdmohammedsameer@gmail.com}}
+\date{}
+
+\begin{document}
+\maketitle
 
 \begin{abstract}
 AfyaCore is an offline-first web application that turns a spoken consultation
@@ -169,3 +184,5 @@ B.~Magnini, B.~Altuna, A.~Lavelli, M.~Speranza, and R.~Zanoli.
 \newblock doi:10.57771/dey2-g751.
 
 \end{thebibliography}
+
+\end{document}
