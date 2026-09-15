@@ -16,13 +16,13 @@ Health Facilities Without Reliable Connectivity}
 AfyaCore is an offline-first web application that turns a spoken consultation
 into a structured, encrypted clinical record on the clinician's own phone, for
 primary-care facilities in sub-Saharan Africa. Speech recognition (Whisper
-base) and clinical de-identification (OpenMed PII) run on the device; no audio
-and no record leaves it unless the facility configures synchronisation. A deterministic extractor turns the transcript into
-typed fields, and nothing machine-derived enters the record until a clinician
-confirms it beside its source phrase. The system is functional end to end and
-technically validated, including field accuracy measured from speech through
-the exact model files the phone runs; it has not yet been evaluated with
-clinicians.
+base) and de-identification (OpenMed PII) run on the device; nothing leaves it
+unless the facility configures synchronisation. A deterministic extractor
+turns the transcript into typed fields, and nothing machine-derived enters the
+record until a clinician confirms it beside its source phrase. The system is
+functional end to end and technically validated, including field accuracy
+measured from speech through the exact model files the phone runs; it has not
+yet been evaluated with clinicians.
 \end{abstract}
 
 \section{Introduction}
@@ -31,65 +31,59 @@ Primary-care facilities across sub-Saharan Africa record consultations on
 paper: written once, hard to find at the next visit, and reaching national
 reporting as a hand-tallied monthly aggregate. Digitisation fails on
 constraints of the setting: intermittent connectivity, low-end Android
-hardware, and staff who cannot spend a consultation typing.
-
-\textbf{Intended use and users.} A data-capture tool for nurses, midwives and
-clinical officers at health posts and health centres, used during or just after
-a general primary-care consultation. It records what the clinician says. It
-does not diagnose, triage or recommend treatment; vital-sign colouring is a
-fixed published threshold table, not a model output. The clinician dictates in
-French or English. On-device speech recognition produces a transcript, a
-deterministic extractor parses vital signs, diagnosis and prescriptions into
-typed fields, and each field is shown with its source phrase and confidence for
-the clinician to confirm. The device is assumed to be shared, offline for long
-periods, and at risk of loss.
+hardware, and staff who cannot spend a consultation typing. AfyaCore is a
+data-capture tool for nurses, midwives and clinical officers at health posts
+and health centres, used during or just after a general primary-care
+consultation. The clinician dictates in French or English; on-device speech
+recognition produces a transcript, a deterministic extractor parses vital
+signs, diagnosis and prescriptions into typed fields, and each field is shown
+with its source phrase and confidence for the clinician to confirm. It does
+not diagnose, triage or recommend treatment; vital-sign colouring is a fixed
+published threshold table, not a model output. The device is assumed to be
+shared, offline for long periods, and at risk of loss.
 
 \section{Method}
 
 \textbf{Architecture.} A single-page progressive web application with an
-optional self-hosted synchronisation server.
-The initial blocking load is 154\,kB gzipped, a service worker precaches the
-shell, and the application is fully functional with the network disabled.
+optional self-hosted synchronisation server. The initial blocking load is
+154\,kB gzipped, a service worker precaches the shell, and the application is
+fully functional with the network disabled.
 
 \textbf{Speech recognition.} OpenAI Whisper \texttt{base} (72.6M parameters)
-\citep{radford2022whisper}, exported to ONNX, quantised
-to int8 (81\,MB) and run in a Web Worker through \texttt{transformers.js} on
-WebAssembly. Without it the application falls back to the browser's Web Speech
-API, which sends audio to the browser vendor, and dictation is then disabled
-behind an explicit administrator acknowledgement rather than silently degraded.
+\citep{radford2022whisper}, exported to ONNX, quantised to int8 (81\,MB) and
+run in a Web Worker through \texttt{transformers.js} on WebAssembly. Without
+it the application falls back to the browser's Web Speech API, which sends
+audio off the device, so dictation is then disabled behind an explicit
+administrator acknowledgement.
 
 \textbf{Extraction and review.} The transcript is parsed by a deterministic,
-locale-aware rule system rather than a language model, because the failure mode
-of a generative extractor is a plausible wrong number in a clinical field with
-nothing downstream to catch it. Each value carries a plausibility range and is
-dropped if outside it, then is presented
-beside the phrase it came from and confirmed individually, the confirmation
-bound to the value so a change makes it pending again. Because a correction
-lands in a record that is already final, an unconfirmed value is also withheld
-where a record leaves the device: the export and the monthly aggregate.
+locale-aware rule system rather than a language model, because the failure
+mode of a generative extractor is a plausible wrong number in a clinical field
+with nothing downstream to catch it. Each value carries a plausibility range,
+is dropped if outside it, and is confirmed individually beside the phrase it
+came from; a later change makes it pending again. Because a correction lands
+in a record that is already final, an unconfirmed value is also withheld from
+the export and the monthly aggregate.
 
 \textbf{De-identification and encryption.} Exports pass through a
 deterministic stage that removes every identifier the device holds for the
 patient, then an optional on-device neural stage (OpenMed PII French Clinical,
-33M parameters, Apache-2.0, 70\,MB) \citep{openmed2025} for identifiers the
-roster has never seen. At rest, the
-clinical stores are AES-GCM ciphertext under a 256-bit key wrapped per staff
-account by PBKDF2-SHA256 (600{,}000 iterations) over that clinician's PIN and
-held in memory only for the session.
+33M parameters, 70\,MB) \citep{openmed2025} for identifiers the roster has
+never seen. At rest, the clinical stores are AES-GCM ciphertext under a
+256-bit key wrapped per staff account by PBKDF2-SHA256 (600{,}000 iterations)
+over that clinician's PIN, held in memory only for the session.
 
-\textbf{Data.} The extractor and scrubber are developed against a synthetic
-corpus of 22 cases. Speech performance is measured by speaking those cases with
-a text-to-speech voice and pushing the audio through the same model files,
-extractor and scorer the phone runs. Clinical-content retention is scored
-against gold \texttt{CLINENTITY} annotations in the E3C corpus
-\citep{magnini2021e3c}, independently annotated clinical narrative.
+\textbf{Data.} A synthetic corpus of 22 cases, scored as text and again as
+text-to-speech audio pushed through the same model files, extractor and scorer
+the phone runs. Clinical-content retention is scored against gold
+\texttt{CLINENTITY} annotations in the E3C corpus \citep{magnini2021e3c}.
 
 \section{Results}
 
-\textbf{State of the tool.} A functional end-to-end system at version 0.0.2,
-deployed publicly and open-sourced under MIT. It has \emph{not} been piloted in
-a facility and no clinician has used it in practice; the evidence below is
-technical validation, which is what this stage supports.
+A functional end-to-end system at version 0.0.2, deployed publicly and
+open-sourced under MIT. It has \emph{not} been piloted in a facility and no
+clinician has used it in practice; the evidence below is technical
+validation, which is what this stage supports.
 
 \begin{table}[h]
 \centering\small
@@ -118,60 +112,53 @@ recall is 0\% by construction for exact matching.}
 
 The system carries 632 automated tests and a fourteen-step offline walk that
 drives the production build through a real browser: it transcribes both
-languages, disconnects, reloads, recreates the speech worker, transcribes again
-and asserts identical transcripts.
-% CUT-FIRST if the PDF spills onto page 3: this sentence (3 lines).
-Nine country profiles carry the governing data-protection statute, regulator,
-phone formats and reporting system, and patient instruction sheets print in ten
-languages including Kiswahili, Wolof, Hausa and Malagasy.
+languages, disconnects, reloads, recreates the speech worker, transcribes
+again and asserts identical transcripts. Nine country profiles and patient
+instruction sheets in ten languages, including Kiswahili, Wolof, Hausa and
+Malagasy, are shipped.
 
 \section{Discussion}
 
 \textbf{Measuring the pipeline, not its parts, found the defects.} An
 extractor at 100\% and a recogniser with a published word error rate said
-nothing about fields from speech until the two were scored together. That cost
-33 to 40 points of F1 and showed where: the recogniser writes a comma where a
-full stop was spoken, so a diagnosis swallows the prescription after it, and it
-spells drugs as it hears them (\emph{par assez tamol} for \emph{parac\'etamol}).
-Each failure is now handled and pinned by a test on the verbatim transcript.
+nothing about fields from speech until the two were scored together. That
+cost 33 to 40 points of F1 and showed where: the recogniser writes a comma
+where a full stop was spoken, so a diagnosis swallows the prescription after
+it, and it spells drugs as it hears them (\emph{par assez tamol} for
+\emph{parac\'etamol}). Each failure is now handled and pinned by a test.
 
 \textbf{A threshold nobody chose is not a control.} The flag for uncertain
 values was \texttt{confidence < 0.8}, and the extractor gives every diagnosis
 and chief complaint exactly 0.8, so the two fields a recogniser mangles most
-could never be flagged, and they were most of every wrong value; a reviewer
-reading flagged rows first reached one error in five. Likewise, confirmation
-before a draft becomes final read like a complete rule and was not, since a
-correction lands in a final record: an unconfirmed diagnosis reached a research
-export and a district malaria count. Both were found by measuring a
-control rather than reading it.
+could never be flagged; a reviewer reading flagged rows first reached one
+error in five. Likewise, confirmation before a draft becomes final was not a
+complete rule, since a correction lands in a final record: an unconfirmed
+diagnosis reached a research export and a district malaria count. Both were
+found by measuring a control rather than reading it.
 
-\textbf{The neural scrub is weakest where the tool is aimed, and it will eat a
-diagnosis.} All three off-roster identifiers it missed were Malagasy: a French
+\textbf{The neural scrub is weakest where the tool is aimed, and it eats
+diagnoses.} All three off-roster identifiers it missed were Malagasy: a French
 model with an English WordPiece vocabulary fragments Malagasy proper nouns. On
 real French text it cost 2.4\% of gold clinical entities before a guard was
-added, the worst losses being \emph{lymphome malin non hodgkinien} and
-\emph{hernie de Spiegel}, because Hodgkin and Spiegel are surnames. Neither
-finding was reachable on a corpus we wrote ourselves.
+added, including \emph{lymphome malin non hodgkinien}, because Hodgkin is a
+surname. Neither finding was reachable on a corpus we wrote ourselves.
 
 \textbf{Hindsight and next.} An external review found five release blockers,
 each a place where documentation flattered behaviour; the worst was dictation
 streaming audio to the browser vendor under a claim of no third-party call.
-The larger lesson is that the system was built to a technical standard before
-it was put in front of a clinician, which is the wrong order.
-Next is a formative study at one facility comparing manual and assisted
-capture, and consented role-play recordings from intended users in place of
-synthetic speech. Eight of ten translations are unreviewed by a speaker, the
-FHIR bundle has not passed the official validator, and encryption at rest
-covers the device but not the synchronisation server.
+The system was built to a technical standard before it was put in front of a
+clinician, which is the wrong order. Next is a formative study at one facility
+and consented role-play recordings from intended users in place of synthetic
+speech. Eight of ten translations are unreviewed by a speaker, the FHIR bundle
+has not passed the official validator, and encryption at rest covers the
+device but not the server.
 
 \textbf{In-person demonstration.} The application installs from a URL on any
-modern phone and runs entirely offline with a synthetic workspace, so it runs on attendees'
-own devices with no network and no real
-patient data.
-% CUT-SECOND if still spilling: this sentence (3 lines).
-It also ships its evaluation as a screen: an attendee runs the speech model on
-a synthetic case and sees the transcript, the fields, which match the
-reference, which were flagged, and how a correction changes the score.
+modern phone and runs entirely offline with a synthetic workspace, dictation
+included, so it runs on attendees' own devices with no network and no real
+patient data. Its evaluation also ships as a screen: an attendee runs the
+speech model on a case and sees each field, whether it matched, whether it was
+flagged, and how a correction changes the score.
 
 % References do not count against the 2-page limit.
 \bibliography{refs}
