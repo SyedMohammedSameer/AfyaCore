@@ -20,9 +20,9 @@ base) and de-identification (OpenMed PII) run on the device; nothing leaves it
 unless the facility configures synchronisation. A deterministic extractor
 turns the transcript into typed fields, and nothing machine-derived enters the
 record until a clinician confirms it beside its source phrase. The system is
-functional end to end and technically validated, including field accuracy
-measured from speech through the exact model files the phone runs; it has not
-yet been evaluated with clinicians.
+functional end to end and technically validated, with field accuracy measured
+from speech through the exact model files the phone runs. It has not yet been
+evaluated with clinicians.
 \end{abstract}
 
 \section{Introduction}
@@ -38,8 +38,7 @@ consultation. The clinician dictates in French or English; on-device speech
 recognition produces a transcript, a deterministic extractor parses vital
 signs, diagnosis and prescriptions into typed fields, and each field is shown
 with its source phrase and confidence for the clinician to confirm. It does
-not diagnose, triage or recommend treatment; vital-sign colouring is a fixed
-published threshold table, not a model output. The device is assumed to be
+not diagnose, triage or recommend treatment. The device is assumed to be
 shared, offline for long periods, and at risk of loss.
 
 \section{Method}
@@ -61,9 +60,8 @@ locale-aware rule system rather than a language model, because the failure
 mode of a generative extractor is a plausible wrong number in a clinical field
 with nothing downstream to catch it. Each value carries a plausibility range,
 is dropped if outside it, and is confirmed individually beside the phrase it
-came from; a later change makes it pending again. Because a correction lands
-in a record that is already final, an unconfirmed value is also withheld from
-the export and the monthly aggregate.
+came from; a later change makes it pending again, and an unconfirmed value is
+withheld from the export and the monthly aggregate.
 
 \textbf{De-identification and encryption.} Exports pass through a
 deterministic stage that removes every identifier the device holds for the
@@ -74,16 +72,16 @@ never seen. At rest, the clinical stores are AES-GCM ciphertext under a
 over that clinician's PIN, held in memory only for the session.
 
 \textbf{Data.} A synthetic corpus of 22 cases, scored as text and again as
-text-to-speech audio pushed through the same model files, extractor and scorer
-the phone runs. Clinical-content retention is scored against gold
+text-to-speech audio through the same model files, extractor and scorer the
+phone runs; clinical-content retention is scored against gold
 \texttt{CLINENTITY} annotations in the E3C corpus \citep{magnini2021e3c}.
 
 \section{Results}
 
 A functional end-to-end system at version 0.0.2, deployed publicly and
 open-sourced under MIT. It has \emph{not} been piloted in a facility and no
-clinician has used it in practice; the evidence below is technical
-validation, which is what this stage supports.
+clinician has used it; the evidence is technical validation, which is what
+this stage supports.
 
 \begin{table}[h]
 \centering\small
@@ -111,11 +109,10 @@ recall is 0\% by construction for exact matching.}
 \end{table}
 
 The system carries 632 automated tests and a fourteen-step offline walk that
-drives the production build through a real browser: it transcribes both
-languages, disconnects, reloads, recreates the speech worker, transcribes
-again and asserts identical transcripts. Nine country profiles and patient
-instruction sheets in ten languages, including Kiswahili, Wolof, Hausa and
-Malagasy, are shipped.
+drives the production build through a real browser, transcribing both
+languages before and after a disconnected reload and asserting identical
+transcripts. Nine country profiles and patient instruction sheets in ten
+languages, including Kiswahili, Wolof, Hausa and Malagasy, are shipped.
 
 \section{Discussion}
 
@@ -131,10 +128,9 @@ it, and it spells drugs as it hears them (\emph{par assez tamol} for
 values was \texttt{confidence < 0.8}, and the extractor gives every diagnosis
 and chief complaint exactly 0.8, so the two fields a recogniser mangles most
 could never be flagged; a reviewer reading flagged rows first reached one
-error in five. Likewise, confirmation before a draft becomes final was not a
-complete rule, since a correction lands in a final record: an unconfirmed
-diagnosis reached a research export and a district malaria count. Both were
-found by measuring a control rather than reading it.
+error in five. Likewise, a correction lands in a record that is already final,
+so an unconfirmed diagnosis reached a research export and a district malaria
+count. Both were found by measuring a control rather than reading it.
 
 \textbf{The neural scrub is weakest where the tool is aimed, and it eats
 diagnoses.} All three off-roster identifiers it missed were Malagasy: a French
@@ -147,11 +143,11 @@ surname. Neither finding was reachable on a corpus we wrote ourselves.
 each a place where documentation flattered behaviour; the worst was dictation
 streaming audio to the browser vendor under a claim of no third-party call.
 The system was built to a technical standard before it was put in front of a
-clinician, which is the wrong order. Next is a formative study at one facility
-and consented role-play recordings from intended users in place of synthetic
-speech. Eight of ten translations are unreviewed by a speaker, the FHIR bundle
-has not passed the official validator, and encryption at rest covers the
-device but not the server.
+clinician, which is the wrong order; next is a formative study at one facility
+and consented role-play recordings from intended users. Eight of ten
+translations are unreviewed by a speaker, the FHIR bundle has not passed the
+official validator, and encryption at rest covers the device but not the
+server.
 
 \textbf{In-person demonstration.} The application installs from a URL on any
 modern phone and runs entirely offline with a synthetic workspace, dictation
