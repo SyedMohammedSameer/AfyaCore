@@ -46,6 +46,8 @@ now inside the document, so it opens no external file and needs no BibTeX pass.
 - `VIDEO-SCRIPT.md`: the shot list and narration, timed to 1:50.
 - `RECORDING.md`: how to record it, including the fake-microphone flag that
   lets Whisper transcribe a supplied WAV on the device.
+- `PHONE-BENCHMARK.md`: measuring the speech model on a phone (load time,
+  real-time factor, memory) with `/bench.html`, for reviewer sMLC.
 
 ## Still open
 

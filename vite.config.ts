@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { extname, join } from 'node:path'
+import { extname, join, resolve } from 'node:path'
 import { defineConfig, type PluginOption } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -94,6 +94,30 @@ function serveVendoredRuntime(): PluginOption {
   }
 }
 
+/**
+ * Keep the app's service worker off the phone benchmark page.
+ *
+ * vite-plugin-pwa adds its registration script to every HTML entry. On
+ * bench.html that would install the app and precache its shell in the middle
+ * of a timed run, and then take control of the page partway through it. The
+ * benchmark measures the model, so the page stays uncontrolled.
+ */
+function benchWithoutServiceWorker(): PluginOption {
+  return {
+    name: 'afyacore:bench-without-service-worker',
+    // The PWA plugin is itself `enforce: 'post'`; this is listed after it in
+    // that group, so it sees the script after it has been added.
+    enforce: 'post',
+    transformIndexHtml: {
+      order: 'post',
+      handler: (html, { path }) =>
+        path.endsWith('/bench.html')
+          ? html.replace(/<script id="vite-plugin-pwa:register-sw"[^>]*><\/script>/, '')
+          : html,
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
     excludeOnnxWasm(),
@@ -131,9 +155,13 @@ export default defineConfig({
         // is bundled as its own graph), so it is excluded for the same reason
         // and cached on first use by the rule below. 545 kB was being
         // precached on every install for a feature most installs never load.
-        globIgnores: ['**/models/**', '**/ocr/**', '**/transformers*', '**/ort-*', '**/asr.worker*'],
+        // The phone benchmark (bench.html) is a measuring instrument, not part
+        // of the app: no install should carry it, and its worker holds another
+        // copy of transformers.js.
+        globIgnores: ['**/models/**', '**/ocr/**', '**/transformers*', '**/ort-*', '**/asr.worker*', '**/bench*'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/ocr\//, /^\/models\//],
+        // /bench too, or the service worker answers it with the app shell.
+        navigateFallbackDenylist: [/^\/ocr\//, /^\/models\//, /^\/bench/],
         cleanupOutdatedCaches: true,
         // Raise the per-file precache ceiling for the app's own chunks only.
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
@@ -210,9 +238,18 @@ export default defineConfig({
         ],
       },
     }),
+    benchWithoutServiceWorker(),
   ],
   build: {
     target: 'es2022',
+    rolldownOptions: {
+      // bench.html: load time, real-time factor and memory of the speech
+      // model on a real phone. See docs/ml4h/PHONE-BENCHMARK.md.
+      input: {
+        index: resolve(import.meta.dirname, 'index.html'),
+        bench: resolve(import.meta.dirname, 'bench.html'),
+      },
+    },
     // Surface bundle regressions loudly: the whole premise is a tiny shell.
     chunkSizeWarningLimit: 350,
   },

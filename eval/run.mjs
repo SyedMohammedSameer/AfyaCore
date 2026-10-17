@@ -333,6 +333,9 @@ async function measureBundle() {
       onDemandRaw += size
       continue
     }
+    // The phone benchmark page, also in globIgnores: never installed, and
+    // never fetched by the app at all, so it is in no bucket.
+    if (/^bench[.-]/.test(file)) continue
     if (/\.woff2?$/.test(file)) {
       fontRaw += size
       continue
@@ -342,8 +345,10 @@ async function measureBundle() {
     const gzipped = gzipSync(await readFile(path)).length
     precachedGzip += gzipped
     // The entry chunk and its stylesheet are what a cold visit waits on; every
-    // other chunk is a route that loads when someone navigates to it.
-    if (/^index-/.test(file)) initialGzip += gzipped
+    // other chunk is a route that loads when someone navigates to it. So is
+    // Vite's modulepreload polyfill, which leaves the entry chunk for one of
+    // its own once a second page (bench.html) shares it.
+    if (/^(index|modulepreload-polyfill)-/.test(file)) initialGzip += gzipped
   }
 
   return {

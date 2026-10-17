@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Speech Benchmark</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f7f5f0;
+        --surface: #ffffff;
+        --text: #1d2420;
+        --muted: #5b655f;
+        --line: #dcd8cf;
+        --accent: #0a6b52;
+        --accent-text: #ffffff;
+        --warn-bg: #fff4d6;
+        --warn-text: #6b4a00;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121614;
+          --surface: #1b211e;
+          --text: #e6ebe8;
+          --muted: #9aa59f;
+          --line: #2e3632;
+          --accent: #3fbf96;
+          --accent-text: #08130f;
+          --warn-bg: #3a2e10;
+          --warn-text: #f3d68a;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      main { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
+      h1 { font-size: 1.35rem; margin: 0 0 4px; }
+      h2 { font-size: 1rem; margin: 24px 0 8px; }
+      p { margin: 0 0 12px; }
+      .lede { color: var(--muted); }
+      section {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-top: 16px;
+      }
+      section > h2:first-child { margin-top: 0; }
+      table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+      th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      thead th { color: var(--muted); font-weight: 600; font-size: 0.85rem; }
+      .facts th { color: var(--muted); font-weight: 500; width: 42%; }
+      .data th, .data td { white-space: nowrap; padding: 4px 5px; font-size: 0.85rem; }
+      tr:last-child > * { border-bottom: 0; }
+      .scroll { overflow-x: auto; }
+      label { display: block; }
+      .row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+      .row label { flex: 1 1 140px; }
+      input[type='number'] {
+        display: block;
+        width: 100%;
+        margin-top: 4px;
+        padding: 8px;
+        font: inherit;
+        color: inherit;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+      .check { padding: 4px 0; }
+      .hint { color: var(--muted); font-size: 0.85rem; }
+      button {
+        font: inherit;
+        font-weight: 600;
+        padding: 12px 18px;
+        border-radius: 8px;
+        border: 1px solid var(--accent);
+        background: var(--surface);
+        color: var(--accent);
+      }
+      button.primary { width: 100%; background: var(--accent); color: var(--accent-text); margin-top: 16px; }
+      button:disabled { opacity: 0.55; }
+      #status { margin-top: 12px; min-height: 1.5em; font-variant-numeric: tabular-nums; }
+      .warning { background: var(--warn-bg); color: var(--warn-text); padding: 8px 10px; border-radius: 6px; }
+      .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+      .actions button { flex: 1 1 140px; }
+      textarea {
+        width: 100%;
+        height: 160px;
+        margin-top: 10px;
+        font: 12px/1.4 ui-monospace, Menlo, monospace;
+        color: inherit;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+      details { margin-top: 16px; }
+      summary { cursor: pointer; font-weight: 600; }
+      details p { margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>On-device speech benchmark</h1>
+      <p class="lede">
+        Times the AfyaCore speech model (Whisper base, int8, single-threaded WebAssembly) on this
+        device: how long it takes to load, how fast it transcribes, and how much memory it uses.
+        Nothing is recorded from the microphone; it runs on bundled sample audio.
+      </p>
+
+      <section>
+        <h2>This device</h2>
+        <div id="device" class="scroll"></div>
+      </section>
+
+      <section id="settings">
+        <h2>Run</h2>
+        <div class="row">
+          <label>Model loads <input id="loads" type="number" min="1" max="20" value="3" inputmode="numeric" /></label>
+          <label>Passes per clip <input id="passes" type="number" min="1" max="20" value="3" inputmode="numeric" /></label>
+        </div>
+        <div id="clips"></div>
+        <p class="hint">
+          Plug the phone in, close other apps, and keep this tab in front with the screen on. The first
+          run downloads about 80 MB. On a low-end phone a full run can take ten minutes.
+        </p>
+      </section>
+
+      <button id="run" class="primary">Run benchmark</button>
+      <p id="status" role="status" aria-live="polite"></p>
+
+      <div id="results" class="scroll"></div>
+
+      <section id="export" hidden>
+        <h2>Results file</h2>
+        <div class="actions">
+          <button id="copy">Copy JSON</button>
+          <button id="download">Download JSON</button>
+        </div>
+        <textarea id="json" readonly aria-label="Results as JSON"></textarea>
+      </section>
+    </main>
+    <script type="module" src="/src/bench/main.ts"></script>
+  </body>
+</html>
